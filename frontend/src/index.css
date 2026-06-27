@@ -4,6 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* ── Fresh Studio CSS Variables ─────────────────────────────────────────────── */
 :root {
     --bg-primary:   #F2F6F4;

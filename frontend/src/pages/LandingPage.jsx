@@ -34,7 +34,7 @@ export default function LandingPage() {
 function DarkHero() {
   const { user } = useAuth();
   return (
-    <div className="relative min-h-screen min-h-[100dvh] overflow-hidden flex flex-col" data-testid="hero"
+    <div className="relative sm:min-h-screen sm:min-h-[100dvh] overflow-x-hidden flex flex-col" data-testid="hero"
       style={{ background: "radial-gradient(ellipse 120% 60% at 20% 30%, #0f3d22 0%, #060d09 55%, #060d09 100%)" }}>
 
       {/* Ambient glows — desktop only (hidden on mobile to avoid black-out) */}
@@ -60,20 +60,20 @@ function DarkHero() {
           <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link to="/login" data-testid="landing-login-btn"
-            className="hidden sm:inline-flex px-4 py-2 text-sm font-medium text-white/60 hover:text-white rounded-full transition-all">
-            Masuk
-          </Link>
+        <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
           <a href="#pricing" data-testid="nav-pricing-cta"
             className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
             Mulai Sekarang <ArrowRight size={14} weight="bold" />
           </a>
+          <Link to="/login" data-testid="landing-login-btn"
+            className="inline-flex px-3 py-1 sm:py-2 text-xs sm:text-sm font-medium text-white/50 hover:text-white rounded-full transition-all">
+            Masuk
+          </Link>
         </div>
       </nav>
 
       {/* HERO CONTENT */}
-      <div className="relative z-10 flex-1 flex flex-col justify-center max-w-[1280px] mx-auto w-full px-5 lg:px-10 pt-8 pb-16 lg:pb-24">
+      <div className="relative z-10 flex-1 flex flex-col justify-center max-w-[1280px] mx-auto w-full px-0 lg:px-0 pt-6 pb-4 lg:pb-24">
 
         {/* Eyebrow */}
         <div className="inline-flex items-center gap-2 mb-8 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-brand-gold text-[10px] font-bold uppercase tracking-[0.22em] w-fit" data-testid="hero-eyebrow">
@@ -156,9 +156,9 @@ const STRIP_ITEMS = [
 function ContentStrip() {
   const items = [...STRIP_ITEMS, ...STRIP_ITEMS];
   return (
-    <div className="mt-16 lg:mt-20 relative" data-testid="hero-result-showcase">
-      <div className="absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(to right, #060d09, transparent)" }} />
-      <div className="absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(to left, #060d09, transparent)" }} />
+    <div className="mt-8 sm:mt-14 lg:mt-20 pb-10 relative" data-testid="hero-result-showcase">
+      <div className="absolute left-0 top-0 bottom-50 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(to right, #060d09, transparent)" }} />
+      <div className="absolute right-0 top-0 bottom-50 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(to left, #060d09, transparent)" }} />
       <div className="overflow-hidden">
         <div className="strip-scroll flex gap-3 w-max pb-2">
           {items.map((item, i) => (
