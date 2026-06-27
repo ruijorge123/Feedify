@@ -59,7 +59,7 @@ export default function OnboardingPage() {
       toast.success("Kredit berhasil ditambahkan! Sekarang lanjutkan setup brand Anda.");
       setSearchParams({}, { replace: true });
     }
-  }, []);
+  }, [searchParams, setSearchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
