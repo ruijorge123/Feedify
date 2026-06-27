@@ -1,0 +1,63 @@
+{
+  "summary": "Iteration 2 backend + frontend E2E testing complete. All 47 backend tests pass (26 from iter1 regression + 21 new iter2). 4 new backend dashboards fully validated: food-menu, consistency, grid-planner, calendar. Stats now includes food_menu count. Frontend E2E confirmed: register \u2192 3-step onboarding \u2192 dashboard works; Grid Planner save+persist+reload works; Consistency Checker renders with Brand DNA reference; Content Calendar add-event works (event visible on calendar grid); mobile bottom-nav present with 5 items. Sidebar nav shows all 9 expected sections.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "PATCH /api/calendar/{id}",
+        "issue": "Uses full CalendarEventIn (all fields required). Should accept partial payloads (true PATCH semantics)."
+      },
+      {
+        "endpoint": "GET /api/grid-planner",
+        "issue": "Returns literal null when no layout exists (same anti-pattern flagged in iter1 for /brand-profile). Consider 200 {} or 404 for cleaner FE handling."
+      },
+      {
+        "endpoint": "POST /api/grid-planner",
+        "issue": "Only enforces len(slots) <= 9 but does not enforce slot_index uniqueness within 0-8 nor minimum slot count. Could create layout with duplicate indices."
+      },
+      {
+        "endpoint": "POST /api/calendar",
+        "issue": "scheduled_date accepted as raw string without date format validation. '2026-13-99' would pass. Recommend Pydantic date type."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_feedify_iter2.py",
+    "/app/backend/tests/test_feedify_api.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/iter2_full.xml"
+  ],
+  "action_items": [
+    "(Optional) Make PATCH /api/calendar/{id} accept partial payloads instead of full CalendarEventIn.",
+    "(Optional) Validate scheduled_date format on /api/calendar (use Pydantic date type).",
+    "(Optional) Enforce slot_index uniqueness 0-8 on /api/grid-planner.",
+    "(Optional) Standardize empty-resource responses (grid-planner & brand-profile currently return raw null).",
+    "Verify mobile More page navigation: I could not click testid `mobile-nav-more` from dashboard view. The mobile bottom-nav itself renders (5 icons visible: Home/Banner/Carousel/Copy/More). Main agent should confirm `nav-more` link wires correctly and /more renders MorePage with `more-page` + `more-link-*` testids."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 1133 lines \u2014 well past 700-line guidance. Strongly recommend splitting into modules: auth.py, brand.py, prompts/banner.py, prompts/carousel.py, prompts/food_menu.py, llm.py (photo + consistency + copywriting), planning.py (grid + calendar).",
+    "Three LLM endpoints (photo/analyze, copywriting, consistency/check) duplicate the same try/import + markdown-strip + JSON-extract logic ~30 lines each. Extract into a single `call_llm_json(prompt, image=None)` helper.",
+    "_build_banner_prompt, _build_carousel_prompts, _build_food_menu_prompt share color/brand-name defaulting boilerplate \u2014 extract `resolve_brand_palette(brand)` helper.",
+    "Mongo indexes still missing: db.users.email (unique), db.generated_prompts.{user_id, created_at}, db.calendar_events.{user_id, scheduled_date}, db.grid_layouts.user_id (unique), db.consistency_checks.{user_id, created_at}.",
+    "Pydantic Field constraints absent on FoodMenuIn.mood/layout (free-text); a typo silently falls back to defaults. Use Literal[...] types so 422 fires on invalid values.",
+    "GridSlotIn.slot_index has no bounds (should be Field(ge=0, le=8)).",
+    "Carousel slide_count bound still checked manually \u2014 noted in iter1 but unresolved.",
+    "/api/consistency/check return shape inconsistent: 200 on success, 400 on missing brand, but on LLM parse failure returns 200 with {error:...} body. Standardize to 422 or document client contract.",
+    "/api/photo/analyze on parse failure returns a fabricated successful-looking object \u2014 dangerous for UI which can't distinguish real vs fallback."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_feedify_iter2.py (new \u2014 21 tests for iter2 endpoints)"
+  ],
+  "success_rate": {"backend": "100% (47/47)", "frontend": "verified critical flows (register/onboarding/dashboard/grid-planner/consistency/calendar/mobile-nav)"},
+  "test_credentials": "Tests generate fresh @feedifyqa.io users per run (TEST_ prefix). Documented demo@feedifyqa.io must be registered via /api/auth/register before login. All emails MUST use real-looking TLD (.io/.com/.id) \u2014 .test rejected by email-validator.",
+  "seed_data_creation": "Each test run creates: 1 primary user + brand profile, 1 isolation user (TestUserIsolation), 1 no-brand user (TestConsistencyChecker), 1 grid-test user, multiple prompts (banner/carousel/copy/food-menu), 2 calendar events (1 deleted during test). All TEST_ prefixed for easy cleanup. No production data touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest /app/backend/tests/ \u2014 expect 47/47 passes (Gemini Vision + text LLM live calls included). conftest.py builds a real coffee-cup JPEG with multiple objects/edges/colors for vision endpoints (satisfies /app/image_testing.md). Frontend E2E: token storage key in localStorage is non-standard \u2014 do NOT seed tokens manually; use the actual register UI flow to obtain auth state. Onboarding step 2 has NO data-testid prefix `color-preset-*` (uses generic color swatches); step 3 has no `style-*`/`tone-*` prefixes either but does work via real click \u2014 it auto-advances. Mobile More page UI was not deeply verified \u2014 click on `[data-testid=mobile-nav-more]` from dashboard didn't fire; main agent should confirm testid wiring.",
+  "rca of the issue": "No blocking issues. Single transient test failure (consistency_check_with_brand) on first run because that test relied on brand profile created by iter1 ordering. Fixed by inlining brand-profile creation inside the test. Now order-independent."
+}

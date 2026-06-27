@@ -1,0 +1,215 @@
+import { useRef } from "react";
+
+export const VISUAL_STYLES_LIST = [
+  { id: "minimal-clean",    name: "Minimal Clean",    desc: "Bersih, ruang lega, kesan modern abadi" },
+  { id: "minimal-korean",   name: "Minimal Korean",   desc: "Estetik Korea lembut, nuansa pastel dreamy" },
+  { id: "editorial-bold",   name: "Editorial Bold",   desc: "Gaya majalah, kontras tinggi, tipografi tebal" },
+  { id: "vibrant-pop",      name: "Vibrant Pop",      desc: "Penuh warna, energik, cocok untuk media sosial" },
+  { id: "neon-street",      name: "Neon Street",      desc: "Berani dan elektrik, energi jalanan Gen Z" },
+  { id: "lifestyle-natural",name: "Lifestyle Natural", desc: "Outdoor, organik, palet warna tanah natural" },
+  { id: "lifestyle-social", name: "Lifestyle Social",  desc: "Candid, orang nyata, nuansa konten UGC" },
+  { id: "luxury-editorial", name: "Luxury Editorial",  desc: "Sekelas editorial Vogue, ultra-premium" },
+  { id: "luxury-spa",       name: "Luxury Spa",        desc: "Suasana wellness, tenang, dominan putih & emas" },
+  { id: "luxury-korean",    name: "Luxury Korean",     desc: "K-luxury premium, clean glass-skin aesthetic" },
+  { id: "dark-moody",       name: "Dark Moody",        desc: "Nada gelap dramatis, sophisticated dan intens" },
+  { id: "warm-artisan",     name: "Warm Artisan",      desc: "Buatan tangan, nada hangat, jiwa artisan" },
+];
+
+export const BRAND_POSITIONINGS_LIST = [
+  { id: "premium_expert",        name: "Premium Expert",         desc: "Ahli di bidangnya, terpercaya, profesional." },
+  { id: "affordable_quality",    name: "Affordable Quality",     desc: "Kualitas bagus dengan harga masuk akal." },
+  { id: "luxury_lifestyle",      name: "Luxury Lifestyle",       desc: "Menjual gaya hidup premium." },
+  { id: "beauty_transformation", name: "Beauty Transformation",  desc: "Fokus hasil transformasi kecantikan." },
+  { id: "fun_trendy",            name: "Fun & Trendy",           desc: "Kekinian, viral, Gen Z." },
+  { id: "practical_everyday",    name: "Practical Everyday",     desc: "Solusi kebutuhan sehari-hari." },
+  { id: "natural_organic",       name: "Natural & Organic",      desc: "Alami, sehat, ramah lingkungan." },
+  { id: "local_pride",           name: "Local Pride",            desc: "Bangga produk lokal Indonesia." },
+  { id: "modern_minimalist",     name: "Modern Minimalist",      desc: "Simple, clean, modern." },
+  { id: "exclusive_limited",     name: "Exclusive Limited",      desc: "Langka, spesial, eksklusif." },
+  { id: "fast_convenient",       name: "Fast & Convenient",      desc: "Cepat, praktis, hemat waktu." },
+  { id: "healthy_choice",        name: "Healthy Choice",         desc: "Pilihan hidup sehat." },
+  { id: "family_friendly",       name: "Family Friendly",        desc: "Untuk keluarga dan semua usia." },
+  { id: "problem_solver",        name: "Problem Solver",         desc: "Fokus menyelesaikan masalah." },
+  { id: "results_driven",        name: "Results Driven",         desc: "Menjual hasil nyata." },
+  { id: "community_driven",      name: "Community Driven",       desc: "Dekat dengan komunitas pengguna." },
+  { id: "budget_friendly",       name: "Budget Friendly",        desc: "Murah tapi tetap berkualitas." },
+  { id: "everyday_luxury",       name: "Everyday Luxury",        desc: "Kemewahan yang bisa dinikmati sehari-hari." },
+  { id: "premium_affordable",    name: "Premium Affordable",     desc: "Terlihat premium tanpa harga premium." },
+  { id: "innovation_first",      name: "Innovation First",       desc: "Teknologi dan inovasi sebagai kekuatan utama." },
+  { id: "trend_setter",          name: "Trend Setter",           desc: "Pelopor tren baru." },
+  { id: "handmade_craftsmanship",name: "Handmade Craftsmanship", desc: "Buatan tangan dengan detail tinggi." },
+  { id: "heritage_tradition",    name: "Heritage & Tradition",   desc: "Mengangkat nilai tradisional." },
+  { id: "eco_conscious",         name: "Eco Conscious",          desc: "Peduli lingkungan." },
+  { id: "performance_focused",   name: "Performance Focused",    desc: "Fokus performa dan efektivitas." },
+  { id: "self_care_lifestyle",   name: "Self Care Lifestyle",    desc: "Fokus perawatan diri dan wellness." },
+  { id: "confidence_booster",    name: "Confidence Booster",     desc: "Membantu pengguna lebih percaya diri." },
+  { id: "transformation_journey",name: "Transformation Journey", desc: "Perubahan bertahap menuju versi terbaik." },
+  { id: "social_proof_leader",   name: "Social Proof Leader",    desc: "Dikenal karena banyak testimoni." },
+  { id: "professional_grade",    name: "Professional Grade",     desc: "Standar profesional untuk konsumen umum." },
+];
+
+export const BRAND_PERSONALITIES_LIST = [
+  { id: "friendly",      name: "Friendly",      desc: "Ramah, hangat, mudah didekati" },
+  { id: "modern",        name: "Modern",        desc: "Kekinian, up-to-date" },
+  { id: "trustworthy",   name: "Trustworthy",   desc: "Terpercaya, meyakinkan" },
+  { id: "professional",  name: "Professional",  desc: "Ahli, serius, kredibel" },
+  { id: "youthful",      name: "Youthful",      desc: "Muda, fresh, energik" },
+  { id: "playful",       name: "Playful",       desc: "Fun, santai, ceria" },
+  { id: "elegant",       name: "Elegant",       desc: "Anggun, berkelas" },
+  { id: "sophisticated", name: "Sophisticated", desc: "Premium, refined" },
+  { id: "luxurious",     name: "Luxurious",     desc: "Mewah, eksklusif" },
+  { id: "minimalist",    name: "Minimalist",    desc: "Simple, bersih" },
+  { id: "clean",         name: "Clean",         desc: "Rapi, higienis" },
+  { id: "natural",       name: "Natural",       desc: "Alami, organik" },
+  { id: "authentic",     name: "Authentic",     desc: "Jujur, apa adanya" },
+  { id: "confident",     name: "Confident",     desc: "Percaya diri, kuat" },
+  { id: "bold",          name: "Bold",          desc: "Berani, menonjol" },
+  { id: "energetic",     name: "Energetic",     desc: "Penuh semangat" },
+  { id: "creative",      name: "Creative",      desc: "Inovatif, unik" },
+  { id: "inspirational", name: "Inspirational", desc: "Memotivasi, uplifting" },
+  { id: "caring",        name: "Caring",        desc: "Peduli, perhatian" },
+  { id: "gentle",        name: "Gentle",        desc: "Lembut, menenangkan" },
+  { id: "feminine",      name: "Feminine",      desc: "Elegan dan feminin" },
+  { id: "masculine",     name: "Masculine",     desc: "Tegas dan maskulin" },
+  { id: "trendy",        name: "Trendy",        desc: "Mengikuti tren" },
+  { id: "stylish",       name: "Stylish",       desc: "Fashionable, estetik" },
+  { id: "cheerful",      name: "Cheerful",      desc: "Positif, menyenangkan" },
+  { id: "smart",         name: "Smart",         desc: "Cerdas, solutif" },
+  { id: "reliable",      name: "Reliable",      desc: "Dapat diandalkan" },
+  { id: "exclusive",     name: "Exclusive",     desc: "Spesial, terbatas" },
+  { id: "premium",       name: "Premium",       desc: "Berkualitas tinggi" },
+  { id: "honest",        name: "Honest",        desc: "Transparan, apa adanya" },
+  { id: "ambitious",     name: "Ambitious",     desc: "Berorientasi maju" },
+  { id: "adventurous",   name: "Adventurous",   desc: "Berani mencoba hal baru" },
+  { id: "artistic",      name: "Artistic",      desc: "Kreatif dan visual" },
+  { id: "cozy",          name: "Cozy",          desc: "Nyaman dan hangat" },
+  { id: "vibrant",       name: "Vibrant",       desc: "Penuh warna dan hidup" },
+  { id: "calm",          name: "Calm",          desc: "Tenang dan damai" },
+  { id: "mature",        name: "Mature",        desc: "Dewasa dan stabil" },
+  { id: "innovative",    name: "Innovative",    desc: "Modern dan inovatif" },
+];
+
+export const BRAND_DONTS_CATEGORIES = [
+  {
+    id: "tampilan",
+    label: "Visual Appearance",
+    sub: "Hindari tampilan visual tertentu",
+    items: [
+      "Terlalu ramai",
+      "Terlalu banyak dekorasi",
+      "Terlalu banyak tulisan",
+      "Terlalu penuh elemen",
+      "Terlihat murahan",
+      "Terlihat seperti marketplace",
+      "Terlihat seperti brosur jadul",
+      "Terlihat seperti template biasa",
+      "Terlihat tidak profesional",
+    ],
+  },
+  {
+    id: "warna",
+    label: "Color",
+    sub: "Hindari warna tertentu",
+    items: [
+      "Warna terlalu mencolok",
+      "Warna neon",
+      "Warna gelap dominan",
+      "Warna pastel dominan",
+      "Warna pink dominan",
+      "Warna emas berlebihan",
+      "Warna hitam dominan",
+    ],
+  },
+  {
+    id: "latar",
+    label: "Background",
+    sub: "Hindari latar belakang tertentu",
+    items: [
+      "Latar gelap",
+      "Latar terlalu ramai",
+      "Latar putih polos",
+      "Latar kayu",
+      "Latar marmer",
+      "Latar luar ruangan",
+      "Latar kafe",
+      "Latar taman",
+      "Latar rumah",
+    ],
+  },
+  {
+    id: "objek",
+    label: "Objects & Props",
+    sub: "Hindari objek atau properti tertentu",
+    items: [
+      "Bunga",
+      "Daun",
+      "Air percikan",
+      "Buah-buahan",
+      "Model wanita",
+      "Model pria",
+      "Anak-anak",
+      "Hewan",
+      "Karakter kartun",
+      "Maskot",
+      "Perhiasan",
+      "Aksesori mewah",
+      "Lampu neon",
+    ],
+  },
+  {
+    id: "suasana",
+    label: "Mood & Atmosphere",
+    sub: "Hindari suasana tertentu",
+    items: [
+      "Terlalu mewah",
+      "Terlalu formal",
+      "Terlalu feminin",
+      "Terlalu maskulin",
+      "Terlalu lucu",
+      "Terlalu serius",
+      "Terlalu anak muda",
+      "Terlalu korporat",
+      "Terlalu futuristik",
+      "Terlalu artistik",
+      "Terlalu elegan",
+    ],
+  },
+  {
+    id: "ai",
+    label: "Feedify Effects",
+    sub: "Hindari hasil Feedify yang tidak natural",
+    items: [
+      "Produk melayang",
+      "Terlalu terlihat buatan",
+      "Kulit terlalu sempurna",
+      "Cahaya berlebihan",
+      "Efek berlebihan",
+      "Refleksi tidak realistis",
+      "Komposisi aneh",
+      "Bentuk produk berubah",
+      "Terlalu seperti render 3D",
+    ],
+  },
+];
+
+export function useDragScroll() {
+  const ref = useRef(null);
+  const drag = useRef({ active: false, startX: 0, scrollLeft: 0 });
+  return {
+    ref,
+    onMouseDown: (e) => {
+      if (!ref.current) return;
+      drag.current = { active: true, startX: e.pageX - ref.current.offsetLeft, scrollLeft: ref.current.scrollLeft };
+      ref.current.style.cursor = "grabbing";
+      ref.current.style.userSelect = "none";
+    },
+    onMouseLeave: () => { drag.current.active = false; if (ref.current) { ref.current.style.cursor = "grab"; ref.current.style.userSelect = ""; } },
+    onMouseUp: () => { drag.current.active = false; if (ref.current) { ref.current.style.cursor = "grab"; ref.current.style.userSelect = ""; } },
+    onMouseMove: (e) => {
+      if (!drag.current.active || !ref.current) return;
+      e.preventDefault();
+      const x = e.pageX - ref.current.offsetLeft;
+      ref.current.scrollLeft = drag.current.scrollLeft - (x - drag.current.startX) * 1.5;
+    },
+  };
+}

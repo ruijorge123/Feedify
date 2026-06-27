@@ -1,0 +1,245 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Fresh Studio CSS Variables ─────────────────────────────────────────────── */
+:root {
+    --bg-primary:   #F2F6F4;
+    --bg-secondary: #FFFFFF;
+    --brand-primary:#0B3D2E;
+    --brand-primary-light:#1A5F4A;
+    --brand-accent-gold:#E5C158;
+    --brand-accent-amber:#D4AF37;
+    --brand-clay:   #C28E6E;
+    --text-primary: #1C2B24;
+    --text-secondary:#4A6B58;
+    --border-subtle:#DDE9E1;
+    --terminal-bg:  #0A1A14;
+}
+
+/* ── shadcn/Radix HSL variables ─────────────────────────────────────────────── */
+@layer base {
+    :root {
+        --background:          150 22% 95%;
+        --foreground:          158 25% 14%;
+        --card:                0 0% 100%;
+        --card-foreground:     158 25% 14%;
+        --popover:             0 0% 100%;
+        --popover-foreground:  158 25% 14%;
+        --primary:             158 70% 14%;
+        --primary-foreground:  38 47% 98%;
+        --secondary:           150 18% 92%;
+        --secondary-foreground:158 70% 14%;
+        --muted:               150 18% 92%;
+        --muted-foreground:    158 20% 42%;
+        --accent:              44 70% 62%;
+        --accent-foreground:   158 70% 14%;
+        --destructive:         0 70% 50%;
+        --destructive-foreground: 0 0% 98%;
+        --border:              150 20% 86%;
+        --input:               150 20% 86%;
+        --ring:                158 60% 24%;
+        --radius:              0.875rem;
+    }
+}
+
+* {
+    border-color: hsl(var(--border));
+}
+
+html, body {
+    overflow-x: hidden;
+}
+
+body {
+    margin: 0;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+code, .font-mono {
+    font-family: 'JetBrains Mono', 'Menlo', monospace;
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: -0.02em;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #c0d8ca;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--brand-primary-light);
+}
+
+/* ── Custom CSS classes ───────────────────────────────────────────────────── */
+
+/* Grain texture */
+.grain-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' /></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+    opacity: 0.03;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+}
+
+/* Terminal block */
+.terminal-block {
+    background: var(--terminal-bg);
+    color: #c5e6d0;
+    font-family: 'JetBrains Mono', monospace;
+    border-radius: 1rem;
+    padding: 1.25rem;
+    font-size: 0.825rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    max-height: 60vh;
+    border: 1px solid rgba(229, 193, 88, 0.15);
+}
+
+/* Premium button hover lift */
+.btn-lift {
+    transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.btn-lift:hover {
+    transform: translateY(-1px);
+}
+.btn-lift:active {
+    transform: scale(0.98);
+}
+
+/* Glass effect — light */
+.glass {
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: rgba(242, 246, 244, 0.85);
+    border: 1px solid rgba(180, 210, 195, 0.5);
+}
+
+/* Brand gradient */
+.brand-gradient {
+    background: linear-gradient(135deg, #0B3D2E 0%, #1A5F4A 60%, #2a7a5f 100%);
+}
+
+/* Card — clean white on sage bg */
+.feedify-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border-subtle);
+    border-radius: 1.25rem;
+    box-shadow: 0 2px 12px rgba(11, 61, 46, 0.06), 0 1px 3px rgba(11, 61, 46, 0.03);
+    transition: box-shadow 250ms ease, border-color 250ms ease, transform 250ms ease;
+}
+.feedify-card:hover {
+    box-shadow: 0 8px 30px rgba(11, 61, 46, 0.10), 0 2px 8px rgba(11, 61, 46, 0.05);
+    border-color: rgba(26, 95, 74, 0.20);
+}
+
+/* Touch targets */
+button, [role="button"], input, select, textarea {
+    min-height: 0;
+}
+.btn-touch {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Hide scrollbar */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+/* Animation fade-up */
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+    animation: fadeUp 380ms ease-out both;
+}
+
+/* Shimmer — sage tinted */
+@keyframes shimmer {
+    0% { background-position: -800px 0; }
+    100% { background-position: 800px 0; }
+}
+.shimmer {
+    background: linear-gradient(90deg, #e6f0ea 0px, #f3faf6 200px, #e6f0ea 400px);
+    background-size: 800px 100%;
+    animation: shimmer 1.6s infinite linear;
+}
+
+/* Hero scrolling strip */
+@keyframes strip-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+.strip-scroll {
+    animation: strip-scroll 28s linear infinite;
+    will-change: transform;
+}
+.strip-scroll:hover {
+    animation-play-state: paused;
+}
+
+@media (max-width: 639px) {
+    .strip-scroll {
+        will-change: auto;
+        animation-duration: 35s;
+    }
+}
+
+/* Slow glow pulse */
+@keyframes glow-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50%       { opacity: 0.55; transform: scale(1.08); }
+}
+.glow-pulse {
+    animation: glow-pulse 6s ease-in-out infinite;
+}
+.glow-pulse-delay {
+    animation: glow-pulse 8s ease-in-out infinite;
+    animation-delay: -3s;
+}
+
+/* Selection */
+::selection {
+    background: var(--brand-accent-gold);
+    color: var(--brand-primary);
+}
+
+/* Reusable input */
+.input {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: #FFFFFF;
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.75rem;
+    outline: none;
+    font-family: inherit;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.input:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(229, 193, 88, 0.25);
+}
+.input::placeholder {
+    color: #8aab9a;
+}

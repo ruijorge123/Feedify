@@ -1,0 +1,133 @@
+{
+  "project_name": "Feedify SaaS Platform",
+  "theme": "light",
+  "archetype": "Archetype 1 (Organic & Earthy)",
+  "design_philosophy": "A premium, warm, and empowering mobile-first SaaS for Indonesian MSMEs (UMKM). Combines the clarity of high-end productivity tools (Swiss/Notion) with the warmth of Indonesian organic elements. Banned generic SaaS purple/teal. Banned Inter font.",
+  "typography": {
+    "font_family": {
+      "heading": "Outfit, sans-serif",
+      "body": "Plus Jakarta Sans, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "rules": {
+      "headings": "Tracking-tight, never pure black, use deep emerald or charcoal. No 'Inter'.",
+      "body": "Highly readable, warm dark grey for high contrast without harshness.",
+      "labels": "Uppercase, wide tracking (tracking-[0.2em]), tiny text for overlines."
+    },
+    "hierarchy": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight",
+      "h2": "text-2xl sm:text-3xl font-semibold tracking-tight",
+      "h3": "text-xl sm:text-2xl font-medium tracking-tight",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed text-stone-700",
+      "body_small": "text-sm text-stone-500",
+      "overline": "text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700"
+    }
+  },
+  "colors": {
+    "background": {
+      "primary": "#FDFBF7",
+      "secondary": "#F3F0EA",
+      "overlay": "rgba(11, 61, 46, 0.4)"
+    },
+    "brand": {
+      "primary": "#0B3D2E",
+      "primary_light": "#1A5F4A",
+      "accent_gold": "#E5C158",
+      "accent_amber": "#D4AF37",
+      "tertiary_clay": "#C28E6E"
+    },
+    "text": {
+      "primary": "#1C1917",
+      "secondary": "#57534E",
+      "inverse": "#FDFBF7",
+      "brand": "#0B3D2E"
+    },
+    "border": {
+      "subtle": "#E8E6E1",
+      "focus": "#1A5F4A"
+    },
+    "status": {
+      "success": "#2E7D32",
+      "warning": "#F57C00",
+      "error": "#D32F2F",
+      "info": "#0288D1"
+    }
+  },
+  "spacing_and_layout": {
+    "mobile_first": true,
+    "container_padding": "px-4 sm:px-6 lg:px-8",
+    "card_padding": "p-6",
+    "touch_targets": "min-h-[44px] min-w-[44px]",
+    "radius": {
+      "button": "rounded-full",
+      "card": "rounded-2xl",
+      "input": "rounded-xl"
+    },
+    "navigation": {
+      "mobile": "Fixed bottom navigation bar with 4-5 icons, glassmorphism background (backdrop-blur-xl bg-[#FDFBF7]/80 border-t border-[#E8E6E1]).",
+      "desktop": "Left sidebar, minimal and compact, utilizing the 'Control Room' grid."
+    },
+    "grid_system": {
+      "dashboard": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6. Use 'Control Room' pattern.",
+      "prompts": "grid-cols-1 md:grid-cols-8 gap-8 'Bento' grid for visual tension."
+    }
+  },
+  "components_strategy": {
+    "general": "Use pure HTML + Tailwind for structural layouts. Use Shadcn for complex interactions (Dialogs, Selects) but heavily override default styles.",
+    "buttons": {
+      "primary": "bg-[#0B3D2E] text-white hover:bg-[#1A5F4A] hover:-translate-y-0.5 transition-transform shadow-md rounded-full px-6 py-3 font-medium",
+      "secondary": "bg-transparent border border-[#0B3D2E] text-[#0B3D2E] hover:bg-[#F3F0EA] rounded-full px-6 py-3 font-medium",
+      "accent": "bg-[#E5C158] text-[#0B3D2E] hover:bg-[#D4AF37] font-bold rounded-full px-6 py-3 shadow-md"
+    },
+    "cards": {
+      "style": "bg-white rounded-2xl border border-[#E8E6E1] shadow-[0_4px_24px_rgba(11,61,46,0.04)]",
+      "hover": "hover:shadow-[0_8px_32px_rgba(11,61,46,0.08)] hover:border-[#1A5F4A]/30 transition-all duration-300"
+    },
+    "custom_requirements": {
+      "color_picker": "Build a custom, touch-friendly circular swatch picker with smooth tactile interactions (neumorphic press effect). Do not use native <input type='color'> on mobile.",
+      "drag_and_drop": "Grid-based visual rearranging for Carousel Slides. Must use generous hit areas."
+    },
+    "inputs": "bg-[#FDFBF7] border border-[#E8E6E1] focus:ring-2 focus:ring-[#E5C158] focus:border-[#0B3D2E] rounded-xl px-4 py-3 text-base"
+  },
+  "motion": {
+    "philosophy": "Smooth, deliberate, and high-performance. Avoid excessive bouncy animations.",
+    "hover_states": "transition-all duration-200 ease-in-out",
+    "page_transitions": "framer-motion opacity and slight y-axis slide (y: 10 -> 0)",
+    "micro_interactions": "Scale down slightly on active/click state (scale: 0.98)."
+  },
+  "icons": {
+    "library": "@phosphor-icons/react",
+    "style": "Duotone or Regular for a sophisticated, non-generic look.",
+    "installation": "yarn add @phosphor-icons/react"
+  },
+  "media_assets": {
+    "background_textures": [
+      {
+        "url": "https://images.unsplash.com/photo-1685871286419-58e4fc0de8e1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzd8MHwxfHNlYXJjaHwyfHxhYnN0cmFjdCUyMGRlZXAlMjBncmVlbiUyMGdvbGQlMjB0ZXh0dXJlfGVufDB8fHx8MTc4MTg4ODc2Mnww&ixlib=rb-4.1.0&q=85",
+        "description": "Deep green abstract background",
+        "usage": "Auth page background or premium card overlays (low opacity)"
+      },
+      {
+        "url": "https://images.pexels.com/photos/4046683/pexels-photo-4046683.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Gold and green textured abstract pattern",
+        "usage": "Hero banner texture or generated prompt placeholder background"
+      }
+    ],
+    "avatars": [
+      {
+        "url": "https://images.pexels.com/photos/3932817/pexels-photo-3932817.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Asian florist/business owner",
+        "usage": "Testimonial or sample user profile image"
+      }
+    ]
+  },
+  "key_features_design": {
+    "live_wireframe_preview": "A sticky mobile-friendly preview pane (or floating drawer on mobile) that updates instantly as users type. Uses 'Glassmorphism' style to overlay above content without blocking.",
+    "json_output_display": "Retro-Futurism 'Terminal' look block. Dark background (#0A1A14) with monospace font and one-click 'Copy to Clipboard' prominent button.",
+    "carousel_builder": "Horizontal scroll area with snap points on mobile. Each slide acts as a 'Bento' block."
+  },
+  "testing": {
+    "attributes": "All interactive elements MUST include a data-testid attribute formatted in kebab-case based on role (e.g., data-testid='generate-prompt-button')."
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "version": 2,
+  "contexts": {
+    "banner": {
+      "title": "Inspirasi Feed Post Brand",
+      "description": "Referensi foto postingan feed brand untuk inspirasi Banner",
+      "categories": [
+        {
+          "id": "skincare",
+          "name": "Skincare & Kosmetik",
+          "icon": "Drop",
+          "photos": [
+            {
+              "id": "skincare-cleanser-01",
+              "filename": "cleanser.png",
+              "description": "Post testimonial cleanser skincare",
+              "tags": ["skincare", "cleanser", "testimonial", "social proof"]
+            },
+            {
+              "id": "skincare-moisturizer-01",
+              "filename": "skincare-moisturizer.png",
+              "description": "Post produk moisturizer premium minimalis",
+              "tags": ["skincare", "moisturizer", "premium", "minimal", "clean"]
+            },
+            {
+              "id": "skincare-freese-01",
+              "filename": "freese-after.png",
+              "description": "Post promo body lotion benefit-focused",
+              "tags": ["skincare", "body lotion", "promo", "benefit", "copywriting"]
+            }
+          ]
+        },
+        {
+          "id": "fashion",
+          "name": "Fashion & Aksesoris",
+          "icon": "TShirt",
+          "photos": [
+            {
+              "id": "fashion-aksesoris-01",
+              "filename": "aksesoris.png",
+              "description": "Post editorial perhiasan dengan model",
+              "tags": ["fashion", "aksesoris", "perhiasan", "gelang", "editorial", "model"]
+            },
+            {
+              "id": "fashion-shirt-01",
+              "filename": "fashion-shirt.png",
+              "description": "Post kemeja gaya minimal lifestyle",
+              "tags": ["fashion", "baju", "kemeja", "minimal", "lifestyle"]
+            }
+          ]
+        },
+        {
+          "id": "fnb",
+          "name": "F&B & Kuliner",
+          "icon": "ForkKnife",
+          "photos": [
+            {
+              "id": "fnb-makanan-01",
+              "filename": "makanan.png",
+              "description": "Menu board rice bowl bold dark",
+              "tags": ["fnb", "makanan", "menu board", "rice bowl", "bold", "dark background"]
+            },
+            {
+              "id": "fnb-minuman-cup-01",
+              "filename": "minuman-cup.png",
+              "description": "Post minuman cup playful vibrant",
+              "tags": ["fnb", "minuman", "cup", "shake", "playful", "vibrant", "colorful"]
+            },
+            {
+              "id": "fnb-minuman-kaleng-01",
+              "filename": "minuman-kaleng.png",
+              "description": "Post minuman kaleng modern colorful",
+              "tags": ["fnb", "minuman", "kaleng", "sparkling", "modern", "colorful"]
+            },
+            {
+              "id": "fnb-minuman-kopi-01",
+              "filename": "minuman-kopi.png",
+              "description": "Menu board kopi handwritten rustic",
+              "tags": ["fnb", "kopi", "coffee", "menu board", "handwritten", "rustic", "cafe"]
+            }
+          ]
+        }
+      ]
+    },
+    "carousel": {
+      "title": "Inspirasi Carousel Brand",
+      "description": "Referensi carousel Instagram — foto tampil per brand, urut dari slide pertama",
+      "categories": []
+    },
+    "food": {
+      "title": "Inspirasi Foto F&B",
+      "description": "Referensi foto makanan & minuman untuk F&B Menu Visual",
+      "categories": []
+    },
+    "marketplace": {
+      "title": "Inspirasi Thumbnail Marketplace",
+      "description": "Referensi thumbnail produk untuk Shopee, Tokopedia, dan marketplace lain",
+      "categories": []
+    }
+  }
+}
