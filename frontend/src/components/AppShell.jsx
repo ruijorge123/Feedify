@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useCredits } from "@/lib/credits";
 import api from "@/lib/api";
+import { useMenuLockStatus, menuMode } from "@/lib/menuLock";
 import {
   HouseSimple,
   ImageSquare,
@@ -26,9 +27,9 @@ import {
 
 const mobileNav = [
   { to: "/dashboard", label: "Home", icon: HouseSimple, testid: "nav-home" },
-  { to: "/generate/banner", label: "Feed Post", icon: ImageSquare, testid: "nav-banner" },
-  { to: "/generate/carousel", label: "Carousel", icon: Stack, testid: "nav-carousel" },
-  { to: "/generate/copywriting", label: "Copy", icon: PenNib, testid: "nav-copy" },
+  { to: "/generate/banner", label: "Feed Post", icon: ImageSquare, testid: "nav-banner", lockKey: "banner" },
+  { to: "/generate/carousel", label: "Carousel", icon: Stack, testid: "nav-carousel", lockKey: "carousel" },
+  { to: "/generate/copywriting", label: "Copy", icon: PenNib, testid: "nav-copy", lockKey: "copywriting" },
   { to: "/more", label: "More", icon: DotsThreeOutline, testid: "nav-more" },
 ];
 
@@ -41,20 +42,20 @@ const sidebarSections = [
   {
     title: "Generate",
     items: [
-      { to: "/generate/banner", label: "Feed Post", icon: ImageSquare, testid: "nav-banner" },
-      { to: "/generate/carousel", label: "Carousel", icon: Stack, testid: "nav-carousel" },
-      { to: "/generate/copywriting", label: "Copywriting", icon: PenNib, testid: "nav-copy" },
-      { to: "/generate/reels", label: "Reels", icon: FilmSlate, testid: "nav-reels" },
-      { to: "/generate/food", label: "F&B Menu", icon: ForkKnife, testid: "nav-food", adminOnly: true },
-      { to: "/generate/marketplace", label: "Marketplace", icon: Storefront, testid: "nav-marketplace" },
+      { to: "/generate/banner", label: "Feed Post", icon: ImageSquare, testid: "nav-banner", lockKey: "banner" },
+      { to: "/generate/carousel", label: "Carousel", icon: Stack, testid: "nav-carousel", lockKey: "carousel" },
+      { to: "/generate/copywriting", label: "Copywriting", icon: PenNib, testid: "nav-copy", lockKey: "copywriting" },
+      { to: "/generate/reels", label: "Reels", icon: FilmSlate, testid: "nav-reels", lockKey: "reels" },
+      { to: "/generate/food", label: "F&B Menu", icon: ForkKnife, testid: "nav-food", adminOnly: true, lockKey: "food" },
+      { to: "/generate/marketplace", label: "Marketplace", icon: Storefront, testid: "nav-marketplace", lockKey: "marketplace" },
     ],
   },
   {
     title: "Planning & QA",
     items: [
-      { to: "/grid-planner", label: "Grid Planner", icon: GridFour, testid: "nav-grid" },
-      { to: "/consistency", label: "Consistency", icon: ShieldCheck, testid: "nav-consistency" },
-      { to: "/calendar", label: "Calendar Planner", icon: CalendarBlank, testid: "nav-calendar" },
+      { to: "/grid-planner", label: "Grid Planner", icon: GridFour, testid: "nav-grid", lockKey: "grid-planner" },
+      { to: "/consistency", label: "Consistency", icon: ShieldCheck, testid: "nav-consistency", lockKey: "consistency" },
+      { to: "/calendar", label: "Calendar Planner", icon: CalendarBlank, testid: "nav-calendar", lockKey: "calendar" },
     ],
   },
   {
@@ -71,6 +72,8 @@ export default function AppShell() {
   const location = useLocation();
   const [activeBrand, setActiveBrand] = useState(null);
   const { credits } = useCredits();
+  const lockStatus = useMenuLockStatus();
+  const isHidden = (item) => item.lockKey && menuMode(lockStatus, item.lockKey) === "hidden";
   const balance = credits?.balance ?? credits?.credits_remaining ?? null;
 
   const fetchBrand = () => {
@@ -120,7 +123,7 @@ export default function AppShell() {
                 <div className="px-4 mb-1.5 text-[10px] uppercase tracking-[0.2em] text-brand-cream/35 font-bold">{section.title}</div>
               )}
               <div className="space-y-0.5">
-                {section.items.filter(item => !item.adminOnly || user?.role === "admin").map((item) => (
+                {section.items.filter(item => (!item.adminOnly || user?.role === "admin") && !isHidden(item)).map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
@@ -248,7 +251,9 @@ export default function AppShell() {
 
       {/* Main Content */}
       <main className="lg:ml-64 pb-24 lg:pb-8 relative z-10 overflow-x-hidden">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 lg:py-10 min-w-0">
+        <div className={`mx-auto py-6 lg:py-10 min-w-0 ${
+          location.pathname.startsWith("/admin") ? "max-w-7xl px-3 sm:px-4 lg:px-6" : "max-w-6xl px-4 sm:px-6 lg:px-10"
+        }`}>
           <Outlet />
         </div>
       </main>
@@ -259,7 +264,7 @@ export default function AppShell() {
         data-testid="mobile-bottom-nav"
       >
         <div className="grid grid-cols-5 px-1 py-1.5 safe-area-inset-bottom">
-          {mobileNav.map((item) => {
+          {mobileNav.filter(item => !isHidden(item)).map((item) => {
             const isActive = location.pathname === item.to;
             return (
               <NavLink

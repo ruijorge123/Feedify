@@ -362,15 +362,36 @@ def create_jwt_token(user_id: str, email: str) -> str:
     return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+DEFAULT_MAINTENANCE_MESSAGE = "Feedify sedang dalam maintenance. Kami akan segera kembali."
+
+
+async def _get_maintenance_doc() -> Optional[dict]:
+    return await db.app_settings.find_one({"key": "maintenance"})
+
+
+async def _block_if_maintenance(role: str):
+    """Admin selalu bisa lewat — lockdown hanya berlaku untuk role 'user'."""
+    if role == "admin":
+        return
+    m = await _get_maintenance_doc()
+    if m and m.get("enabled"):
+        raise HTTPException(
+            status_code=503,
+            detail=m.get("message") or DEFAULT_MAINTENANCE_MESSAGE,
+            headers={"X-Maintenance": "1"},
+        )
+
+
 async def get_current_user(creds: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     try:
         payload = pyjwt.decode(creds.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("user_id")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
-        user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+        user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "admin_pin_hash": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        await _block_if_maintenance(user.get("role", "user"))
         return user
     except pyjwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -1298,13 +1319,14 @@ async def _send_otp_email(to_email: str, name: str, otp: str) -> bool:
         return False
 
 
-async def _create_otp(email: str) -> str:
+async def _create_otp(email: str, purpose: str = "register") -> str:
     otp = _generate_otp()
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
     await db.email_otps.delete_many({"email": email})
     await db.email_otps.insert_one({
         "email": email,
         "otp": otp,
+        "purpose": purpose,
         "expires_at": expires_at,
         "attempts": 0,
         "created_at": now_iso(),
@@ -1314,6 +1336,7 @@ async def _create_otp(email: str) -> str:
 
 @api_router.post("/auth/register")
 async def register(payload: UserRegister):
+    await _block_if_maintenance("user")
     email = payload.email.lower()
     existing = await db.users.find_one({"email": email})
     if existing:
@@ -1345,6 +1368,7 @@ async def login(payload: UserLogin):
     user = await db.users.find_one({"email": payload.email.lower()})
     if not user or not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Email atau password salah")
+    await _block_if_maintenance(user.get("role", "user"))
     if not user.get("email_verified", True):
         otp = await _create_otp(user["email"])
         await _send_otp_email(user["email"], user["name"], otp)
@@ -1375,7 +1399,7 @@ async def verify_otp(payload: dict):
     if not email or not otp_input:
         raise HTTPException(status_code=400, detail="Email dan OTP wajib diisi")
 
-    record = await db.email_otps.find_one({"email": email})
+    record = await db.email_otps.find_one({"email": email, "purpose": "register"})
     if not record:
         raise HTTPException(status_code=400, detail="OTP tidak ditemukan, minta kode baru")
 
@@ -1423,6 +1447,50 @@ async def resend_otp(payload: dict):
     otp = await _create_otp(email)
     await _send_otp_email(email, user["name"], otp)
     return {"message": "Kode OTP baru dikirim ke email kamu"}
+
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(payload: dict):
+    email = (payload.get("email") or "").lower().strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email wajib diisi")
+    user = await db.users.find_one({"email": email})
+    if user:
+        otp = await _create_otp(email, purpose="reset_password")
+        await _send_otp_email(email, user["name"], otp)
+    # Selalu balas pesan generik agar tidak membocorkan email mana yang terdaftar
+    return {"message": "Jika email terdaftar, kode OTP sudah dikirim"}
+
+
+@api_router.post("/auth/reset-password")
+async def reset_password(payload: dict):
+    email = (payload.get("email") or "").lower().strip()
+    otp_input = (payload.get("otp") or "").strip()
+    new_password = payload.get("new_password") or ""
+    if not email or not otp_input or not new_password:
+        raise HTTPException(status_code=400, detail="Email, OTP, dan password baru wajib diisi")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password minimal 6 karakter")
+
+    record = await db.email_otps.find_one({"email": email, "purpose": "reset_password"})
+    if not record:
+        raise HTTPException(status_code=400, detail="OTP tidak ditemukan, minta kode baru")
+
+    if record.get("attempts", 0) >= 5:
+        raise HTTPException(status_code=429, detail="Terlalu banyak percobaan, minta kode baru")
+
+    expires_at = datetime.fromisoformat(record["expires_at"].replace("Z", "+00:00"))
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=400, detail="OTP sudah kedaluwarsa, minta kode baru")
+
+    if record["otp"] != otp_input:
+        await db.email_otps.update_one({"email": email}, {"$inc": {"attempts": 1}})
+        remaining = 5 - record.get("attempts", 0) - 1
+        raise HTTPException(status_code=400, detail=f"Kode OTP salah, sisa {remaining} percobaan")
+
+    await db.email_otps.delete_many({"email": email})
+    await db.users.update_one({"email": email}, {"$set": {"password_hash": hash_password(new_password)}})
+    return {"message": "Password berhasil diganti, silakan login"}
 
 
 @api_router.get("/auth/me")
@@ -1489,6 +1557,7 @@ async def auth_google_token(body: dict):
         raise HTTPException(status_code=400, detail="Data akun Google tidak lengkap")
 
     user_id, user, _ = await _google_upsert_user(email, name, google_sub)
+    await _block_if_maintenance(user.get("role", "user"))
     has_bp = await db.brand_profiles.find_one({"user_id": user_id}) is not None
     token  = create_jwt_token(user_id, email)
     return {
@@ -3578,6 +3647,7 @@ async def preview_banner_prompt(payload: BannerPromptIn, current_user: dict = De
 
 @api_router.post("/prompt/generate-banner")
 async def generate_banner(payload: BannerPromptIn, current_user: dict = Depends(get_current_user)):
+    await _block_if_menu_locked("banner")
     # Content moderation — before consuming any credit
     _raise_if_banned(payload.headline, payload.subheadline, payload.description, payload.product_name, payload.call_to_action)
 
@@ -3639,6 +3709,7 @@ async def preview_carousel_prompt(payload: CarouselPromptIn, current_user: dict 
 
 @api_router.post("/prompt/generate-carousel")
 async def generate_carousel(payload: CarouselPromptIn, current_user: dict = Depends(get_current_user)):
+    await _block_if_menu_locked("carousel")
     if payload.slide_count < 3 or payload.slide_count > 7:
         raise HTTPException(status_code=400, detail="Jumlah slide harus 3-7")
 
@@ -3705,6 +3776,7 @@ async def generate_carousel_stream(payload: CarouselPromptIn, current_user: dict
     Streams one event per slide as it completes, rather than waiting for all slides.
     Frontend reads the streaming response with fetch() + ReadableStream.
     """
+    await _block_if_menu_locked("carousel")
     import json as _json
 
     if payload.slide_count < 3 or payload.slide_count > 7:
@@ -3909,6 +3981,7 @@ async def regenerate(payload: RegenerateIn, current_user: dict = Depends(get_cur
 
 @api_router.post("/prompt/generate-copywriting")
 async def generate_copywriting(payload: CopywritingIn, current_user: dict = Depends(get_current_user)):
+    await _block_if_menu_locked("copywriting")
     # Content moderation
     _raise_if_banned(payload.product_name, payload.product_description, payload.target_audience, payload.main_problem)
 
@@ -4508,6 +4581,7 @@ async def preview_food_menu_prompt(payload: FoodMenuIn, current_user: dict = Dep
 
 @api_router.post("/prompt/generate-food-menu")
 async def generate_food_menu(payload: FoodMenuIn, current_user: dict = Depends(get_current_user)):
+    await _block_if_menu_locked("food")
     # Content moderation
     item_texts = " ".join(str(i.get("name", "")) + " " + str(i.get("description", "")) for i in (payload.items or []))
     _raise_if_banned(payload.menu_name, payload.headline, payload.call_to_action, item_texts)
@@ -4731,6 +4805,7 @@ async def preview_marketplace_prompt(payload: MarketplaceIn, current_user: dict 
 
 @api_router.post("/prompt/generate-marketplace")
 async def generate_marketplace(payload: MarketplaceIn, current_user: dict = Depends(get_current_user)):
+    await _block_if_menu_locked("marketplace")
     # Content moderation
     _raise_if_banned(payload.product_name, payload.tagline, payload.promo_label)
 
@@ -4776,6 +4851,7 @@ async def generate_marketplace(payload: MarketplaceIn, current_user: dict = Depe
 # ============= BRAND CONSISTENCY CHECKER (Gemini Vision) =============
 @api_router.post("/consistency/check")
 async def consistency_check(payload: ConsistencyCheckIn, current_user: dict = Depends(get_current_user)):
+    await _block_if_menu_locked("consistency")
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
     except Exception as e:
@@ -4882,6 +4958,7 @@ async def get_grid_layout(current_user: dict = Depends(get_current_user)):
 
 @api_router.post("/grid-planner")
 async def save_grid_layout(payload: GridLayoutIn, current_user: dict = Depends(get_current_user)):
+    await _block_if_menu_locked("grid-planner")
     if len(payload.slots) > 9:
         raise HTTPException(status_code=400, detail="Maksimal 9 slot")
     doc = {
@@ -5242,6 +5319,7 @@ _MONTH_NAMES_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agu
 @api_router.post("/calendar/generate-ideas")
 async def generate_calendar_ideas(payload: CalendarIdeasIn, current_user: dict = Depends(get_current_user)):
     """Generate AI content slot ideas for a full month. No credits consumed."""
+    await _block_if_menu_locked("calendar")
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
     except Exception as e:
@@ -5819,6 +5897,196 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     return current_user
 
 
+def _validate_pin_format(pin: str):
+    if not _re.fullmatch(r"\d{6}", pin or ""):
+        raise HTTPException(status_code=400, detail="PIN harus 6 digit angka")
+
+
+@api_router.get("/admin/pin/status")
+async def admin_pin_status(admin_user: dict = Depends(require_admin)):
+    """1 admin = 1 PIN. Dipakai frontend untuk tahu apakah harus tampilkan form buat PIN atau form input PIN."""
+    user = await db.users.find_one({"id": admin_user["id"]}, {"admin_pin_hash": 1})
+    return {"has_pin": bool(user and user.get("admin_pin_hash"))}
+
+
+@api_router.post("/admin/pin/setup")
+async def admin_pin_setup(payload: dict, admin_user: dict = Depends(require_admin)):
+    pin = (payload.get("pin") or "").strip()
+    _validate_pin_format(pin)
+    user = await db.users.find_one({"id": admin_user["id"]}, {"admin_pin_hash": 1})
+    if user and user.get("admin_pin_hash"):
+        raise HTTPException(status_code=400, detail="PIN sudah pernah dibuat, gunakan ganti PIN")
+    await db.users.update_one(
+        {"id": admin_user["id"]},
+        {"$set": {"admin_pin_hash": hash_password(pin), "admin_pin_attempts": 0, "admin_pin_locked_until": None}},
+    )
+    return {"message": "PIN admin berhasil dibuat"}
+
+
+@api_router.post("/admin/pin/verify")
+async def admin_pin_verify(payload: dict, admin_user: dict = Depends(require_admin)):
+    pin = (payload.get("pin") or "").strip()
+    user = await db.users.find_one({"id": admin_user["id"]})
+    pin_hash = user.get("admin_pin_hash") if user else None
+    if not pin_hash:
+        raise HTTPException(status_code=400, detail="PIN belum dibuat")
+
+    locked_until = user.get("admin_pin_locked_until")
+    if locked_until:
+        locked_dt = datetime.fromisoformat(locked_until.replace("Z", "+00:00"))
+        if datetime.now(timezone.utc) < locked_dt:
+            remaining_min = max(1, int((locked_dt - datetime.now(timezone.utc)).total_seconds() // 60) + 1)
+            raise HTTPException(status_code=429, detail=f"Terlalu banyak percobaan salah, coba lagi {remaining_min} menit lagi")
+
+    if not verify_password(pin, pin_hash):
+        attempts = user.get("admin_pin_attempts", 0) + 1
+        if attempts >= 5:
+            locked_until_new = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+            await db.users.update_one(
+                {"id": admin_user["id"]},
+                {"$set": {"admin_pin_attempts": 0, "admin_pin_locked_until": locked_until_new}},
+            )
+            raise HTTPException(status_code=429, detail="Terlalu banyak percobaan salah, PIN dikunci 15 menit")
+        await db.users.update_one({"id": admin_user["id"]}, {"$set": {"admin_pin_attempts": attempts}})
+        raise HTTPException(status_code=400, detail=f"PIN salah, sisa {5 - attempts} percobaan")
+
+    await db.users.update_one({"id": admin_user["id"]}, {"$set": {"admin_pin_attempts": 0, "admin_pin_locked_until": None}})
+    return {"message": "PIN valid"}
+
+
+@api_router.post("/admin/pin/change")
+async def admin_pin_change(payload: dict, admin_user: dict = Depends(require_admin)):
+    old_pin = (payload.get("old_pin") or "").strip()
+    new_pin = (payload.get("new_pin") or "").strip()
+    _validate_pin_format(new_pin)
+    user = await db.users.find_one({"id": admin_user["id"]})
+    pin_hash = user.get("admin_pin_hash") if user else None
+    if not pin_hash:
+        raise HTTPException(status_code=400, detail="PIN belum dibuat, gunakan buat PIN")
+    if not verify_password(old_pin, pin_hash):
+        raise HTTPException(status_code=400, detail="PIN lama salah")
+    await db.users.update_one(
+        {"id": admin_user["id"]},
+        {"$set": {"admin_pin_hash": hash_password(new_pin), "admin_pin_attempts": 0, "admin_pin_locked_until": None}},
+    )
+    return {"message": "PIN admin berhasil diganti"}
+
+
+# ============= MAINTENANCE LOCKDOWN =============
+@api_router.get("/admin/maintenance")
+async def admin_get_maintenance(admin_user: dict = Depends(require_admin)):
+    m = await _get_maintenance_doc()
+    return {
+        "enabled": bool(m and m.get("enabled")),
+        "message": (m or {}).get("message") or DEFAULT_MAINTENANCE_MESSAGE,
+        "updated_at": (m or {}).get("updated_at"),
+        "updated_by_name": (m or {}).get("updated_by_name"),
+    }
+
+
+@api_router.post("/admin/maintenance")
+async def admin_set_maintenance(payload: dict, admin_user: dict = Depends(require_admin)):
+    enabled = bool(payload.get("enabled"))
+    message = (payload.get("message") or "").strip() or DEFAULT_MAINTENANCE_MESSAGE
+    doc = {
+        "key": "maintenance",
+        "enabled": enabled,
+        "message": message,
+        "updated_at": now_iso(),
+        "updated_by_name": admin_user.get("name"),
+    }
+    await db.app_settings.update_one({"key": "maintenance"}, {"$set": doc}, upsert=True)
+    return {k: v for k, v in doc.items() if k != "key"}
+
+
+@api_router.get("/maintenance-status")
+async def maintenance_status():
+    """Public — dipakai halaman Maintenance untuk poll kapan lockdown dicabut."""
+    m = await _get_maintenance_doc()
+    return {
+        "enabled": bool(m and m.get("enabled")),
+        "message": (m or {}).get("message") or DEFAULT_MAINTENANCE_MESSAGE,
+    }
+
+
+# ============= PER-MENU LOCKDOWN =============
+# Registry dari menu yang bisa dikunci individual oleh admin.
+# Tiap menu punya salah satu mode:
+#   - "active"      : normal, kelihatan & bisa diakses
+#   - "maintenance" : tetap kelihatan di nav, tapi begitu dibuka user lihat halaman maintenance
+#   - "hidden"      : disembunyikan total dari nav user (seolah menu itu tidak ada)
+# Kedua mode "maintenance" dan "hidden" sama-sama menolak request di backend —
+# bedanya cuma di frontend: "hidden" gak pernah ditampilkan sebagai opsi nav sama sekali.
+LOCKABLE_MENUS = {
+    "banner":        "Feed Post / Banner",
+    "carousel":      "Carousel",
+    "copywriting":   "Copywriting",
+    "reels":         "Reels",
+    "food":          "F&B Menu",
+    "marketplace":   "Marketplace",
+    "grid-planner":  "Grid Planner",
+    "consistency":   "Consistency Checker",
+    "calendar":      "Calendar Planner",
+}
+MENU_LOCK_MODES = ("active", "maintenance", "hidden")
+DEFAULT_MENU_LOCK_MESSAGE = "Menu ini sedang maintenance. Coba lagi nanti."
+
+
+async def _get_menu_lockdown_doc() -> dict:
+    doc = await db.app_settings.find_one({"key": "menu_lockdown"})
+    return (doc or {}).get("menus", {})
+
+
+async def _block_if_menu_locked(menu_key: str):
+    menus = await _get_menu_lockdown_doc()
+    mode = (menus.get(menu_key) or {}).get("mode", "active")
+    if mode in ("maintenance", "hidden"):
+        raise HTTPException(
+            status_code=503,
+            detail=DEFAULT_MENU_LOCK_MESSAGE,
+            headers={"X-Menu-Locked": menu_key, "X-Menu-Mode": mode},
+        )
+
+
+@api_router.get("/menu-lockdown-status")
+async def menu_lockdown_status():
+    """Public — dipakai tiap halaman/nav untuk cek mode menu (active/maintenance/hidden)."""
+    menus = await _get_menu_lockdown_doc()
+    return {k: {"mode": v.get("mode", "active")} for k, v in menus.items()}
+
+
+@api_router.get("/admin/menu-lockdown")
+async def admin_get_menu_lockdown(admin_user: dict = Depends(require_admin)):
+    menus = await _get_menu_lockdown_doc()
+    return {
+        key: {
+            "label": label,
+            "mode": menus.get(key, {}).get("mode", "active"),
+        }
+        for key, label in LOCKABLE_MENUS.items()
+    }
+
+
+@api_router.post("/admin/menu-lockdown")
+async def admin_set_menu_lockdown(payload: dict, admin_user: dict = Depends(require_admin)):
+    menu_key = payload.get("menu_key")
+    if menu_key not in LOCKABLE_MENUS:
+        raise HTTPException(status_code=400, detail="Menu key tidak dikenal")
+    mode = payload.get("mode")
+    if mode not in MENU_LOCK_MODES:
+        raise HTTPException(status_code=400, detail="Mode tidak valid")
+    await db.app_settings.update_one(
+        {"key": "menu_lockdown"},
+        {"$set": {
+            f"menus.{menu_key}": {"mode": mode},
+            "updated_at": now_iso(),
+            "updated_by_name": admin_user.get("name"),
+        }},
+        upsert=True,
+    )
+    return {"menu_key": menu_key, "mode": mode}
+
+
 @api_router.get("/admin/daily-voucher")
 async def admin_get_daily_voucher(admin_user: dict = Depends(require_admin)):
     """Return today's daily voucher code + claim stats. Admin only."""
@@ -6083,6 +6351,7 @@ async def generate_reels(
     aspect_ratio: str = Form(...),
     current_user: dict = Depends(get_current_user),
 ):
+    await _block_if_menu_locked("reels")
     if not _REELS_ENABLED:
         raise HTTPException(status_code=503, detail="Reels feature not available — install fal-client and openai")
 

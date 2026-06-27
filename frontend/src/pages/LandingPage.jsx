@@ -17,14 +17,16 @@ export default function LandingPage() {
         <div className="absolute top-[55%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-brand-gold/[0.04] blur-[130px]" />
         <div className="absolute bottom-[10%] left-[20%] w-[40vw] h-[40vw] rounded-full bg-brand/[0.03] blur-[120px]" />
       </div>
-      <DarkHero />
-      <Marquee />
-      <Transformation />
-      <HowItWorks />
-      <Bento />
-      <Testimonials />
-      <Pricing />
-      <SupportChat />
+      <main>
+        <DarkHero />
+        <Marquee />
+        <Transformation />
+        <HowItWorks />
+        <Bento />
+        <Testimonials />
+        <Pricing />
+        <SupportChat />
+      </main>
       <Footer />
     </div>
   );
@@ -60,15 +62,15 @@ function DarkHero() {
           <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
         </div>
 
-        <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
-          <a href="#pricing" data-testid="nav-pricing-cta"
-            className="inline-flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
-            Mulai Sekarang <ArrowRight size={14} weight="bold" />
-          </a>
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link to="/login" data-testid="landing-login-btn"
-            className="inline-flex px-3 py-1 sm:py-2 text-xs sm:text-sm font-medium text-white/50 hover:text-white rounded-full transition-all">
+            className="inline-flex items-center justify-center px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-white border border-white/25 hover:border-white/50 hover:bg-white/10 rounded-full transition-all">
             Masuk
           </Link>
+          <a href="#pricing" data-testid="nav-pricing-cta"
+            className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
+            Mulai Sekarang <ArrowRight size={14} weight="bold" />
+          </a>
         </div>
       </nav>
 
@@ -142,15 +144,15 @@ function HeroStat({ num, label }) {
 }
 
 const STRIP_ITEMS = [
-  { img: "/skincare-moisturizer.png", label: "Skincare", tag: "Moisturizer" },
-  { img: "/cleanser.png", label: "Skincare", tag: "Cleanser", contain: true },
-  { img: "/minuman-kaleng.png", label: "Minuman", tag: "Beverage", contain: true },
-  { img: "/minuman-cup.png", label: "F&B", tag: "Minuman Cup", contain: true },
-  { img: "/minuman-kopi.png", label: "Café", tag: "Menu Kopi", contain: true },
-  { img: "/fashion-shirt.png", label: "Fashion", tag: "Pakaian" },
-  { img: "/makanan.png", label: "Kuliner", tag: "Rice Bowl", contain: true },
-  { img: "/aksesoris.png", label: "Aksesoris", tag: "Perhiasan", contain: true },
-  { img: "/freese-after.png", label: "Skincare", tag: "Body Lotion", contain: true },
+  { img: "/skincare-moisturizer.webp", label: "Skincare", tag: "Moisturizer" },
+  { img: "/cleanser.webp", label: "Skincare", tag: "Cleanser", contain: true },
+  { img: "/minuman-kaleng.webp", label: "Minuman", tag: "Beverage", contain: true },
+  { img: "/minuman-cup.webp", label: "F&B", tag: "Minuman Cup", contain: true },
+  { img: "/minuman-kopi.webp", label: "Café", tag: "Menu Kopi", contain: true },
+  { img: "/fashion-shirt.webp", label: "Fashion", tag: "Pakaian" },
+  { img: "/makanan.webp", label: "Kuliner", tag: "Rice Bowl", contain: true },
+  { img: "/aksesoris.webp", label: "Aksesoris", tag: "Perhiasan", contain: true },
+  { img: "/freese-after.webp", label: "Skincare", tag: "Body Lotion", contain: true },
 ];
 
 function ContentStrip() {
@@ -251,7 +253,7 @@ function Transformation() {
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/30">Sebelum Feedify</span>
             </div>
             <div className="rounded-2xl overflow-hidden bg-white/5 border border-white/10 aspect-[4/5] relative">
-              <img src="/freese-before.png" alt="Foto produk polos"
+              <img src="/freese-before.webp" alt="Foto produk polos"
                 className="h-full w-full object-contain p-10 opacity-90" loading="lazy" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-5">
@@ -276,7 +278,7 @@ function Transformation() {
               <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-gold">Setelah Feedify</span>
             </div>
             <div className="rounded-2xl overflow-hidden border-2 border-brand-gold/40 aspect-[4/5] relative shadow-2xl shadow-black/40">
-              <img src="/freese-after.png" alt="Hasil feed profesional"
+              <img src="/freese-after.webp" alt="Hasil feed profesional"
                 className="h-full w-full object-cover" loading="lazy" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-5">

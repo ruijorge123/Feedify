@@ -14,6 +14,12 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (r) => r,
   (err) => {
+    if (err?.response?.headers?.["x-maintenance"]) {
+      if (window.location.pathname !== "/maintenance") {
+        window.location.href = "/maintenance";
+      }
+      return Promise.reject(err);
+    }
     if (err?.response?.status === 401) {
       const path = window.location.pathname;
       if (!["/login", "/register"].includes(path)) {

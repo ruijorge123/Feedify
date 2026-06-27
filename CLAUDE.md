@@ -41,6 +41,13 @@ TELEGRAM_BOT_TOKEN=...        # enables Telegram schedule reminders
 FONNTE_TOKEN=...              # enables WhatsApp notifications via Fonnte
 FONNTE_COMMUNITY_ID=...
 FONNTE_COMMUNITY_LINK=...
+FAL_KEY=...                   # enables Reels video generation (fal.ai Kling)
+OPENAI_API_KEY=...            # GPT-4o Video Director for Reels (falls back to EMERGENT_LLM_KEY)
+SMTP_USER=...                 # enables OTP email verification on signup
+SMTP_PASSWORD=...
+SMTP_HOST=smtp.gmail.com      # default
+SMTP_PORT=587                 # default
+SMTP_FROM=...
 ```
 
 ### Frontend
@@ -71,12 +78,15 @@ REACT_APP_BACKEND_URL=http://localhost:8001 pytest tests/test_feedify_api.py::te
 ### Auth Flow
 JWT stored in `localStorage` as `feedify_token`. The axios instance in `frontend/src/lib/api.js` injects it automatically. A 401 response redirects to `/login` and clears localStorage. The backend `get_current_user` dependency validates JWT and fetches the user from MongoDB. Google OAuth is handled by `POST /api/auth/google-token` on the backend and `GoogleOAuthProvider` + `loginWithGoogle()` on the frontend (`AuthContext.jsx`).
 
+Email/password registration requires OTP verification: `POST /api/auth/register` creates an unverified user and emails a 6-digit OTP (`_send_otp_email`, requires `SMTP_USER`/`SMTP_PASSWORD`), then `POST /api/auth/verify-otp` confirms it (`VerifyEmailPage.jsx`). `POST /api/auth/login` rejects unverified accounts with `403 EMAIL_NOT_VERIFIED` and resends the OTP.
+
 ### AI Stack
 - **Image generation**: `gpt-image-1` via `emergentintegrations.llm.openai.image_generation.OpenAIImageGeneration` — triggered on banner, carousel slide, food-menu, and marketplace generation. Uses `EMERGENT_LLM_KEY`.
 - **Vision/Text AI**: Gemini (`gemini-3-flash-preview`) via `emergentintegrations.llm.chat.LlmChat` — used for photo analysis, copywriting, calendar idea generation, and brand consistency checks.
 - **Support chat**: Groq (`AsyncGroq`) via `GROQ_API_KEY` — used only for the `/chat/support` endpoint.
 - After every image is generated, `_auto_consistency_check()` runs as an `asyncio.create_task()` background task (best-effort, never blocks the response).
 - `emergentintegrations` is a private package. The stub at `backend/emergentintegrations_stub/` satisfies imports when the real package is absent; all real imports are inside `try/except` in `server.py`.
+- **Video generation (Reels)**: `POST /api/reels/generate` orchestrates `backend/video_service.py:run_reels_pipeline()` — (1) upload product image to fal.ai CDN via `fal_provider.upload_image`, (2) build a cinematic motion prompt with GPT-4o Vision via `gpt_video_director.build_video_prompt` (analyzes the image + video goal/duration/aspect ratio), (3) generate the clip with fal.ai Kling v2.5 via `fal_provider.generate_video`. Requires `FAL_KEY`; the modules degrade gracefully (raise at call time, not import time) if unset. `backend/storage.py` is a thin pass-through since videos are served directly from fal.ai CDN URLs.
 
 ### Credits System
 Credits are per-user, per-30-day rolling period. Logic lives in `_ensure_user_credits`, `_consume_credit`, `_credits_summary` in `server.py`. Credits are consumed atomically before generation and refunded if the API call fails. Plan definitions (quotas, prices) come from `feedify_config.py`. Top-up purchases go through Xendit (`POST /api/credits/purchase`, webhook at `POST /api/credits/xendit-webhook`).
@@ -113,12 +123,13 @@ Source of truth: `design_guidelines.json`. Never deviate from these:
 
 ## Content Dashboards
 
-The app has five generation dashboards (routes under `/generate/*`):
+The app has six generation dashboards (routes under `/generate/*`):
 - **Banner** (`/generate/banner`) — single static promotional image
 - **Carousel** (`/generate/carousel`) — multi-slide Instagram carousel (3–7 slides, each costs 1 credit)
 - **Copywriting** (`/generate/copywriting`) — text only via Gemini, no image credit consumed
 - **Food Menu** (`/generate/food`) — F&B specific image with mood/layout presets
 - **Marketplace** (`/generate/marketplace`) — marketplace product listing image
+- **Reels** (`ReelsGeneratorPage.jsx`) — image-to-video ad (fal.ai Kling), see Video generation above
 
 Plus planning tools: **Grid Planner** (9-slot Instagram feed preview), **Content Calendar**, **Consistency Checker**, and **History**.
 

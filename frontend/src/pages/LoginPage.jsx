@@ -2,9 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from 'react-toastify';
-import { Sparkle, Envelope, Lock, ArrowRight, ArrowLeft } from "@phosphor-icons/react";
+import { Sparkle, Envelope, ArrowRight, ArrowLeft } from "@phosphor-icons/react";
 import { useGoogleLogin } from "@react-oauth/google";
 import api from "@/lib/api";
+import { LOGIN } from "@/constants/testIds/auth";
+import PasswordInput from "@/components/PasswordInput";
 
 function GoogleButton({ onClick, loading }) {
   return (
@@ -136,14 +138,15 @@ export default function LoginPage() {
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 mb-1.5 block">Password</label>
-              <div className="relative">
-                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input type="password" required data-testid="login-password-input" value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3.5 bg-white border border-brand-sand rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-brand outline-none transition-all"
-                  placeholder="Min. 6 karakter" />
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 block">Password</label>
+                <Link to="/forgot-password" data-testid={LOGIN.forgotPasswordLink}
+                  className="text-xs font-semibold text-brand hover:underline">
+                  Lupa password?
+                </Link>
               </div>
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)}
+                dataTestId="login-password-input" placeholder="Min. 6 karakter" autoComplete="current-password" />
             </div>
             <button type="submit" disabled={loading} data-testid="login-submit-button"
               className="w-full py-4 bg-brand text-brand-cream rounded-xl font-semibold hover:bg-brand-light btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60">

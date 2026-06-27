@@ -45,15 +45,20 @@ if ! command -v yarn &>/dev/null; then
 fi
 
 # ── 3. Python & pip ──────────────────────────────────────────────────────────
-if ! command -v python3 &>/dev/null; then
-  die "Python3 tidak ditemukan. Install dari https://www.python.org lalu jalankan lagi."
+# python3 tidak selalu ada di Windows (sering cuma "python") — coba dua-duanya.
+if command -v python3 &>/dev/null; then
+  PY_CMD=python3
+elif command -v python &>/dev/null; then
+  PY_CMD=python
+else
+  die "Python tidak ditemukan. Install dari https://www.python.org lalu jalankan lagi."
 fi
 
 # Bootstrap pip jika belum ada
-if ! python3 -m pip --version &>/dev/null 2>&1; then
+if ! "$PY_CMD" -m pip --version &>/dev/null 2>&1; then
   log "Menginstall pip..."
-  python3 -m ensurepip --upgrade 2>/dev/null || {
-    curl -sSL https://bootstrap.pypa.io/get-pip.py | python3
+  "$PY_CMD" -m ensurepip --upgrade 2>/dev/null || {
+    curl -sSL https://bootstrap.pypa.io/get-pip.py | "$PY_CMD"
   }
 fi
 
@@ -61,16 +66,26 @@ fi
 VENV_DIR="$BACKEND_DIR/.venv"
 if [ ! -d "$VENV_DIR" ]; then
   log "Membuat Python virtual environment..."
-  python3 -m venv "$VENV_DIR"
+  "$PY_CMD" -m venv "$VENV_DIR"
 fi
 
 # shellcheck disable=SC1091
-source "$VENV_DIR/bin/activate"
+if [ -f "$VENV_DIR/bin/activate" ]; then
+  source "$VENV_DIR/bin/activate"
+elif [ -f "$VENV_DIR/Scripts/activate" ]; then
+  source "$VENV_DIR/Scripts/activate"
+else
+  die "Tidak ditemukan activate script di $VENV_DIR. Hapus folder .venv dan jalankan lagi."
+fi
 
 log "Menginstall Python dependencies..."
 # emergentintegrations adalah package private Emergent — tidak tersedia di PyPI publik.
 # Semua import-nya ada di dalam try/except di server.py, jadi stub lokal cukup.
-grep -v "emergentintegrations" "$BACKEND_DIR/requirements.txt" | pip install -q --timeout=300 -r /dev/stdin
+# (/dev/stdin tidak bisa dipakai sebagai -r di Git Bash/Windows, jadi pakai file sementara)
+TMP_REQ="$(mktemp)"
+grep -v "emergentintegrations" "$BACKEND_DIR/requirements.txt" > "$TMP_REQ"
+pip install -q --timeout=300 -r "$TMP_REQ"
+rm -f "$TMP_REQ"
 pip install -q -e "$BACKEND_DIR/emergentintegrations_stub/"
 
 # ── 5. Backend .env ──────────────────────────────────────────────────────────

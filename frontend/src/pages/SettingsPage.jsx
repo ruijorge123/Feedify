@@ -201,16 +201,16 @@ export default function SettingsPage() {
 
       {/* Multi-brand section */}
       <div className="feedify-card p-6 animate-fade-up">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <Buildings size={20} weight="duotone" className="text-brand" />
-            <h2 className="font-heading text-xl font-bold text-brand">Brand Profiles</h2>
-            <span className="text-xs bg-brand-sand text-brand-light px-2 py-0.5 rounded-full font-semibold">{brands.length} brand</span>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div className="flex items-center gap-2 min-w-0">
+            <Buildings size={20} weight="duotone" className="text-brand flex-shrink-0" />
+            <h2 className="font-heading text-xl font-bold text-brand truncate">Brand Profiles</h2>
+            <span className="text-xs bg-brand-sand text-brand-light px-2 py-0.5 rounded-full font-semibold flex-shrink-0">{brands.length} brand</span>
           </div>
           <button
             onClick={() => setShowNewBrand(!showNewBrand)}
             data-testid="add-brand-btn"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-gold text-brand rounded-full text-sm font-semibold hover:bg-brand-amber btn-touch"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-brand-gold text-brand rounded-full text-sm font-semibold hover:bg-brand-amber btn-touch w-full sm:w-auto"
           >
             <Plus size={14} weight="bold" /> Tambah Brand
           </button>

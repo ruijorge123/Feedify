@@ -129,6 +129,7 @@ export default function SupportChatWidget({ title = "Ada pertanyaan?", subtitle 
           />
           <button onClick={() => send()}
             disabled={!input.trim() || loading}
+            aria-label="Kirim pesan"
             className="h-9 w-9 rounded-full bg-brand text-brand-cream flex items-center justify-center flex-shrink-0 hover:bg-brand-light transition-colors disabled:opacity-40"
             data-testid="support-chat-send">
             <ArrowRight size={15} weight="bold" />

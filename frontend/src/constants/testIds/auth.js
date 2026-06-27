@@ -30,3 +30,18 @@ export const REGISTER = {
 export const LOGOUT = {
 	button: 'logout-button',
 };
+
+export const FORGOT_PASSWORD = {
+	emailInput: 'forgot-password-email-input',
+	requestSubmitButton: 'forgot-password-request-submit',
+	otpInput: 'forgot-password-otp-input',
+	newPasswordInput: 'forgot-password-new-password-input',
+	resetSubmitButton: 'forgot-password-reset-submit',
+	backToLoginLink: 'forgot-password-back-to-login',
+};
+
+export const ADMIN_PIN = {
+	input: 'admin-pin-input',
+	setupSubmitButton: 'admin-pin-setup-submit',
+	verifySubmitButton: 'admin-pin-verify-submit',
+};

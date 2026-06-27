@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import api from "@/lib/api";
 import { toast } from 'react-toastify';
 import { handleGenerateError } from "@/lib/moderation";
@@ -6,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Stack, Sparkle, CircleNotch, CheckCircle, ArrowsHorizontal, ArrowsClockwise,
          DownloadSimple, ChatCircle, Copy, Check, Hash, Images, Camera, Users,
          Person, GridFour, Shuffle, Lightning, Sliders, CaretDown, CaretUp,
-         Package, BookOpen, Palette, WarningCircle, HourglassMedium, ArrowRight } from "@phosphor-icons/react";
+         Package, BookOpen, Palette, WarningCircle, HourglassMedium, ArrowRight, Eye, X } from "@phosphor-icons/react";
 import JsonOutput from "@/components/JsonOutput";
 import BrandDnaCard from "@/components/BrandDnaCard";
 import NoCreditsModal from "@/components/NoCreditsModal";
@@ -177,6 +178,7 @@ export default function CarouselGeneratorPage() {
   const [regeneratingSlide, setRegeneratingSlide] = useState(null);
   const [referenceImg, setReferenceImg] = useState(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [ratioPreviewOpen, setRatioPreviewOpen] = useState(false);
   const [captions, setCaptions] = useState(null);
   const [generatingCaptions, setGeneratingCaptions] = useState(false);
   const [promptPreview, setPromptPreview] = useState(null);
@@ -747,9 +749,15 @@ export default function CarouselGeneratorPage() {
                     );
                   })}
                 </div>
-                <div className="mt-3">
-                  <CarouselWireframe ratio={form.aspect_ratio} slideCount={form.slide_count} />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setRatioPreviewOpen(true)}
+                  data-testid="carousel-ratio-preview-btn"
+                  className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-dashed border-brand-sand text-xs font-semibold text-brand-light hover:border-brand hover:text-brand hover:bg-brand-sand/40 transition-all"
+                >
+                  <Eye size={14} weight="duotone" />
+                  Lihat Preview {form.aspect_ratio.split(" ")[0]}
+                </button>
               </Field>
             </div>
           </SectionCard>
@@ -1092,6 +1100,29 @@ export default function CarouselGeneratorPage() {
         </div>
       )}
 
+      {ratioPreviewOpen && createPortal(
+        <div className="fixed inset-0 z-[100] bg-brand/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-backdrop-fade"
+          data-testid="carousel-ratio-preview-modal" onClick={() => setRatioPreviewOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl max-w-sm sm:max-w-xl w-full p-7 sm:p-10 animate-sheet-up">
+            <div className="flex items-start justify-between mb-5 sm:mb-7">
+              <div>
+                <h3 className="font-heading text-lg sm:text-2xl font-bold text-brand tracking-tight">Preview Carousel</h3>
+                <p className="text-sm text-stone-500 mt-0.5">{form.aspect_ratio.split(" ")[0]} · {form.slide_count} slide</p>
+              </div>
+              <button onClick={() => setRatioPreviewOpen(false)} data-testid="close-carousel-ratio-preview"
+                className="h-9 w-9 rounded-full bg-brand-sand hover:bg-brand-gold/30 text-brand flex items-center justify-center flex-shrink-0">
+                <X size={16} weight="bold" />
+              </button>
+            </div>
+            <div className="bg-brand-sand/30 rounded-2xl p-4 sm:p-8">
+              <CarouselWireframe ratio={form.aspect_ratio} slideCount={form.slide_count} />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       <NoCreditsModal open={noCredits} onClose={() => setNoCredits(false)} />
       <InspirationGallery
         open={galleryOpen}
@@ -1210,15 +1241,16 @@ function CarouselWireframe({ ratio, slideCount }) {
   const SH = Math.round(CH * 0.62);
   const SW = Math.round(CW * 0.62);
 
-  const GAP = 6, PAD = 8;
+  const GAP = 10, PAD_X = 16, PAD_Y = 14, DOTS_H = 20;
   const totalW = SW + GAP + CW + GAP + SW;
-  const vbW = totalW + PAD * 2;
-  const vbH = CH + 20; // room for nav dots
+  const vbW = totalW + PAD_X * 2;
+  const vbH = PAD_Y + CH + DOTS_H + PAD_Y; // top gap + slides + dots room + bottom gap
 
-  const sx1X = PAD;
+  const sx1X = PAD_X;
   const cX   = sx1X + SW + GAP;
   const sx2X = cX + CW + GAP;
-  const sideY = (CH - SH) / 2; // vertically centre side slides
+  const cY    = PAD_Y;
+  const sideY = PAD_Y + (CH - SH) / 2; // vertically centre side slides
 
   const dotCount = Math.min(slideCount, 6);
 
@@ -1227,14 +1259,14 @@ function CarouselWireframe({ ratio, slideCount }) {
       {/* Side slide 1 */}
       <WireSlide x={sx1X} y={sideY} w={SW} h={SH} active={false} />
       {/* Center slide */}
-      <WireSlide x={cX} y={0} w={CW} h={CH} active={true} />
+      <WireSlide x={cX} y={cY} w={CW} h={CH} active={true} />
       {/* Center border highlight */}
-      <rect x={cX - 1.5} y={-1.5} width={CW + 3} height={CH + 3} rx={5}
+      <rect x={cX - 1.5} y={cY - 1.5} width={CW + 3} height={CH + 3} rx={5}
         fill="none" stroke="#0B3D2E" strokeWidth={2} />
       {/* Side slide 2 */}
       <WireSlide x={sx2X} y={sideY} w={SW} h={SH} active={false} />
       {/* Nav dots */}
-      <g transform={`translate(${cX + CW / 2 - (dotCount - 1) * 4.5}, ${CH + 10})`}>
+      <g transform={`translate(${cX + CW / 2 - (dotCount - 1) * 4.5}, ${cY + CH + 10})`}>
         {Array.from({ length: dotCount }).map((_, i) => (
           <circle key={i} cx={i * 9} cy={0} r={i === 1 ? 3 : 2}
             fill={i === 1 ? "#0B3D2E" : "#C8D0C4"} />

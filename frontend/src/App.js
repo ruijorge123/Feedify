@@ -26,9 +26,13 @@ import CheckoutPage from "@/pages/CheckoutPage";
 import AdminPage from "@/pages/AdminPage";
 import ReelsGeneratorPage from "@/pages/ReelsGeneratorPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import MaintenancePage from "@/pages/MaintenancePage";
 import CommunityPage from "@/pages/CommunityPage";
 import BuyCreditsPage from "@/pages/BuyCreditsPage";
 import AppShell from "@/components/AppShell";
+import AdminPinGate from "@/components/AdminPinGate";
+import MenuLockGate from "@/components/MenuLockGate";
 import "@/App.css";
 
 function ScrollToTop() {
@@ -98,25 +102,27 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/forgot-password" element={<PublicOnly><ForgotPasswordPage /></PublicOnly>} />
+          <Route path="/maintenance" element={<MaintenancePage />} />
           <Route path="/onboarding" element={
             <ProtectedRoute requireBrand={false}><OnboardingPage /></ProtectedRoute>
           } />
           <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/generate/banner" element={<BannerGeneratorPage />} />
-            <Route path="/generate/carousel" element={<CarouselGeneratorPage />} />
-            <Route path="/generate/copywriting" element={<CopywritingPage />} />
-            <Route path="/generate/reels" element={<ReelsGeneratorPage />} />
-            <Route path="/generate/food" element={<AdminRoute><FoodMenuPage /></AdminRoute>} />
-            <Route path="/generate/marketplace" element={<MarketplacePage />} />
-            <Route path="/grid-planner" element={<GridPlannerPage />} />
-            <Route path="/consistency" element={<ConsistencyCheckerPage />} />
-            <Route path="/calendar" element={<ContentCalendarPage />} />
+            <Route path="/generate/banner" element={<MenuLockGate menuKey="banner"><BannerGeneratorPage /></MenuLockGate>} />
+            <Route path="/generate/carousel" element={<MenuLockGate menuKey="carousel"><CarouselGeneratorPage /></MenuLockGate>} />
+            <Route path="/generate/copywriting" element={<MenuLockGate menuKey="copywriting"><CopywritingPage /></MenuLockGate>} />
+            <Route path="/generate/reels" element={<MenuLockGate menuKey="reels"><ReelsGeneratorPage /></MenuLockGate>} />
+            <Route path="/generate/food" element={<AdminRoute><MenuLockGate menuKey="food"><FoodMenuPage /></MenuLockGate></AdminRoute>} />
+            <Route path="/generate/marketplace" element={<MenuLockGate menuKey="marketplace"><MarketplacePage /></MenuLockGate>} />
+            <Route path="/grid-planner" element={<MenuLockGate menuKey="grid-planner"><GridPlannerPage /></MenuLockGate>} />
+            <Route path="/consistency" element={<MenuLockGate menuKey="consistency"><ConsistencyCheckerPage /></MenuLockGate>} />
+            <Route path="/calendar" element={<MenuLockGate menuKey="calendar"><ContentCalendarPage /></MenuLockGate>} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/brand-kit" element={<BrandKitPage />} />
             <Route path="/more" element={<MorePage />} />
-            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/admin" element={<AdminRoute><AdminPinGate><AdminPage /></AdminPinGate></AdminRoute>} />
             <Route path="/community" element={<CommunityPage />} />
             <Route path="/credits" element={<BuyCreditsPage />} />
           </Route>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
@@ -36,7 +37,18 @@ import {
   Storefront,
   CaretDown,
   Package,
+  Wrench,
+  FilmSlate,
+  GridFour,
+  ShieldCheck,
+  EyeSlash,
 } from "@phosphor-icons/react";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+  PieChart, Pie, Cell,
+} from "recharts";
 
 const ROLE_BADGE = {
   admin: "bg-brand-gold/20 text-brand border border-brand-gold/40",
@@ -82,7 +94,7 @@ function RoleDialog({ target, currentUserId, open, onOpenChange, onSaved }) {
     setSaving(true);
     try {
       await api.patch(`/admin/users/${target.id}/role`, { role: selectedRole });
-      toast.success(`Role ${target.name} diubah ke ${selectedRole}`);
+      toast.success(`Role ${target.name} diubah ke ${selectedRole === "admin" ? "Admin" : "User"}`);
       onSaved(target.id, selectedRole);
       onOpenChange(false);
     } catch (err) {
@@ -132,7 +144,7 @@ function RoleDialog({ target, currentUserId, open, onOpenChange, onSaved }) {
           </div>
           {selectedRole !== target.role && (
             <div className="mb-4 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
-              Role akan diubah dari <strong>{target.role}</strong> → <strong>{selectedRole}</strong>
+              Role akan diubah dari <strong className="capitalize">{target.role}</strong> → <strong className="capitalize">{selectedRole}</strong>
             </div>
           )}
           <div className="flex gap-2">
@@ -401,12 +413,65 @@ function UserDetailDrawer({ userId, open, onClose }) {
   );
 }
 
+// ─── Shared collapsible card wrapper for admin panel sections ──────────────
+
+function CollapsibleCard({ icon: Icon, iconClassName, title, badge, defaultOpen = true, children, testid, cardClassName = "" }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={`feedify-card overflow-hidden ${cardClassName}`} data-testid={testid}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 px-5 py-4 hover:bg-brand-sand/20 transition-all"
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Icon size={18} weight="duotone" className={iconClassName || "text-brand"} />
+          <span className="font-heading font-bold text-brand truncate">{title}</span>
+          {badge}
+        </div>
+        <CaretDown size={14} className={`text-stone-400 transition-transform duration-300 flex-shrink-0 ${open ? "rotate-180" : ""}`} />
+      </button>
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-out"
+        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden min-h-0">
+          <div
+            className={`px-4 sm:px-5 pb-4 sm:pb-5 pt-4 border-t border-brand-sand/50 space-y-4 transition-all duration-300 ${
+              open ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
+            }`}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Analytics Panel ───────────────────────────────────────────────────────
+
+const PIE_COLORS = ["#0B3D2E", "#E5C158", "#3B82F6", "#C28E6E", "#E0607E"];
+
+function zeroFillDaily(dailyChart) {
+  const map = new Map((dailyChart || []).map((d) => [d.date, d.count]));
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    days.push({
+      date: key,
+      label: d.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }),
+      count: map.get(key) || 0,
+    });
+  }
+  return days;
+}
 
 function AnalyticsPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(true);
 
   useEffect(() => {
     api.get("/admin/analytics")
@@ -415,31 +480,15 @@ function AnalyticsPanel() {
       .finally(() => setLoading(false));
   }, []);
 
-  const maxDay = data ? Math.max(...(data.daily_chart?.map((d) => d.count) || [1]), 1) : 1;
-
   return (
-    <div className="feedify-card overflow-hidden" data-testid="analytics-panel">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-brand-sand/20 transition-all"
-      >
-        <div className="flex items-center gap-2.5">
-          <ChartBar size={18} weight="duotone" className="text-brand" />
-          <span className="font-heading font-bold text-brand">Platform Analytics</span>
-          {data && <span className="text-[10px] bg-brand-sand text-brand-light px-2 py-0.5 rounded-full font-semibold">7 hari terakhir</span>}
-        </div>
-        <CaretDown size={14} className={`text-stone-400 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+    <CollapsibleCard icon={ChartBar} title="Platform Analytics" testid="analytics-panel"
+      badge={data && <span className="text-[10px] bg-brand-sand text-brand-light px-2 py-0.5 rounded-full font-semibold flex-shrink-0">7 hari terakhir</span>}>
+      {loading && <div className="py-6 text-center text-stone-400 text-sm">Memuat analytics...</div>}
 
-      {open && (
-        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-5 border-t border-brand-sand/50">
-          {loading && <div className="py-6 text-center text-stone-400 text-sm">Memuat analytics...</div>}
-
-          {data && (
+      {data && (
             <>
               {/* Quick stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: "Konten Hari Ini", value: data.content.today, icon: TrendUp, color: "text-emerald-600", bg: "bg-emerald-50" },
                   { label: "Konten Minggu Ini", value: data.content.week, icon: ChartBar, color: "text-brand", bg: "bg-brand/5" },
@@ -454,60 +503,318 @@ function AnalyticsPanel() {
                 ))}
               </div>
 
-              {/* Daily bar chart — 7 days */}
-              {data.daily_chart?.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-400 mb-3">Konten per Hari</div>
-                  <div className="flex items-end gap-1.5 h-24">
-                    {data.daily_chart.map((d) => (
-                      <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
-                        <div className="text-[9px] font-bold text-stone-500">{d.count}</div>
-                        <div
-                          className="w-full rounded-t-md bg-brand transition-all"
-                          style={{ height: `${Math.max(4, (d.count / maxDay) * 72)}px` }}
-                        />
-                        <div className="text-[8px] text-stone-400 whitespace-nowrap">
-                          {new Date(d.date).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Daily trend — 7 days */}
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-400 mb-3">Konten per Hari</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <AreaChart data={zeroFillDaily(data.daily_chart)} margin={{ top: 5, right: 8, left: -22, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="contentGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#0B3D2E" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#0B3D2E" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid vertical={false} stroke="#EDEEE9" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#A8B0A4" }} axisLine={false} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#A8B0A4" }} axisLine={false} tickLine={false} width={28} />
+                    <RechartsTooltip
+                      contentStyle={{ borderRadius: 12, border: "1px solid #EDEEE9", fontSize: 12 }}
+                      labelStyle={{ fontWeight: 700, color: "#0B3D2E" }}
+                      formatter={(value) => [`${value} konten`, ""]}
+                    />
+                    <Area type="monotone" dataKey="count" stroke="#0B3D2E" strokeWidth={2.5} fill="url(#contentGradient)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
 
               {/* By type breakdown */}
               {Object.keys(data.content.by_type || {}).length > 0 && (
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-400 mb-3">Breakdown per Tipe (All Time)</div>
-                  <div className="space-y-2">
-                    {Object.entries(data.content.by_type)
-                      .sort(([, a], [, b]) => b - a)
-                      .map(([type, count]) => {
-                        const Icon = TYPE_ICON[type] || Package;
-                        const pct = Math.round((count / data.content.total) * 100);
-                        return (
-                          <div key={type} className="flex items-center gap-2 sm:gap-3 min-w-0">
-                            <Icon size={14} weight="duotone" className="text-brand flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-1 gap-2 min-w-0">
-                                <span className="text-xs font-semibold text-stone-600 truncate">{TYPE_LABEL[type] || type}</span>
-                                <span className="text-xs text-stone-400 flex-shrink-0">{count} ({pct}%)</span>
-                              </div>
-                              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-brand rounded-full" style={{ width: `${pct}%` }} />
-                              </div>
+                  <div className="flex flex-col sm:flex-row items-center gap-4">
+                    <ResponsiveContainer width="100%" height={160} className="sm:!w-40 sm:flex-shrink-0">
+                      <PieChart>
+                        <Pie
+                          data={Object.entries(data.content.by_type).map(([type, count]) => ({ type, count }))}
+                          dataKey="count" nameKey="type" innerRadius={45} outerRadius={70} paddingAngle={2} stroke="none"
+                        >
+                          {Object.keys(data.content.by_type).map((type, i) => (
+                            <Cell key={type} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          contentStyle={{ borderRadius: 12, border: "1px solid #EDEEE9", fontSize: 12 }}
+                          formatter={(value, _name, item) => [`${value} (${Math.round((value / data.content.total) * 100)}%)`, TYPE_LABEL[item.payload.type] || item.payload.type]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex-1 w-full space-y-2">
+                      {Object.entries(data.content.by_type)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([type, count], i) => {
+                          const Icon = TYPE_ICON[type] || Package;
+                          const pct = Math.round((count / data.content.total) * 100);
+                          return (
+                            <div key={type} className="flex items-center gap-2 min-w-0">
+                              <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                              <Icon size={13} weight="duotone" className="text-brand flex-shrink-0" />
+                              <span className="text-xs font-semibold text-stone-600 truncate flex-1">{TYPE_LABEL[type] || type}</span>
+                              <span className="text-xs text-stone-400 flex-shrink-0">{count} ({pct}%)</span>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                    </div>
                   </div>
                 </div>
               )}
             </>
-          )}
-        </div>
       )}
+    </CollapsibleCard>
+  );
+}
+
+// ─── Shared confirm modal for lockdown toggles ──────────────────────────────
+
+function ConfirmLockModal({ open, title, description, confirmLabel, danger, loading, onConfirm, onCancel }) {
+  if (!open) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-brand/40 backdrop-blur-sm flex items-center justify-center p-4 animate-backdrop-fade"
+      onClick={onCancel} data-testid="lockdown-confirm-modal">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl max-w-sm w-full p-7 animate-sheet-up">
+        <h3 className="font-heading text-lg font-bold text-brand mb-2">{title}</h3>
+        <p className="text-sm text-stone-500 leading-relaxed mb-6">{description}</p>
+        <div className="flex gap-2">
+          <button onClick={onCancel} data-testid="lockdown-confirm-cancel"
+            className="flex-1 py-2.5 rounded-xl border border-stone-200 text-stone-600 font-semibold text-sm hover:bg-stone-50 transition-all">
+            Batal
+          </button>
+          <button onClick={onConfirm} disabled={loading} data-testid="lockdown-confirm-ok"
+            className={`flex-1 py-2.5 rounded-xl font-semibold text-sm text-white disabled:opacity-50 transition-all ${danger ? "bg-red-500 hover:bg-red-600" : "bg-brand hover:bg-brand-light"}`}>
+            {loading ? "Memproses..." : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ─── Maintenance Lockdown Panel ─────────────────────────────────────────────
+
+function MaintenancePanel() {
+  const [status, setStatus] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null); // boolean (target enabled state) or null
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    try {
+      const { data } = await api.get("/admin/maintenance");
+      setStatus(data);
+    } catch { toast.error("Gagal memuat status maintenance"); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const apply = async () => {
+    const enabled = confirmTarget;
+    setSaving(true);
+    try {
+      const { data } = await api.post("/admin/maintenance", { enabled, message: "" });
+      setStatus(data);
+      toast.success(enabled ? "Maintenance diaktifkan" : "Maintenance dimatikan");
+      setConfirmTarget(null);
+    } catch { toast.error("Gagal mengubah status maintenance"); }
+    finally { setSaving(false); }
+  };
+
+  if (!status) return (
+    <div className="feedify-card p-6 animate-pulse">
+      <div className="h-4 bg-stone-100 rounded w-1/3 mb-3" />
+      <div className="h-10 bg-stone-100 rounded w-1/2" />
     </div>
+  );
+
+  return (
+    <CollapsibleCard icon={Wrench} title="Lockdown Menu (Maintenance)" testid="maintenance-panel"
+      iconClassName={status.enabled ? "text-red-500" : "text-brand"}
+      cardClassName={status.enabled ? "border-2 border-red-300" : ""}
+      badge={
+        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${status.enabled ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}>
+          {status.enabled ? "AKTIF" : "Normal"}
+        </span>
+      }>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-stone-500 flex-1 min-w-[180px]">Saat diaktifkan, semua user (selain admin) akan melihat halaman maintenance dan tidak bisa mengakses aplikasi sama sekali.</p>
+        <Switch
+          checked={status.enabled}
+          disabled={saving}
+          data-testid="maintenance-switch"
+          onCheckedChange={(checked) => setConfirmTarget(checked)}
+        />
+      </div>
+      {status.updated_at && (
+        <p className="text-xs text-stone-400">
+          Terakhir diubah {formatDateTime(status.updated_at)}{status.updated_by_name ? ` oleh ${status.updated_by_name}` : ""}
+        </p>
+      )}
+
+      <ConfirmLockModal
+        open={confirmTarget !== null}
+        loading={saving}
+        danger={confirmTarget === true}
+        title={confirmTarget ? "Aktifkan maintenance seluruh app?" : "Matikan mode maintenance?"}
+        description={confirmTarget
+          ? "Semua user (selain admin) akan langsung diarahkan ke halaman maintenance dan tidak bisa mengakses aplikasi sampai kamu matikan lagi."
+          : "User bisa mengakses aplikasi seperti biasa lagi."}
+        confirmLabel={confirmTarget ? "Ya, Aktifkan" : "Ya, Matikan"}
+        onConfirm={apply}
+        onCancel={() => setConfirmTarget(null)}
+      />
+    </CollapsibleCard>
+  );
+}
+
+// ─── Per-Menu Lockdown Panel ─────────────────────────────────────────────────
+
+const MENU_LOCK_ICONS = {
+  banner: ImageSquare,
+  carousel: Stack,
+  copywriting: PenNib,
+  reels: FilmSlate,
+  food: ForkKnife,
+  marketplace: Storefront,
+  "grid-planner": GridFour,
+  consistency: ShieldCheck,
+  calendar: CalendarBlank,
+};
+
+const MODE_META = {
+  active: {
+    label: "Aktif", icon: CheckCircle,
+    badge: "bg-emerald-100 text-emerald-600",
+    ring: "border-stone-100 bg-white",
+  },
+  maintenance: {
+    label: "Maintenance", icon: Wrench,
+    badge: "bg-amber-100 text-amber-600",
+    ring: "border-amber-200 bg-amber-50/40",
+  },
+  hidden: {
+    label: "Hidden", icon: EyeSlash,
+    badge: "bg-red-100 text-red-600",
+    ring: "border-red-200 bg-red-50/40",
+  },
+};
+
+const MODE_CONFIRM = {
+  active: { title: (label) => `Aktifkan menu ${label}?`, desc: "Menu ini akan terlihat & bisa diakses user lagi seperti biasa.", confirmLabel: "Ya, Aktifkan", danger: false },
+  maintenance: { title: (label) => `Set ${label} ke mode Maintenance?`, desc: "Menu tetap terlihat di navigasi, tapi user akan melihat halaman maintenance saat membukanya.", confirmLabel: "Ya, Maintenance", danger: true },
+  hidden: { title: (label) => `Sembunyikan menu ${label}?`, desc: "Menu ini akan hilang total dari navigasi user — seolah menu ini tidak ada sama sekali.", confirmLabel: "Ya, Sembunyikan", danger: true },
+};
+
+function MenuLockdownPanel() {
+  const [menus, setMenus] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null); // {key, mode} or null
+  const [saving, setSaving] = useState(null);
+
+  const load = async () => {
+    try {
+      const { data } = await api.get("/admin/menu-lockdown");
+      setMenus(data);
+    } catch { toast.error("Gagal memuat status menu"); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const apply = async () => {
+    const { key, mode } = confirmTarget;
+    setSaving(key);
+    try {
+      await api.post("/admin/menu-lockdown", { menu_key: key, mode });
+      setMenus((prev) => ({ ...prev, [key]: { ...prev[key], mode } }));
+      toast.success(`${menus[key].label} → ${MODE_META[mode].label}`);
+      setConfirmTarget(null);
+    } catch { toast.error("Gagal mengubah status menu"); }
+    finally { setSaving(null); }
+  };
+
+  if (!menus) return (
+    <div className="feedify-card p-6 animate-pulse">
+      <div className="h-4 bg-stone-100 rounded w-1/3 mb-3" />
+      <div className="h-20 bg-stone-100 rounded-2xl" />
+    </div>
+  );
+
+  const inactiveCount = Object.values(menus).filter((m) => m.mode !== "active").length;
+
+  return (
+    <CollapsibleCard icon={Lightning} title="Lockdown Per Menu" testid="menu-lockdown-panel"
+      badge={inactiveCount > 0 && (
+        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-600 flex-shrink-0">
+          {inactiveCount} menu tidak aktif
+        </span>
+      )}>
+      <p className="text-sm text-stone-500">
+        <strong className="text-amber-600 font-semibold">Maintenance</strong> = menu tetap kelihatan, tapi gak bisa dibuka.{" "}
+        <strong className="text-red-500 font-semibold">Hidden</strong> = menu hilang total dari navigasi user.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {Object.entries(menus).map(([key, m]) => {
+          const Icon = MENU_LOCK_ICONS[key] || Package;
+          const meta = MODE_META[m.mode] || MODE_META.active;
+          return (
+            <div key={key}
+              className={`p-4 rounded-2xl border-2 transition-all ${meta.ring}`}
+              data-testid={`menu-lockdown-card-${key}`}>
+              <div className="flex items-center gap-3 mb-3.5">
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 ${m.mode === "active" ? "bg-brand-sand text-brand" : meta.badge}`}>
+                  <Icon size={18} weight="duotone" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm text-stone-700 truncate">{m.label}</div>
+                  <div className={`flex items-center gap-1 mt-0.5 text-xs font-medium ${m.mode === "active" ? "text-emerald-600" : m.mode === "maintenance" ? "text-amber-600" : "text-red-500"}`}>
+                    <meta.icon size={12} weight="bold" /> {meta.label}
+                  </div>
+                </div>
+              </div>
+              <Select
+                value={m.mode}
+                disabled={saving === key}
+                onValueChange={(modeKey) => modeKey !== m.mode && setConfirmTarget({ key, mode: modeKey })}
+              >
+                <SelectTrigger data-testid={`menu-lockdown-select-${key}`} className="h-9 text-xs font-semibold bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(MODE_META).map(([modeKey, mm]) => (
+                    <SelectItem key={modeKey} value={modeKey} className="text-xs font-medium">
+                      <span className="flex items-center gap-1.5">
+                        <mm.icon size={13} weight="bold" className={
+                          modeKey === "active" ? "text-emerald-500" : modeKey === "maintenance" ? "text-amber-500" : "text-red-500"
+                        } />
+                        {mm.label}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          );
+        })}
+      </div>
+
+      <ConfirmLockModal
+        open={!!confirmTarget}
+        loading={!!saving}
+        danger={confirmTarget ? MODE_CONFIRM[confirmTarget.mode].danger : false}
+        title={confirmTarget ? MODE_CONFIRM[confirmTarget.mode].title(menus[confirmTarget.key]?.label) : ""}
+        description={confirmTarget ? MODE_CONFIRM[confirmTarget.mode].desc : ""}
+        confirmLabel={confirmTarget ? MODE_CONFIRM[confirmTarget.mode].confirmLabel : ""}
+        onConfirm={apply}
+        onCancel={() => setConfirmTarget(null)}
+      />
+    </CollapsibleCard>
   );
 }
 
@@ -558,12 +865,18 @@ function DailyVoucherPanel() {
   const remaining = voucher?.claims_remaining ?? 0;
 
   return (
-    <div className="feedify-card p-4 sm:p-6 space-y-5" data-testid="daily-voucher-panel">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
-          <InstagramLogo size={20} weight="duotone" className="text-pink-500 flex-shrink-0" />
-          <span className="font-heading font-bold text-brand text-base sm:text-lg">Voucher Harian IG Story</span>
-        </div>
+    <CollapsibleCard
+      icon={InstagramLogo}
+      iconClassName="text-pink-500"
+      title="Voucher Harian IG Story"
+      badge={
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isFull ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}>
+          {voucher?.claims_used}/{voucher?.max_claims}{isFull ? " · PENUH" : ""}
+        </span>
+      }
+      testid="daily-voucher-panel"
+    >
+      <div className="flex items-center justify-end gap-2 -mt-1">
         <button onClick={regenerate} disabled={regenerating}
           className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-stone-200 text-stone-500 hover:border-brand hover:text-brand transition-all disabled:opacity-50">
           <ArrowsClockwise size={13} className={regenerating ? "animate-spin" : ""} />
@@ -612,7 +925,7 @@ function DailyVoucherPanel() {
       {voucher?.claimants?.length === 0 && (
         <div className="text-center py-4 text-stone-400 text-sm">Belum ada yang klaim — post kode ke IG Story @feedify.id</div>
       )}
-    </div>
+    </CollapsibleCard>
   );
 }
 
@@ -670,6 +983,8 @@ export default function AdminPage() {
         <p className="text-stone-500 text-sm mt-1">Kelola semua pengguna Feedify</p>
       </div>
 
+      <MaintenancePanel />
+      <MenuLockdownPanel />
       <DailyVoucherPanel />
       <AnalyticsPanel />
 
@@ -753,7 +1068,7 @@ export default function AdminPage() {
                     <div className="flex items-center gap-1"><CalendarBlank size={12} />{formatDate(u.created_at)}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${ROLE_BADGE[u.role] || ROLE_BADGE.user}`}>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${ROLE_BADGE[u.role] || ROLE_BADGE.user}`}>
                       {u.role === "admin" ? <Crown size={10} weight="fill" /> : <UserCircle size={10} />}
                       {u.role}
                     </span>
@@ -820,7 +1135,7 @@ export default function AdminPage() {
                     <div className="text-xs text-stone-400 truncate">{u.email}</div>
                   </div>
                 </div>
-                <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${ROLE_BADGE[u.role] || ROLE_BADGE.user}`}>
+                <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${ROLE_BADGE[u.role] || ROLE_BADGE.user}`}>
                   {u.role === "admin" ? <Crown size={10} weight="fill" /> : <UserCircle size={10} />}
                   {u.role}
                 </span>

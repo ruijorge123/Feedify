@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { useMenuLockStatus, menuMode } from "@/lib/menuLock";
 import {
   GridFour,
   ShieldCheck,
@@ -21,19 +22,19 @@ const sections = [
   {
     title: "Generators",
     items: [
-      { to: "/generate/banner", label: "Feed Post Generator", desc: "Konten feed Instagram siap posting", icon: ImageSquare, color: "bg-brand text-brand-cream" },
-      { to: "/generate/carousel", label: "Carousel Builder", desc: "3–7 slide storytelling", icon: Stack, color: "bg-brand-gold text-brand" },
-      { to: "/generate/reels", label: "Reels Generator", desc: "Video iklan pendek dari foto produk", icon: FilmSlate, color: "bg-violet-700 text-violet-50" },
-      { to: "/generate/copywriting", label: "Copywriting", desc: "Headline, caption, hashtag", icon: PenNib, color: "bg-brand-clay text-white" },
-      { to: "/generate/food", label: "F&B Menu Visual", desc: "Food photography prompt khusus", icon: ForkKnife, color: "bg-amber-700 text-amber-50", adminOnly: true },
+      { to: "/generate/banner", label: "Feed Post Generator", desc: "Konten feed Instagram siap posting", icon: ImageSquare, color: "bg-brand text-brand-cream", lockKey: "banner" },
+      { to: "/generate/carousel", label: "Carousel Builder", desc: "3–7 slide storytelling", icon: Stack, color: "bg-brand-gold text-brand", lockKey: "carousel" },
+      { to: "/generate/reels", label: "Reels Generator", desc: "Video iklan pendek dari foto produk", icon: FilmSlate, color: "bg-violet-700 text-violet-50", lockKey: "reels" },
+      { to: "/generate/copywriting", label: "Copywriting", desc: "Headline, caption, hashtag", icon: PenNib, color: "bg-brand-clay text-white", lockKey: "copywriting" },
+      { to: "/generate/food", label: "F&B Menu Visual", desc: "Food photography prompt khusus", icon: ForkKnife, color: "bg-amber-700 text-amber-50", adminOnly: true, lockKey: "food" },
     ],
   },
   {
     title: "Planning & QA",
     items: [
-      { to: "/grid-planner", label: "Feed Grid Planner", desc: "Plan 3×3 Instagram feed", icon: GridFour, color: "bg-emerald-700 text-emerald-50" },
-      { to: "/consistency", label: "Consistency Checker", desc: "Skor konsistensi vs Brand DNA", icon: ShieldCheck, color: "bg-rose-700 text-rose-50" },
-      { to: "/calendar", label: "Calendar Planner", desc: "Jadwalkan konten & notif pengingat", icon: CalendarBlank, color: "bg-indigo-700 text-indigo-50" },
+      { to: "/grid-planner", label: "Feed Grid Planner", desc: "Plan 3×3 Instagram feed", icon: GridFour, color: "bg-emerald-700 text-emerald-50", lockKey: "grid-planner" },
+      { to: "/consistency", label: "Consistency Checker", desc: "Skor konsistensi vs Brand DNA", icon: ShieldCheck, color: "bg-rose-700 text-rose-50", lockKey: "consistency" },
+      { to: "/calendar", label: "Calendar Planner", desc: "Jadwalkan konten & notif pengingat", icon: CalendarBlank, color: "bg-indigo-700 text-indigo-50", lockKey: "calendar" },
     ],
   },
   {
@@ -53,6 +54,7 @@ const sections = [
 
 export default function MorePage() {
   const { user } = useAuth();
+  const lockStatus = useMenuLockStatus();
 
   return (
     <div className="space-y-8" data-testid="more-page">
@@ -66,7 +68,7 @@ export default function MorePage() {
         <div key={sec.title} className="animate-fade-up">
           <h2 className="font-heading text-xl font-bold text-brand mb-3">{sec.title}</h2>
           <div className="grid sm:grid-cols-2 gap-3">
-            {sec.items.filter(item => !item.adminOnly || user?.role === "admin").map((item) => (
+            {sec.items.filter(item => (!item.adminOnly || user?.role === "admin") && (!item.lockKey || menuMode(lockStatus, item.lockKey) !== "hidden")).map((item) => (
               <Link
                 key={item.to}
                 to={item.to}

@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from 'react-toastify';
-import { Sparkle, User, Envelope, Lock, ArrowRight, ArrowLeft } from "@phosphor-icons/react";
+import { Sparkle, User, Envelope, ArrowRight, ArrowLeft } from "@phosphor-icons/react";
 import { useGoogleLogin } from "@react-oauth/google";
 import api from "@/lib/api";
+import PasswordInput from "@/components/PasswordInput";
 
 function GoogleButton({ onClick, loading }) {
   return (
@@ -153,13 +154,8 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 mb-1.5 block">Password</label>
-              <div className="relative">
-                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input type="password" required data-testid="register-password-input" value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3.5 bg-white border border-brand-sand rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-brand outline-none transition-all"
-                  placeholder="Min. 6 karakter" />
-              </div>
+              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)}
+                dataTestId="register-password-input" placeholder="Min. 6 karakter" autoComplete="new-password" />
             </div>
             <button type="submit" disabled={loading} data-testid="register-submit-button"
               className="w-full py-4 bg-brand text-brand-cream rounded-xl font-semibold hover:bg-brand-light btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60">
