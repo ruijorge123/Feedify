@@ -499,12 +499,13 @@ async def _get_balance(user_id: str) -> int:
     doc = await db.user_credits.find_one({"user_id": user_id}, {"balance": 1})
     return (doc or {}).get("balance", 0)
 
-async def _consume_credit(user_id: str, n: int = 1) -> bool:
+async def _consume_credit(user_id: str, n: int = 1, role: str = "user") -> bool:
     """
-    Atomically deduct n credits. Uses findOneAndUpdate with balance >= n filter
-    so there is no race condition. Returns True if deducted, False if insufficient.
-    Also logs to credit_transactions.
+    Atomically deduct n credits. Admin users bypass credit check entirely.
+    Returns True if deducted (or admin), False if insufficient balance.
     """
+    if role == "admin":
+        return True
     result = await db.user_credits.find_one_and_update(
         {"user_id": user_id, "balance": {"$gte": n}},
         {"$inc": {"balance": -n}, "$set": {"updated_at": now_iso()}},
@@ -3581,7 +3582,7 @@ async def generate_banner(payload: BannerPromptIn, current_user: dict = Depends(
     _raise_if_banned(payload.headline, payload.subheadline, payload.description, payload.product_name, payload.call_to_action)
 
     # Consume credit first (refund on failure)
-    if not await _consume_credit(current_user["id"], 1):
+    if not await _consume_credit(current_user["id"], 1, current_user.get("role", "user")):
         raise HTTPException(status_code=402, detail="Kredit tidak cukup. Beli kredit di halaman pricing.")
 
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
@@ -3646,7 +3647,7 @@ async def generate_carousel(payload: CarouselPromptIn, current_user: dict = Depe
 
     n_slides = payload.slide_count
     # Need n credits
-    if not await _consume_credit(current_user["id"], n_slides):
+    if not await _consume_credit(current_user["id"], n_slides, current_user.get("role", "user")):
         raise HTTPException(status_code=402, detail=f"Butuh {n_slides} kredit, tidak cukup. Upgrade paket atau top-up.")
 
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
@@ -3712,7 +3713,7 @@ async def generate_carousel_stream(payload: CarouselPromptIn, current_user: dict
     _raise_if_banned(payload.topic, payload.product_name, payload.call_to_action, payload.target_audience)
 
     n_slides = payload.slide_count
-    if not await _consume_credit(current_user["id"], n_slides):
+    if not await _consume_credit(current_user["id"], n_slides, current_user.get("role", "user")):
         raise HTTPException(status_code=402, detail=f"Butuh {n_slides} kredit, tidak cukup.")
 
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
@@ -3846,7 +3847,7 @@ async def regenerate_slide(payload: RegenerateIn, current_user: dict = Depends(g
     if payload.slide_index < 0 or payload.slide_index >= len(existing["prompt_json"]["slides"]):
         raise HTTPException(status_code=400, detail="Invalid slide_index")
 
-    if not await _consume_credit(current_user["id"], 1):
+    if not await _consume_credit(current_user["id"], 1, current_user.get("role", "user")):
         raise HTTPException(status_code=402, detail="Kredit tidak cukup. Beli kredit di halaman pricing.")
 
     try:
@@ -3887,7 +3888,7 @@ async def regenerate(payload: RegenerateIn, current_user: dict = Depends(get_cur
     if existing.get("dashboard_type") == "carousel":
         raise HTTPException(status_code=400, detail="Use /prompt/regenerate-slide for carousel")
 
-    if not await _consume_credit(current_user["id"], 1):
+    if not await _consume_credit(current_user["id"], 1, current_user.get("role", "user")):
         raise HTTPException(status_code=402, detail="Kredit tidak cukup. Beli kredit di halaman pricing.")
 
     try:
@@ -4511,7 +4512,7 @@ async def generate_food_menu(payload: FoodMenuIn, current_user: dict = Depends(g
     item_texts = " ".join(str(i.get("name", "")) + " " + str(i.get("description", "")) for i in (payload.items or []))
     _raise_if_banned(payload.menu_name, payload.headline, payload.call_to_action, item_texts)
 
-    if not await _consume_credit(current_user["id"], 1):
+    if not await _consume_credit(current_user["id"], 1, current_user.get("role", "user")):
         raise HTTPException(status_code=402, detail="Kredit tidak cukup. Beli kredit di halaman pricing.")
 
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
@@ -4733,7 +4734,7 @@ async def generate_marketplace(payload: MarketplaceIn, current_user: dict = Depe
     # Content moderation
     _raise_if_banned(payload.product_name, payload.tagline, payload.promo_label)
 
-    if not await _consume_credit(current_user["id"], 1):
+    if not await _consume_credit(current_user["id"], 1, current_user.get("role", "user")):
         raise HTTPException(status_code=402, detail="Kredit tidak cukup. Beli kredit di halaman pricing.")
 
     brand = await _get_active_brand(current_user["id"])
@@ -6104,7 +6105,7 @@ async def generate_reels(
 
     # Consume credits upfront (refund on failure)
     user_id = current_user["id"]
-    consumed = await _consume_credit(user_id, REELS_CREDITS_PER_VIDEO)
+    consumed = await _consume_credit(user_id, REELS_CREDITS_PER_VIDEO, current_user.get("role", "user"))
     if not consumed:
         raise HTTPException(status_code=402, detail=f"Kredit tidak cukup — dibutuhkan {REELS_CREDITS_PER_VIDEO} kredit untuk generate video")
 
