@@ -1532,8 +1532,8 @@ async def upsert_brand_profile(payload: BrandProfileIn, current_user: dict = Dep
     if not existing:
         existing = await db.brand_profiles.find_one({"user_id": current_user["id"]})
 
-    # Credits gate: new users must have at least 1 credit before completing onboarding
-    if not existing:
+    # Credits gate: new users must have at least 1 credit before completing onboarding (admin bypass)
+    if not existing and current_user.get("role") != "admin":
         credits_doc = await db.user_credits.find_one({"user_id": current_user["id"]})
         balance = (credits_doc or {}).get("balance", 0)
         if balance <= 0:

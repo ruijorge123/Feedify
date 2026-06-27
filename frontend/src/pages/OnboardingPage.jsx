@@ -108,7 +108,7 @@ export default function OnboardingPage() {
       navigate("/dashboard");
     } catch (err) {
       const detail = err?.response?.data?.detail;
-      if (err?.response?.status === 402 && detail?.type === "no_credits") {
+      if (err?.response?.status === 402 && detail?.type === "no_credits" && user?.role !== "admin") {
         setShowPaywall(true);
       } else {
         toast.error(typeof detail === "string" ? detail : "Gagal menyimpan");
