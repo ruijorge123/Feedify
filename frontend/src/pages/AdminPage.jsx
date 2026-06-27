@@ -259,9 +259,9 @@ function UserDetailDrawer({ userId, open, onClose }) {
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed right-0 top-0 h-full w-full max-w-md z-50 bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+      <div className="fixed right-0 top-0 h-full w-full max-w-md z-50 bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 min-w-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-brand-sand">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-brand-sand">
           <div className="font-heading font-bold text-brand text-lg">Detail User</div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-stone-100 text-stone-400 transition-all btn-touch">
             <X size={18} />
@@ -276,19 +276,19 @@ function UserDetailDrawer({ userId, open, onClose }) {
           )}
 
           {detail && (
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-6">
               {/* User info */}
-              <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-full bg-brand text-brand-cream flex items-center justify-center font-heading font-bold text-2xl flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-brand text-brand-cream flex items-center justify-center font-heading font-bold text-xl sm:text-2xl flex-shrink-0">
                   {detail.user.name?.[0]?.toUpperCase() || "?"}
                 </div>
-                <div>
-                  <div className="font-heading font-bold text-brand text-lg flex items-center gap-2">
-                    {detail.user.name}
-                    {detail.user.role === "admin" && <Crown size={14} weight="fill" className="text-brand-gold" />}
-                    {detail.user.google_linked && <GoogleLogo size={14} weight="fill" className="text-blue-400" />}
+                <div className="min-w-0">
+                  <div className="font-heading font-bold text-brand text-base sm:text-lg flex items-center gap-1.5 flex-wrap">
+                    <span className="truncate">{detail.user.name}</span>
+                    {detail.user.role === "admin" && <Crown size={14} weight="fill" className="text-brand-gold flex-shrink-0" />}
+                    {detail.user.google_linked && <GoogleLogo size={14} weight="fill" className="text-blue-400 flex-shrink-0" />}
                   </div>
-                  <div className="text-sm text-stone-500">{detail.user.email}</div>
+                  <div className="text-sm text-stone-500 truncate">{detail.user.email}</div>
                   <div className="text-xs text-stone-400 mt-0.5">Daftar {formatDate(detail.user.created_at)}</div>
                 </div>
               </div>
@@ -313,7 +313,7 @@ function UserDetailDrawer({ userId, open, onClose }) {
                 <div>
                   <div className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-3">Brand Profile</div>
                   <div className="feedify-card p-4 space-y-2">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div className="h-10 w-10 rounded-xl overflow-hidden flex-shrink-0 border border-brand-sand flex items-center justify-center"
                         style={{ background: detail.brand.color_secondary || "#FDFBF7" }}>
                         {detail.brand.logo_base64
@@ -323,11 +323,11 @@ function UserDetailDrawer({ userId, open, onClose }) {
                             </span>
                         }
                       </div>
-                      <div>
-                        <div className="font-semibold text-brand">{detail.brand.brand_name}</div>
-                        <div className="text-xs text-stone-500">{detail.brand.category}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-brand truncate">{detail.brand.brand_name}</div>
+                        <div className="text-xs text-stone-500 truncate">{detail.brand.category}</div>
                       </div>
-                      <div className="ml-auto flex gap-1.5">
+                      <div className="flex-shrink-0 flex gap-1.5">
                         {[detail.brand.color_primary, detail.brand.color_secondary].filter(Boolean).map((c) => (
                           <div key={c} className="h-5 w-5 rounded-full border border-white shadow-sm" style={{ background: c }} title={c} />
                         ))}
@@ -433,7 +433,7 @@ function AnalyticsPanel() {
       </button>
 
       {open && (
-        <div className="px-5 pb-5 space-y-5 border-t border-brand-sand/50">
+        <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-5 border-t border-brand-sand/50">
           {loading && <div className="py-6 text-center text-stone-400 text-sm">Memuat analytics...</div>}
 
           {data && (
@@ -486,12 +486,12 @@ function AnalyticsPanel() {
                         const Icon = TYPE_ICON[type] || Package;
                         const pct = Math.round((count / data.content.total) * 100);
                         return (
-                          <div key={type} className="flex items-center gap-3">
+                          <div key={type} className="flex items-center gap-2 sm:gap-3 min-w-0">
                             <Icon size={14} weight="duotone" className="text-brand flex-shrink-0" />
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs font-semibold text-stone-600">{TYPE_LABEL[type] || type}</span>
-                                <span className="text-xs text-stone-400">{count} ({pct}%)</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-1 gap-2 min-w-0">
+                                <span className="text-xs font-semibold text-stone-600 truncate">{TYPE_LABEL[type] || type}</span>
+                                <span className="text-xs text-stone-400 flex-shrink-0">{count} ({pct}%)</span>
                               </div>
                               <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
                                 <div className="h-full bg-brand rounded-full" style={{ width: `${pct}%` }} />
@@ -558,22 +558,22 @@ function DailyVoucherPanel() {
   const remaining = voucher?.claims_remaining ?? 0;
 
   return (
-    <div className="feedify-card p-6 space-y-5" data-testid="daily-voucher-panel">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <InstagramLogo size={20} weight="duotone" className="text-pink-500" />
-          <span className="font-heading font-bold text-brand text-lg">Voucher Harian IG Story</span>
+    <div className="feedify-card p-4 sm:p-6 space-y-5" data-testid="daily-voucher-panel">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2 min-w-0">
+          <InstagramLogo size={20} weight="duotone" className="text-pink-500 flex-shrink-0" />
+          <span className="font-heading font-bold text-brand text-base sm:text-lg">Voucher Harian IG Story</span>
         </div>
         <button onClick={regenerate} disabled={regenerating}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-stone-200 text-stone-500 hover:border-brand hover:text-brand transition-all disabled:opacity-50">
+          className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-stone-200 text-stone-500 hover:border-brand hover:text-brand transition-all disabled:opacity-50">
           <ArrowsClockwise size={13} className={regenerating ? "animate-spin" : ""} />
           Generate ulang
         </button>
       </div>
-      <div className="flex items-center gap-3 p-4 bg-brand rounded-2xl">
-        <div className="flex-1">
+      <div className="flex items-center gap-3 p-3 sm:p-4 bg-brand rounded-2xl min-w-0">
+        <div className="flex-1 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.2em] text-brand-cream/60 font-bold mb-1">Kode hari ini · {voucher?.date}</div>
-          <div className="font-heading text-3xl font-bold text-brand-gold tracking-widest">{voucher?.code}</div>
+          <div className="font-heading text-2xl sm:text-3xl font-bold text-brand-gold tracking-widest break-all">{voucher?.code}</div>
           <div className="text-xs text-brand-cream/70 mt-1">Diskon {voucher?.discount_pct}% · Max {voucher?.max_claims} pengguna</div>
         </div>
         <button onClick={copy}
@@ -661,10 +661,10 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6" data-testid="admin-page">
-      <div className="animate-fade-up">
+      <div className="animate-fade-up min-w-0">
         <div className="text-xs uppercase tracking-[0.2em] text-brand-light font-semibold mb-2">Admin</div>
-        <h1 className="font-heading text-3xl sm:text-4xl font-bold text-brand tracking-tight flex items-center gap-2">
-          <ShieldStar size={32} weight="duotone" className="text-brand-gold" />
+        <h1 className="font-heading text-2xl sm:text-4xl font-bold text-brand tracking-tight flex items-center gap-2">
+          <ShieldStar size={28} weight="duotone" className="text-brand-gold flex-shrink-0" />
           Panel Admin
         </h1>
         <p className="text-stone-500 text-sm mt-1">Kelola semua pengguna Feedify</p>
@@ -681,11 +681,11 @@ export default function AdminPage() {
           { label: "Punya Brand", value: withBrand, icon: Images, color: "text-emerald-600" },
           { label: "Google Login", value: googleCount, icon: GoogleLogo, color: "text-blue-500" },
         ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="feedify-card p-4 flex items-center gap-3">
-            <Icon size={22} weight="duotone" className={color} />
-            <div>
-              <div className="font-heading text-xl font-bold text-brand">{value}</div>
-              <div className="text-xs text-stone-500">{label}</div>
+          <div key={label} className="feedify-card p-3 sm:p-4 flex items-center gap-2 sm:gap-3 min-w-0">
+            <Icon size={20} weight="duotone" className={`${color} flex-shrink-0`} />
+            <div className="min-w-0">
+              <div className="font-heading text-lg sm:text-xl font-bold text-brand">{value}</div>
+              <div className="text-xs text-stone-500 truncate">{label}</div>
             </div>
           </div>
         ))}
@@ -693,17 +693,17 @@ export default function AdminPage() {
 
       {/* Search */}
       <div className="feedify-card p-4 animate-fade-up">
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <div className="relative flex-1">
+        <form onSubmit={handleSearch} className="flex gap-2 min-w-0">
+          <div className="relative flex-1 min-w-0">
             <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-            <input type="text" placeholder="Cari nama atau email..." value={searchInput}
+            <input type="text" placeholder="Cari nama / email..." value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)} data-testid="admin-search"
-              className="w-full pl-9 pr-4 py-2.5 bg-white border border-brand-sand rounded-xl text-sm focus:ring-2 focus:ring-brand-gold focus:border-brand outline-none" />
+              className="w-full pl-9 pr-2 py-2.5 bg-white border border-brand-sand rounded-xl text-sm focus:ring-2 focus:ring-brand-gold focus:border-brand outline-none" />
           </div>
           <button type="submit" data-testid="admin-search-btn"
-            className="px-4 py-2.5 bg-brand text-brand-cream rounded-xl text-sm font-semibold hover:bg-brand-light btn-touch">Cari</button>
+            className="flex-shrink-0 px-3 sm:px-4 py-2.5 bg-brand text-brand-cream rounded-xl text-sm font-semibold hover:bg-brand-light btn-touch">Cari</button>
           <button type="button" onClick={() => { setSearchInput(""); setSearch(""); setPage(1); }} title="Reset"
-            className="px-3 py-2.5 border border-brand-sand text-stone-500 rounded-xl hover:bg-brand-sand btn-touch">
+            className="flex-shrink-0 px-2.5 py-2.5 border border-brand-sand text-stone-500 rounded-xl hover:bg-brand-sand btn-touch">
             <ArrowClockwise size={16} />
           </button>
         </form>
@@ -711,11 +711,11 @@ export default function AdminPage() {
 
       {/* User table */}
       <div className="feedify-card overflow-hidden animate-fade-up">
-        <div className="px-5 py-4 border-b border-brand-sand/50 flex items-center justify-between">
-          <span className="font-heading font-bold text-brand text-sm">
+        <div className="px-4 sm:px-5 py-4 border-b border-brand-sand/50 flex items-center justify-between gap-2 min-w-0">
+          <span className="font-heading font-bold text-brand text-sm truncate min-w-0">
             {total} pengguna{search ? ` · hasil: "${search}"` : ""}
           </span>
-          {loading && <ArrowClockwise size={16} className="animate-spin text-stone-400" />}
+          {loading && <ArrowClockwise size={16} className="animate-spin text-stone-400 flex-shrink-0" />}
         </div>
 
         {/* Desktop */}
@@ -851,7 +851,7 @@ export default function AdminPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-5 py-4 border-t border-brand-sand/50 flex items-center justify-between gap-2">
+          <div className="px-4 sm:px-5 py-4 border-t border-brand-sand/50 flex items-center justify-between gap-2 flex-wrap">
             <span className="text-xs text-stone-500">Halaman {page} dari {totalPages}</span>
             <div className="flex items-center gap-2">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}

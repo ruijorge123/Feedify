@@ -425,14 +425,14 @@ export default function CarouselGeneratorPage() {
   return (
     <div className="space-y-6" data-testid="carousel-generator-page">
       {/* Header */}
-      <div className="animate-fade-up">
-        <h1 className="font-heading text-3xl sm:text-4xl font-bold text-brand tracking-tight">Carousel Builder</h1>
+      <div className="animate-fade-up min-w-0">
+        <h1 className="font-heading text-2xl sm:text-4xl font-bold text-brand tracking-tight">Carousel Builder</h1>
         <p className="text-stone-500 mt-1.5 max-w-xl text-sm">
           Isi brief sederhana — Feedify Visual Director mengubahnya menjadi carousel Instagram level agency.
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-6 min-w-0">
         {/* ── Left: Form ─────────────────────────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-4 animate-fade-up min-w-0">
 
@@ -461,14 +461,14 @@ export default function CarouselGeneratorPage() {
             </Field>
 
             <Field label="Content Goal">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                 {CONTENT_GOALS.map((g) => (
                   <button
                     key={g.id}
                     type="button"
                     data-testid={`goal-${g.id}`}
                     onClick={() => upd("content_goal", g.id)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    className={`px-2.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                       form.content_goal === g.id ? g.color + " ring-1 ring-offset-1 ring-current" : "bg-white border-stone-200 text-stone-600 hover:border-stone-300"
                     }`}
                   >
@@ -547,15 +547,15 @@ export default function CarouselGeneratorPage() {
                     type="button"
                     data-testid={`visual-type-${id}`}
                     onClick={() => upd("visual_type", id)}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                    className={`p-3 rounded-xl border-2 text-left transition-all min-w-0 ${
                       form.visual_type === id
                         ? "border-brand bg-brand-sand"
                         : "border-stone-100 hover:border-brand/30 bg-white"
                     }`}
                   >
                     <Icon size={18} weight="duotone" className={form.visual_type === id ? "text-brand" : "text-stone-400"} />
-                    <div className={`font-semibold text-xs mt-1.5 ${form.visual_type === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
-                    <div className="text-[10px] text-stone-400 mt-0.5">{desc}</div>
+                    <div className={`font-semibold text-xs mt-1.5 leading-tight ${form.visual_type === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
+                    <div className="text-[10px] text-stone-400 mt-0.5 leading-tight">{desc}</div>
                   </button>
                 ))}
               </div>
@@ -659,14 +659,14 @@ export default function CarouselGeneratorPage() {
                     type="button"
                     data-testid={`visual-priority-${id}`}
                     onClick={() => upd("visual_priority", id)}
-                    className={`p-3 rounded-xl border-2 text-center transition-all ${
+                    className={`p-2 sm:p-3 rounded-xl border-2 text-center transition-all min-w-0 ${
                       form.visual_priority === id
                         ? "border-brand bg-brand-sand"
                         : "border-stone-100 hover:border-brand/30 bg-white"
                     }`}
                   >
-                    <div className={`font-semibold text-xs ${form.visual_priority === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
-                    <div className="text-[10px] text-stone-400 mt-0.5">{desc}</div>
+                    <div className={`font-semibold text-xs leading-tight ${form.visual_priority === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
+                    <div className="text-[10px] text-stone-400 mt-0.5 leading-tight hidden sm:block">{desc}</div>
                   </button>
                 ))}
               </div>
@@ -675,14 +675,14 @@ export default function CarouselGeneratorPage() {
 
           {/* SECTION 4 — Content */}
           <SectionCard num="04" title="Content" icon={<BookOpen size={16} weight="duotone" />}>
-            <div className="grid sm:grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {TEMPLATES.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   data-testid={`template-${t.id}`}
                   onClick={() => upd("template", t.id)}
-                  className={`text-left p-4 rounded-xl border-2 transition-all ${
+                  className={`text-left p-3 sm:p-4 rounded-xl border-2 transition-all min-w-0 ${
                     form.template === t.id
                       ? "border-brand bg-brand-sand"
                       : "border-stone-100 hover:border-brand/30 bg-white"
@@ -690,21 +690,21 @@ export default function CarouselGeneratorPage() {
                 >
                   <div className="text-xl mb-1">{t.icon}</div>
                   <div className="font-heading font-semibold text-brand text-sm">{t.name}</div>
-                  <div className="text-[10px] text-stone-500 mt-0.5">{t.desc}</div>
+                  <div className="text-[10px] text-stone-500 mt-0.5 leading-tight">{t.desc}</div>
                 </button>
               ))}
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4 mt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
               <Field label="Jumlah Slide">
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   {[3, 4, 5, 6, 7].map((n) => (
                     <button
                       key={n}
                       type="button"
                       data-testid={`slide-count-${n}`}
                       onClick={() => upd("slide_count", n)}
-                      className={`flex-1 py-2.5 rounded-xl border-2 font-heading font-bold text-base transition-all ${
+                      className={`flex-1 min-w-0 py-2.5 rounded-xl border-2 font-heading font-bold text-sm sm:text-base transition-all ${
                         form.slide_count === n
                           ? "border-brand bg-brand text-brand-cream"
                           : "border-stone-100 text-stone-600 hover:border-brand/30"
@@ -733,7 +733,7 @@ export default function CarouselGeneratorPage() {
                         type="button"
                         data-testid={`carousel-ratio-${key0}`}
                         onClick={() => upd("aspect_ratio", r)}
-                        className={`flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-xl border-2 transition-all ${
+                        className={`flex flex-col items-center gap-1.5 px-1 sm:px-2 py-2.5 rounded-xl border-2 transition-all min-w-0 ${
                           active
                             ? "bg-brand border-brand text-brand-cream"
                             : "bg-white border-stone-200 text-stone-600 hover:border-stone-300"
@@ -770,26 +770,26 @@ export default function CarouselGeneratorPage() {
               <div className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                 <Lightning size={12} weight="duotone" /> Feedify Visual Director
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               {DIRECTOR_MODES.map(({ id, name, desc, badge }) => (
                 <button
                   key={id}
                   type="button"
                   data-testid={`director-mode-${id}`}
                   onClick={() => { upd("ai_director_mode", id); if (id !== "advanced") setShowAdvanced(false); }}
-                  className={`p-3 rounded-xl border-2 text-left transition-all relative ${
+                  className={`p-2 sm:p-3 rounded-xl border-2 text-left transition-all relative min-w-0 ${
                     form.ai_director_mode === id
                       ? "border-brand bg-brand-sand"
                       : "border-stone-100 hover:border-brand/30 bg-white"
                   }`}
                 >
                   {badge && (
-                    <span className="absolute -top-2 left-3 text-[9px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide">
-                      Recommended
+                    <span className="absolute -top-2 left-2 sm:left-3 text-[8px] sm:text-[9px] bg-brand-gold text-brand font-bold px-1 sm:px-1.5 py-0.5 rounded-full uppercase tracking-wide whitespace-nowrap">
+                      Rekomendasi
                     </span>
                   )}
-                  <div className={`font-heading font-bold text-sm ${form.ai_director_mode === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
-                  <div className="text-[10px] text-stone-400 mt-1 leading-tight">{desc}</div>
+                  <div className={`font-heading font-bold text-xs sm:text-sm ${form.ai_director_mode === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
+                  <div className="text-[9px] sm:text-[10px] text-stone-400 mt-1 leading-tight hidden sm:block">{desc}</div>
                 </button>
               ))}
             </div>
@@ -813,7 +813,7 @@ export default function CarouselGeneratorPage() {
                   {showAdvanced ? "Sembunyikan" : "Tampilkan"} Advanced Controls
                 </button>
                 {showAdvanced && (
-                  <div className="grid sm:grid-cols-2 gap-3 animate-fade-up">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-up">
                     <Field label="Mood Override">
                       <input type="text" value={form.mood_override} onChange={(e) => upd("mood_override", e.target.value)}
                         className="input text-sm" placeholder="mis. dark moody, warm cozy, bright energetic" />
@@ -892,7 +892,7 @@ export default function CarouselGeneratorPage() {
         </div>
 
         {/* ── Right: Sidebar ─────────────────────────────────────────────────── */}
-        <div className="lg:sticky lg:top-6 lg:self-start space-y-4">
+        <div className="lg:sticky lg:top-6 lg:self-start space-y-4 min-w-0 order-last lg:order-none">
           {/* Slide Preview */}
           <div className="feedify-card p-5">
             <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold mb-3 flex items-center gap-1.5">
@@ -947,12 +947,14 @@ export default function CarouselGeneratorPage() {
         <div id="carousel-result" className="space-y-4 animate-fade-up">
 
           {/* Header */}
-          <div className="flex items-center gap-3">
-            {generating
-              ? <CircleNotch size={22} className="animate-spin text-brand" />
-              : <CheckCircle size={22} weight="fill" className="text-green-600" />}
-            <div>
-              <h2 className="font-heading text-xl font-bold text-brand">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="flex-shrink-0 mt-0.5">
+              {generating
+                ? <CircleNotch size={22} className="animate-spin text-brand" />
+                : <CheckCircle size={22} weight="fill" className="text-green-600" />}
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-heading text-lg sm:text-xl font-bold text-brand break-words">
                 {generating
                   ? genPhase || "Generating..."
                   : `${slideImages.filter(Boolean).length} dari ${totalSlides} Slide Selesai`}
@@ -1005,17 +1007,17 @@ export default function CarouselGeneratorPage() {
 
           {/* Active Slide Preview */}
           {slideImages[selectedSlide] && (
-            <div className="feedify-card p-5" data-testid="active-slide-preview">
-              <div className="flex items-center justify-between mb-3">
+            <div className="feedify-card p-4 sm:p-5" data-testid="active-slide-preview">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                 <div className="font-heading font-bold text-brand capitalize">
                   Slide {selectedSlide + 1}
                   {slideRoles[selectedSlide] && <span className="text-stone-400 font-normal"> · {slideRoles[selectedSlide]}</span>}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     onClick={() => downloadSlide(selectedSlide)}
                     data-testid={`download-slide-${selectedSlide}`}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-brand text-brand-cream rounded-full text-xs font-semibold hover:bg-brand-light"
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-brand text-brand-cream rounded-full text-xs font-semibold hover:bg-brand-light"
                   >
                     <DownloadSimple size={12} weight="bold" /> Download
                   </button>
@@ -1023,7 +1025,7 @@ export default function CarouselGeneratorPage() {
                     onClick={() => regenerateSlide(selectedSlide)}
                     disabled={regeneratingSlide === selectedSlide || generating}
                     data-testid={`regenerate-slide-${selectedSlide}`}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-brand-gold text-brand rounded-full text-xs font-semibold hover:opacity-80 disabled:opacity-50"
+                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-brand-gold text-brand rounded-full text-xs font-semibold hover:opacity-80 disabled:opacity-50"
                   >
                     {regeneratingSlide === selectedSlide
                       ? <CircleNotch size={12} className="animate-spin" />
