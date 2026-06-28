@@ -460,57 +460,58 @@ function Testimonials() {
           </p>
         </div>
 
-        {/* Cards grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 lg:gap-6 items-end">
-          {TESTIMONIALS.map((t, i) => (
-            <div
-              key={i}
-              className="relative group cursor-default transition-all duration-500 ease-out hover:scale-[1.02] hover:z-10"
-              data-testid={`testimonial-${i + 1}`}
-            >
-              {/* Card */}
+        {/* Cards — staggered masonry */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5 items-start">
+          {TESTIMONIALS.map((t, i) => {
+            const tall = i === 0 || i === 3;
+            return (
               <div
-                className="relative rounded-[20px] sm:rounded-[28px] overflow-hidden"
-                style={{
-                  boxShadow: `0 30px 70px -15px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.07), 0 0 40px -10px ${t.glow}`,
-                }}
+                key={i}
+                className={`flex flex-col gap-2.5 group cursor-default transition-all duration-500 hover:scale-[1.02] hover:z-10 ${tall ? "" : "mt-0 lg:mt-10"}`}
+                data-testid={`testimonial-${i + 1}`}
               >
-                {/* Fake phone status bar */}
-                <div className="absolute top-0 left-0 right-0 z-20 h-7 bg-gradient-to-b from-black/70 to-transparent flex items-center px-3 gap-1.5">
-                  <div className="flex-1" />
-                  <div className="flex items-center gap-1">
-                    <div className="w-3.5 h-1.5 bg-white/30 rounded-sm" />
-                    <div className="w-1 h-1 rounded-full bg-white/30" />
-                    <div className="w-3 h-1.5 border border-white/30 rounded-sm" />
-                  </div>
+                {/* Badge above card */}
+                <div className="flex justify-center">
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-brand-gold text-brand text-[9px] sm:text-[10px] font-bold shadow-lg shadow-brand-gold/25 whitespace-nowrap">
+                    <Lightning size={9} weight="fill" /> {t.badge}
+                  </span>
                 </div>
 
-                {/* Screenshot image */}
-                <div className="aspect-[9/16] sm:aspect-[3/5] lg:aspect-[9/16]">
+                {/* Phone frame */}
+                <div
+                  className="relative rounded-[20px] overflow-hidden bg-[#f0f2f5]"
+                  style={{ boxShadow: `0 20px 55px -10px rgba(0,0,0,0.85), 0 0 0 1.5px rgba(255,255,255,0.08), 0 0 30px -8px ${t.glow}` }}
+                >
+                  {/* Phone top chrome */}
+                  <div className="h-7 bg-[#1c1c1e] flex items-center justify-between px-3 flex-shrink-0">
+                    <div className="text-white/30 text-[8px] font-medium">9:41</div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-1.5 bg-white/25 rounded-sm" />
+                      <div className="w-1 h-1 rounded-full bg-white/25" />
+                      <div className="w-3 h-1.5 border border-white/25 rounded-sm" />
+                    </div>
+                  </div>
+
+                  {/* Screenshot — full height, no crop */}
                   <img
                     src={t.img}
-                    alt={`Testimoni ${t.name}`}
-                    className="h-full w-full object-cover object-top"
+                    alt={`Testimoni ${i + 1}`}
+                    className="w-full h-auto block"
                     loading="lazy"
                     onError={(e) => {
-                      e.currentTarget.parentElement.style.background = "#1a2e22";
                       e.currentTarget.style.display = "none";
+                      e.currentTarget.parentElement.style.minHeight = "300px";
                     }}
                   />
+
+                  {/* Phone bottom chrome */}
+                  <div className="h-5 bg-[#f0f2f5] flex items-center justify-center border-t border-black/5">
+                    <div className="w-16 h-1 bg-black/15 rounded-full" />
+                  </div>
                 </div>
-
-                {/* Subtle bottom vignette */}
-                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
               </div>
-
-              {/* Result badge — floating above card */}
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap">
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-gold text-brand text-[9px] sm:text-[10px] font-bold shadow-lg shadow-brand-gold/30">
-                  <Lightning size={8} weight="fill" /> {t.badge}
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Bottom trust line */}
