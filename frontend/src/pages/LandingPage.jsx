@@ -460,58 +460,63 @@ function Testimonials() {
           </p>
         </div>
 
-        {/* Cards — staggered masonry */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5 items-start">
-          {TESTIMONIALS.map((t, i) => {
-            const tall = i === 0 || i === 3;
-            return (
-              <div
-                key={i}
-                className={`flex flex-col gap-2.5 group cursor-default transition-all duration-500 hover:scale-[1.02] hover:z-10 ${tall ? "" : "mt-0 lg:mt-10"}`}
-                data-testid={`testimonial-${i + 1}`}
-              >
-                {/* Badge above card */}
-                <div className="flex justify-center">
-                  <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-brand-gold text-brand text-[9px] sm:text-[10px] font-bold shadow-lg shadow-brand-gold/25 whitespace-nowrap">
-                    <Lightning size={9} weight="fill" /> {t.badge}
-                  </span>
-                </div>
+        {/* Marquee strip */}
+        <div className="relative mt-4" data-testid="testimonial-marquee">
+          {/* Left fade */}
+          <div className="absolute left-0 top-0 bottom-0 w-20 sm:w-32 z-10 pointer-events-none"
+            style={{ background: "linear-gradient(to right, #060d09, transparent)" }} />
+          {/* Right fade */}
+          <div className="absolute right-0 top-0 bottom-0 w-20 sm:w-32 z-10 pointer-events-none"
+            style={{ background: "linear-gradient(to left, #060d09, transparent)" }} />
 
-                {/* Phone frame */}
+          <div className="overflow-hidden">
+            <div className="testimoni-scroll flex gap-5 w-max pb-3">
+              {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
                 <div
-                  className="relative rounded-[20px] overflow-hidden bg-[#f0f2f5]"
-                  style={{ boxShadow: `0 20px 55px -10px rgba(0,0,0,0.85), 0 0 0 1.5px rgba(255,255,255,0.08), 0 0 30px -8px ${t.glow}` }}
+                  key={i}
+                  className="flex-shrink-0 w-[240px] sm:w-[280px] flex flex-col gap-2.5"
+                  data-testid={i < TESTIMONIALS.length ? `testimonial-${i + 1}` : undefined}
                 >
-                  {/* Phone top chrome */}
-                  <div className="h-7 bg-[#1c1c1e] flex items-center justify-between px-3 flex-shrink-0">
-                    <div className="text-white/30 text-[8px] font-medium">9:41</div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-1.5 bg-white/25 rounded-sm" />
-                      <div className="w-1 h-1 rounded-full bg-white/25" />
-                      <div className="w-3 h-1.5 border border-white/25 rounded-sm" />
+                  {/* Badge */}
+                  <div className="flex justify-center">
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-brand-gold text-brand text-[9px] sm:text-[10px] font-bold shadow-lg shadow-brand-gold/25 whitespace-nowrap">
+                      <Lightning size={9} weight="fill" /> {t.badge}
+                    </span>
+                  </div>
+
+                  {/* Phone frame */}
+                  <div
+                    className="rounded-[22px] overflow-hidden bg-[#f0f2f5]"
+                    style={{ boxShadow: `0 20px 50px -10px rgba(0,0,0,0.8), 0 0 0 1.5px rgba(255,255,255,0.08), 0 0 30px -8px ${t.glow}` }}
+                  >
+                    {/* Top chrome */}
+                    <div className="h-7 bg-[#1c1c1e] flex items-center justify-between px-3">
+                      <div className="text-white/30 text-[8px] font-medium">9:41</div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-1.5 bg-white/25 rounded-sm" />
+                        <div className="w-1 h-1 rounded-full bg-white/25" />
+                        <div className="w-3 h-1.5 border border-white/25 rounded-sm" />
+                      </div>
+                    </div>
+
+                    {/* Full screenshot — no crop */}
+                    <img
+                      src={t.img}
+                      alt={`Testimoni ${(i % TESTIMONIALS.length) + 1}`}
+                      className="w-full h-auto block"
+                      loading="lazy"
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    />
+
+                    {/* Bottom chrome */}
+                    <div className="h-5 bg-[#f0f2f5] flex items-center justify-center">
+                      <div className="w-16 h-1 bg-black/15 rounded-full" />
                     </div>
                   </div>
-
-                  {/* Screenshot — full height, no crop */}
-                  <img
-                    src={t.img}
-                    alt={`Testimoni ${i + 1}`}
-                    className="w-full h-auto block"
-                    loading="lazy"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                      e.currentTarget.parentElement.style.minHeight = "300px";
-                    }}
-                  />
-
-                  {/* Phone bottom chrome */}
-                  <div className="h-5 bg-[#f0f2f5] flex items-center justify-center border-t border-black/5">
-                    <div className="w-16 h-1 bg-black/15 rounded-full" />
-                  </div>
                 </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Bottom trust line */}

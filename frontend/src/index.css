@@ -255,6 +255,21 @@ button, [role="button"], input, select, textarea {
     }
 }
 
+/* Testimonial marquee */
+.testimoni-scroll {
+    animation: strip-scroll 50s linear infinite;
+    will-change: transform;
+}
+.testimoni-scroll:hover {
+    animation-play-state: paused;
+}
+
+@media (max-width: 639px) {
+    .testimoni-scroll {
+        animation-duration: 60s;
+    }
+}
+
 /* Slow glow pulse */
 @keyframes glow-pulse {
     0%, 100% { opacity: 0.35; transform: scale(1); }
