@@ -57,6 +57,13 @@ JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', '168'))
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 GROQ_API_KEY_LOCAL = os.environ.get('GROQ_API_KEY_LOCAL', '')
+GROQ_API_KEYS = [k for k in [
+    os.environ.get('GROQ_API_KEY_1', ''),
+    os.environ.get('GROQ_API_KEY_2', ''),
+    os.environ.get('GROQ_API_KEY_3', ''),
+    os.environ.get('GROQ_API_KEY_4', ''),
+    os.environ.get('GROQ_API_KEY_5', ''),
+] if k]
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
@@ -1300,14 +1307,24 @@ async def _send_otp_email(to_email: str, name: str, otp: str) -> bool:
     from email.mime.text import MIMEText
 
     def _send():
+        import uuid
+        from email.utils import formatdate
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"{otp} — Kode Verifikasi Feedify"
+        msg["Subject"] = f"Konfirmasi akun Feedify kamu ({otp})"
         msg["From"] = SMTP_FROM or f"Feedify <{SMTP_USER}>"
         msg["To"] = to_email
+        msg["Reply-To"] = SMTP_USER
+        msg["Message-ID"] = f"<{uuid.uuid4()}@feedify.id>"
+        msg["Date"] = formatdate(localtime=True)
+        msg["X-Mailer"] = "Feedify Mailer"
+        # Plain text fallback (reduces spam score)
+        plain = f"Hei {name},\n\nKode konfirmasi akun Feedify kamu: {otp}\n\nKode berlaku 15 menit. Jangan bagikan ke siapapun.\n\nSalam,\nTim Feedify"
+        msg.attach(MIMEText(plain, "plain", "utf-8"))
         msg.attach(MIMEText(html, "html", "utf-8"))
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.ehlo()
             server.starttls()
+            server.ehlo()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_USER, to_email, msg.as_string())
 
@@ -5683,19 +5700,57 @@ FITUR YANG SEDANG DIKEMBANGKAN:
 
 SUPPORT:
 - Instagram DM: @feedify.id (untuk pertanyaan kompleks, kendala teknis, atau billing)
+- Tidak ada WhatsApp support — hanya via IG DM @feedify.id
 - Tim Feedify akan balas secepat mungkin karena setiap user adalah prioritas
+
+KNOWLEDGE BASE TAMBAHAN:
+
+Q: Kalau foto gagal generate atau kredit terpotong tapi foto tidak keluar?
+A: Tenang! Feedify akan otomatis kembalikan 1 kredit ke akun kamu kalau ada masalah teknis. Tidak perlu khawatir, kredit kamu aman.
+
+Q: Ada WhatsApp support?
+A: Untuk saat ini support Feedify bisa dihubungi lewat Instagram DM @feedify.id ya! Tim kami siap bantu di sana.
+
+Q: Resolusi foto hasil generate berapa?
+A: 1080×1080px (square), 1080×1350px (portrait 4:5), 1080×1920px (story). Format PNG, tanpa watermark.
+
+Q: 1 akun bisa punya lebih dari 1 Brand Profile?
+A: Bisa! 1 akun Feedify bisa punya lebih dari 1 Brand DNA. Cocok kalau kamu punya 2 bisnis atau lebih.
+
+Q: Ada rencana fitur video atau Reels?
+A: Fitur Reels dan video sedang dalam pengembangan aktif. Ditunggu ya, pasti segera hadir!
+
+Q: Bisa upload logo sendiri?
+A: Bisa banget! Logo brand kamu bisa diintegrasikan ke dalam hasil generate.
+
+Q: Ada watermark di hasil foto?
+A: Tidak ada watermark sama sekali. Semua hasil generate bebas watermark dan langsung siap pakai.
+
+Q: Ada program referral?
+A: Ada! Cek kode referral kamu di bagian Settings akun, ajak teman bergabung lewat kode kamu.
+
+Q: Feedify sudah berapa lama berjalan?
+A: Feedify mulai berjalan sejak Juli 2026. Masih fresh dan terus berkembang!
+
+Q: Ada berapa user aktif?
+A: Itu informasi internal yang tidak bisa kami share. Yang pasti komunitas Feedify terus bertumbuh tiap harinya!
+
+Q: Kalau mau hapus akun bisa?
+A: Untuk saat ini akun Feedify belum bisa dihapus mandiri. Kamu tetap bisa logout kapan saja.
+
+Q: Ada konten yang tidak boleh di-generate?
+A: Ada. Feedify tidak mengizinkan konten dewasa, judi, rokok, dan konten melanggar hukum lainnya.
 
 CARA HANDLE SITUASI:
 - User komplain / tidak puas → validasi dulu perasaan mereka, lalu arahkan DM ke @feedify.id
-- User tanya kenapa kredit terpotong tapi foto tidak keluar → jelasin bahwa kredit otomatis dikembalikan kalau generate gagal, minta cek saldo kredit di dashboard
-- User banding harga dengan tool lain → fokus ke value Feedify (brand consistency dari DNA, otomatis, khusus UMKM), jangan serang kompetitor
-- User tanya sesuatu yang tidak kamu tahu pasti → jujur bilang tidak tahu, arahkan ke @feedify.id
-- User tanya hal di luar Feedify (politik, resep, dll) → dengan ramah arahkan balik ke topik Feedify
+- User tanya kenapa kredit terpotong tapi foto tidak keluar → jelasin bahwa kredit otomatis dikembalikan kalau generate gagal
+- User banding harga dengan tool lain → fokus ke value Feedify (brand consistency dari DNA, otomatis, khusus UMKM)
+- User tanya sesuatu yang tidak kamu tahu → jujur bilang tidak tahu, arahkan ke @feedify.id
+- User tanya hal di luar Feedify → dengan ramah arahkan balik ke topik Feedify
 
 TOLAK DENGAN SOPAN TAPI TEGAS kalau ada:
 - Pertanyaan tentang cara hack, scam, tipu orang
 - Permintaan konten yang melanggar hukum
-- Pertanyaan tidak relevan dengan Feedify
 
 INGAT: Jangan pernah karang jawaban kalau tidak tahu. Lebih baik jujur dan arahkan ke @feedify.id."""
 
@@ -5711,12 +5766,9 @@ async def support_chat(request: Request):
         if len(message) > 500:
             raise HTTPException(status_code=400, detail="Pesan terlalu panjang")
 
-        from groq import AsyncGroq
-        origin = request.headers.get("origin", "")
-        groq_key = GROQ_API_KEY_LOCAL if "localhost" in origin and GROQ_API_KEY_LOCAL else GROQ_API_KEY
-        client = AsyncGroq(api_key=groq_key)
+        from groq import AsyncGroq, RateLimitError
 
-        # Build messages array with history
+        # Build messages once
         messages = [{"role": "system", "content": SUPPORT_SYSTEM_PROMPT}]
         for h in (history or [])[-8:]:
             role = h.get("role")
@@ -5724,14 +5776,31 @@ async def support_chat(request: Request):
                 messages.append({"role": role, "content": h.get("content", "")})
         messages.append({"role": "user", "content": message})
 
-        completion = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            max_tokens=300,
-            temperature=0.75,
-        )
-        reply = completion.choices[0].message.content.strip()
-        return {"reply": reply}
+        # Try each key in rotation until one works
+        keys_to_try = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
+        last_error = None
+        for key in keys_to_try:
+            if not key:
+                continue
+            try:
+                client = AsyncGroq(api_key=key)
+                completion = await client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=messages,
+                    max_tokens=300,
+                    temperature=0.75,
+                )
+                reply = completion.choices[0].message.content.strip()
+                return {"reply": reply}
+            except RateLimitError as e:
+                last_error = e
+                logging.warning(f"Groq key rate limited, trying next key")
+                continue
+            except Exception as e:
+                last_error = e
+                break
+
+        raise Exception(f"All Groq keys failed: {last_error}")
 
     except HTTPException:
         raise
