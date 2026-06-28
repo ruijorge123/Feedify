@@ -423,10 +423,10 @@ function BentoTile({ testid, tag, title, desc, span, accent }) {
 
 /* ============ TESTIMONIALS ============ */
 const TESTIMONIALS = [
-  { img: "/testimoni-hiljab.jpg",     badge: "Hemat biaya agency",        rotate: "-rotate-[1.5deg]", glow: "rgba(229,193,88,0.15)" },
-  { img: "/testimoni-bodylotion.jpg", badge: "Feeds makin estetik",       rotate: "rotate-[1deg]",    glow: "rgba(11,61,46,0.4)" },
-  { img: "/testimoni-skincare.jpg",   badge: "Followers naik terus",      rotate: "-rotate-[0.8deg]", glow: "rgba(229,193,88,0.12)" },
-  { img: "/testimoni-kaos.jpg",       badge: "Customer makin yakin beli", rotate: "rotate-[1.5deg]",  glow: "rgba(11,61,46,0.35)" },
+  { img: "/testimoni-hiljab.jpg",     badge: "Hemat biaya agency",        glow: "rgba(229,193,88,0.15)" },
+  { img: "/testimoni-bodylotion.jpg", badge: "Feeds makin estetik",       glow: "rgba(11,61,46,0.4)" },
+  { img: "/testimoni-skincare.jpg",   badge: "Followers naik terus",      glow: "rgba(229,193,88,0.12)" },
+  { img: "/testimoni-kaos.jpg",       badge: "Customer makin yakin beli", glow: "rgba(11,61,46,0.35)" },
 ];
 
 function Testimonials() {
@@ -456,7 +456,7 @@ function Testimonials() {
             <span className="text-brand-gold italic font-medium">buktikan sendiri.</span>
           </h2>
           <p className="mt-4 text-white/40 text-sm max-w-md mx-auto leading-relaxed">
-            Cerita nyata dari pengguna Feedify yang sudah merasakan hasilnya.
+            Apa kata mereka setelah pakai Feedify.
           </p>
         </div>
 
@@ -465,7 +465,7 @@ function Testimonials() {
           {TESTIMONIALS.map((t, i) => (
             <div
               key={i}
-              className={`relative group cursor-default transition-all duration-500 ease-out hover:scale-[1.03] hover:rotate-0 hover:z-10 ${t.rotate}`}
+              className="relative group cursor-default transition-all duration-500 ease-out hover:scale-[1.02] hover:z-10"
               data-testid={`testimonial-${i + 1}`}
             >
               {/* Card */}
@@ -515,7 +515,7 @@ function Testimonials() {
 
         {/* Bottom trust line */}
         <div className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-white/25 text-xs">
-          <span className="flex items-center gap-2"><span className="h-px w-8 bg-white/15" />Dari pengguna nyata Feedify<span className="h-px w-8 bg-white/15" /></span>
+          <span className="flex items-center gap-2"><span className="h-px w-8 bg-white/15" />Feedback langsung dari pengguna<span className="h-px w-8 bg-white/15" /></span>
           <span className="hidden sm:block h-3 w-px bg-white/15" />
           <span className="flex items-center gap-2"><Lightning size={10} weight="fill" className="text-brand-gold/40" />Hasil bisa berbeda tiap brand</span>
         </div>
