@@ -422,39 +422,102 @@ function BentoTile({ testid, tag, title, desc, span, accent }) {
 
 
 /* ============ TESTIMONIALS ============ */
+const TESTIMONIALS = [
+  { img: "/testimoni-hiljab.jpg",     badge: "Hemat biaya agency",        rotate: "-rotate-[1.5deg]", glow: "rgba(229,193,88,0.15)" },
+  { img: "/testimoni-bodylotion.jpg", badge: "Feeds makin estetik",       rotate: "rotate-[1deg]",    glow: "rgba(11,61,46,0.4)" },
+  { img: "/testimoni-skincare.jpg",   badge: "Followers naik terus",      rotate: "-rotate-[0.8deg]", glow: "rgba(229,193,88,0.12)" },
+  { img: "/testimoni-kaos.jpg",       badge: "Customer makin yakin beli", rotate: "rotate-[1.5deg]",  glow: "rgba(11,61,46,0.35)" },
+];
+
 function Testimonials() {
-  const items = [
-    { quote: "Brand Profile sekali isi, langsung dipakai untuk banner, carousel, sampai caption. Konten Instagram kami akhirnya kelihatan satu identitas — bukan campur aduk seperti sebelumnya.", name: "Anisa Rachmawati", business: "Voyoa Skincare · Bandung", metric: "Posting 5× lebih konsisten / minggu" },
-    { quote: "Sebelumnya saya bayar freelancer 2,5 juta per bulan. Sekarang saya kerjakan sendiri pakai Feedify, dan hasilnya justru lebih sesuai brand — karena saya yang paling tahu produk saya.", name: "Rizki Pratama", business: "Kopi Lokal · Yogyakarta", metric: "Hemat ± Rp 28 juta / tahun" },
-    { quote: "Yang paling membantu Consistency Checker. Saya jadi tahu kapan hasil Feedify melenceng dari brand saya, dengan saran perbaikan yang konkret. Bukan tebak-tebakan lagi.", name: "Sari Maharani", business: "Linen by Sari · Jakarta", metric: "Konsistensi feed naik 87%" },
-  ];
   return (
-    <section className="relative py-24 lg:py-36 overflow-hidden" style={{ background: "radial-gradient(ellipse 120% 60% at 80% 100%, #0f3d22 0%, #060d09 55%, #060d09 100%)" }} data-testid="testimonials">
+    <section
+      className="relative py-20 lg:py-32 overflow-hidden"
+      style={{ background: "radial-gradient(ellipse 140% 80% at 50% 110%, #0f3d22 0%, #060d09 50%, #060d09 100%)" }}
+      data-testid="testimonials"
+    >
+      {/* Background glows */}
+      <div className="absolute top-[10%] left-[-5%] w-[40vw] h-[40vw] rounded-full bg-brand-gold/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[10%] right-[-5%] w-[35vw] h-[35vw] rounded-full bg-brand/30 blur-[100px] pointer-events-none" />
+
       <div className="max-w-[1280px] mx-auto px-5 lg:px-10">
-        <div className="max-w-3xl mb-16 lg:mb-20">
-          <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-gold/70 mb-4">Cerita Pengguna</div>
-          <h2 className="font-heading font-bold text-brand-cream tracking-[-0.03em] leading-[0.95]" style={{ fontSize: "clamp(2rem, 5.5vw, 4.5rem)" }}>
-            UMKM yang naik kelas <br /><span className="italic font-medium text-brand-gold">dengan brand mereka sendiri.</span>
+
+        {/* Header */}
+        <div className="text-center mb-12 lg:mb-16">
+          <div className="inline-flex items-center gap-2 mb-5 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-brand-gold text-[10px] font-bold uppercase tracking-[0.22em]">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand-gold animate-pulse" />
+            Bukan kata kami
+          </div>
+          <h2
+            className="font-heading font-bold text-brand-cream tracking-[-0.03em] leading-[0.95]"
+            style={{ fontSize: "clamp(2rem, 5.5vw, 4.5rem)" }}
+          >
+            Kata mereka yang sudah<br />
+            <span className="text-brand-gold italic font-medium">buktikan sendiri.</span>
           </h2>
+          <p className="mt-4 text-white/40 text-sm max-w-md mx-auto leading-relaxed">
+            Cerita nyata dari pengguna Feedify yang sudah merasakan hasilnya.
+          </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
-          {items.map((t, i) => (
-            <figure key={i} className="border-t border-white/10 pt-6" data-testid={`testimonial-${i + 1}`}>
-              <blockquote className="font-heading text-brand-cream/90 font-medium tracking-tight leading-[1.25]" style={{ fontSize: "clamp(1.05rem, 1.5vw, 1.3rem)" }}>
-                &ldquo;{t.quote}&rdquo;
-              </blockquote>
-              <figcaption className="mt-7 flex items-center gap-3">
-                <div className="h-11 w-11 rounded-full flex items-center justify-center font-heading font-bold text-brand-gold text-base bg-white/10 border border-white/15">{t.name[0]}</div>
-                <div>
-                  <div className="font-heading font-bold text-brand-cream text-sm">{t.name}</div>
-                  <div className="text-xs text-brand-cream/50">{t.business}</div>
+
+        {/* Cards grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 lg:gap-6 items-end">
+          {TESTIMONIALS.map((t, i) => (
+            <div
+              key={i}
+              className={`relative group cursor-default transition-all duration-500 ease-out hover:scale-[1.03] hover:rotate-0 hover:z-10 ${t.rotate}`}
+              data-testid={`testimonial-${i + 1}`}
+            >
+              {/* Card */}
+              <div
+                className="relative rounded-[20px] sm:rounded-[28px] overflow-hidden"
+                style={{
+                  boxShadow: `0 30px 70px -15px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.07), 0 0 40px -10px ${t.glow}`,
+                }}
+              >
+                {/* Fake phone status bar */}
+                <div className="absolute top-0 left-0 right-0 z-20 h-7 bg-gradient-to-b from-black/70 to-transparent flex items-center px-3 gap-1.5">
+                  <div className="flex-1" />
+                  <div className="flex items-center gap-1">
+                    <div className="w-3.5 h-1.5 bg-white/30 rounded-sm" />
+                    <div className="w-1 h-1 rounded-full bg-white/30" />
+                    <div className="w-3 h-1.5 border border-white/30 rounded-sm" />
+                  </div>
                 </div>
-              </figcaption>
-              <div className="mt-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/8 border border-white/10 text-brand-gold text-[10px] font-bold uppercase tracking-[0.15em]">
-                <Lightning size={10} weight="fill" /> {t.metric}
+
+                {/* Screenshot image */}
+                <div className="aspect-[9/16] sm:aspect-[3/5] lg:aspect-[9/16]">
+                  <img
+                    src={t.img}
+                    alt={`Testimoni ${t.name}`}
+                    className="h-full w-full object-cover object-top"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.parentElement.style.background = "#1a2e22";
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+
+                {/* Subtle bottom vignette */}
+                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
               </div>
-            </figure>
+
+              {/* Result badge — floating above card */}
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-gold text-brand text-[9px] sm:text-[10px] font-bold shadow-lg shadow-brand-gold/30">
+                  <Lightning size={8} weight="fill" /> {t.badge}
+                </span>
+              </div>
+            </div>
           ))}
+        </div>
+
+        {/* Bottom trust line */}
+        <div className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-white/25 text-xs">
+          <span className="flex items-center gap-2"><span className="h-px w-8 bg-white/15" />Dari pengguna nyata Feedify<span className="h-px w-8 bg-white/15" /></span>
+          <span className="hidden sm:block h-3 w-px bg-white/15" />
+          <span className="flex items-center gap-2"><Lightning size={10} weight="fill" className="text-brand-gold/40" />Hasil bisa berbeda tiap brand</span>
         </div>
       </div>
     </section>
