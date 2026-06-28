@@ -386,7 +386,7 @@ export default function CarouselGeneratorPage() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* ── Left: Form ──────────────────────────────────────────────────────── */}
-        <div className="lg:col-span-2 space-y-5 animate-fade-up">
+        <div className="lg:col-span-2 space-y-4 animate-fade-up">
 
           {/* ① HERO PROMPT */}
           <div className="feedify-card p-6 space-y-5">
@@ -396,7 +396,7 @@ export default function CarouselGeneratorPage() {
                 <span className="font-heading font-bold text-brand text-base">Ceritakan Carousel Kamu</span>
               </div>
               <p className="text-xs text-stone-400 leading-relaxed">
-                Ceritakan idemu. Feedify akan menyusun hook, copywriting, storyboard, visual direction, dan prompt GPT Image secara otomatis.
+                Ceritakan idemu. Feedify akan menyusun hook, copywriting, storyboard, visual direction, dan seluruh slide secara otomatis.
               </p>
             </div>
 
@@ -424,9 +424,9 @@ export default function CarouselGeneratorPage() {
               ))}
             </div>
 
-            {/* AI understands badges */}
+            {/* Understands badges */}
             <div className="pt-1 border-t border-stone-100">
-              <p className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-2.5">Feedify AI memahami otomatis</p>
+              <p className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-2.5">Feedify memahami otomatis</p>
               <div className="flex flex-wrap gap-1.5">
                 {AI_UNDERSTANDS.map((item) => (
                   <span key={item} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-sand text-brand text-[10px] font-semibold">
@@ -492,7 +492,7 @@ export default function CarouselGeneratorPage() {
           </div>
 
           {/* ④ VISUAL MOOD + PHOTO TYPE + SLIDES */}
-          <div className="feedify-card p-6 space-y-6">
+          <div className="feedify-card p-5 space-y-5">
             {/* Visual Mood */}
             <div>
               <p className="text-[11px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-3">Visual Mood</p>
@@ -590,6 +590,9 @@ export default function CarouselGeneratorPage() {
                 </div>
               </div>
             </div>
+
+            {/* Live Creative Brief */}
+            <LiveCreativeBrief form={form} brand={brand} />
           </div>
 
           {/* ⑤ REFERENCE IMAGE */}
@@ -696,20 +699,6 @@ export default function CarouselGeneratorPage() {
 
           {/* ⑦ GENERATE */}
           <div className="space-y-3">
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={previewPrompt}
-                disabled={previewing || generating}
-                data-testid="preview-carousel-btn"
-                className="w-full py-3.5 bg-white border-2 border-brand text-brand rounded-full font-bold text-sm hover:bg-brand-sand btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {previewing
-                  ? <><CircleNotch size={16} className="animate-spin" /> Memuat...</>
-                  : <><Sliders size={16} weight="duotone" /> Preview Brief JSON</>}
-              </button>
-            )}
-
             <button
               type="button"
               onClick={generate}
@@ -718,22 +707,31 @@ export default function CarouselGeneratorPage() {
               className="w-full py-4 bg-brand text-brand-cream rounded-full font-bold text-base hover:bg-brand-light btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg shadow-brand/20"
             >
               {generating
-                ? <><CircleNotch size={20} className="animate-spin" /> {genPhase || "Generating..."}</>
+                ? <><CircleNotch size={20} className="animate-spin" /> {genPhase || "Menyiapkan..."}</>
                 : <><Sparkle size={18} weight="fill" /> Generate Carousel</>}
             </button>
 
             {!generating && (
-              <div className="rounded-2xl bg-stone-50 border border-stone-100 px-5 py-4">
-                <p className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-2.5">Feedify akan membuat</p>
-                <div className="grid grid-cols-2 gap-y-1.5 gap-x-4">
-                  {["Story","Copywriting","Storyboard","Visual Direction","Prompt GPT Image","Semua Slide"].map((item) => (
-                    <div key={item} className="flex items-center gap-1.5 text-xs text-stone-600">
-                      <div className="w-1 h-1 rounded-full bg-brand-gold flex-shrink-0" />
+              <div className="rounded-2xl border border-stone-100 overflow-hidden">
+                <div className="px-5 py-3.5 bg-stone-50 border-b border-stone-100">
+                  <p className="text-[11px] font-bold text-stone-600 uppercase tracking-[0.15em]">Yang Akan Disiapkan Feedify</p>
+                </div>
+                <div className="px-5 py-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  {[
+                    "Storyline","Struktur Carousel",
+                    "Headline setiap slide","Copywriting",
+                    "Visual Direction","Layout setiap slide",
+                    "CTA","Konsistensi Brand",
+                  ].map((item) => (
+                    <div key={item} className="flex items-center gap-2 text-xs text-stone-600">
+                      <CheckCircle size={13} weight="fill" className="text-brand flex-shrink-0" />
                       {item}
                     </div>
                   ))}
                 </div>
-                <p className="text-[10px] text-stone-400 mt-3">Estimasi 40–70 detik</p>
+                <div className="px-5 pb-4">
+                  <p className="text-[10px] text-stone-400">Feedify akan menyusun story, copywriting, visual direction, dan seluruh slide secara otomatis. Estimasi 40–70 detik.</p>
+                </div>
               </div>
             )}
           </div>
@@ -742,8 +740,7 @@ export default function CarouselGeneratorPage() {
             <div id="carousel-preview-panel" className="animate-fade-up space-y-3">
               <div className="flex items-center gap-2">
                 <Stack size={16} weight="duotone" className="text-brand" />
-                <span className="font-heading font-bold text-brand text-sm">Prompt per Slide</span>
-                <span className="text-xs text-stone-400">— copy ke ChatGPT</span>
+                <span className="font-heading font-bold text-brand text-sm">Creative Brief</span>
               </div>
               {(promptPreview.prompt_json?.slides || []).map((slide, i) => (
                 <SlidePromptCard key={i} index={i} slide={slide} />
@@ -947,6 +944,42 @@ export default function CarouselGeneratorPage() {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
+
+function LiveCreativeBrief({ form, brand }) {
+  const mood   = VISUAL_MOODS.find(v => v.id === form.visual_mood) || VISUAL_MOODS[0];
+  const pt     = PHOTO_TYPES.find(p => p.id === form.photo_type) || PHOTO_TYPES[0];
+  const ratio  = form.aspect_ratio.split(" ")[0];
+  const brandLabel = form.brand_name || brand?.brand_name;
+
+  const lines = [
+    CONTENT_INTENTS.find(c => c.id === form.content_intent)?.name || "Auto",
+    `${form.slide_count} Slide`,
+    `Rasio ${ratio}`,
+    mood.name !== "Auto" ? `${mood.name} · ${mood.desc}` : "Visual otomatis dipilih",
+    pt.name !== "Auto" ? pt.name : "Photo type otomatis",
+    brandLabel ? `Brand: ${brandLabel}` : null,
+    "Story otomatis disusun",
+    "Copywriting otomatis dibuat",
+    "CTA otomatis disesuaikan",
+  ].filter(Boolean);
+
+  return (
+    <div className="rounded-xl border border-brand/15 bg-brand-sand/30 overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-brand/10 flex items-center gap-2">
+        <div className="w-1.5 h-1.5 rounded-full bg-brand-gold animate-pulse" />
+        <span className="text-[10px] uppercase tracking-[0.15em] font-bold text-brand">Feedify akan membuat</span>
+      </div>
+      <div className="px-4 py-3 space-y-1.5">
+        {lines.map((line, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs">
+            <span className="text-brand-gold mt-0.5 flex-shrink-0">•</span>
+            <span className={i >= lines.length - 3 ? "text-stone-400 italic" : "text-stone-700 font-medium"}>{line}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Storyboard frame — shows wireframe layout per slide type
 function StoryboardFrame({ index, layout, ratio, brand }) {
