@@ -14,8 +14,7 @@ import {
   SignOut,
   Sparkle,
   DotsThreeOutline,
-  GridFour,
-  ShieldCheck,
+  Brain,
   ForkKnife,
   CalendarBlank,
   Storefront,
@@ -23,13 +22,17 @@ import {
   ShieldStar,
   Lightning,
   FilmSlate,
+  Wrench,
+  Camera,
+  Microphone,
+  CaretDown,
 } from "@phosphor-icons/react";
 
 const mobileNav = [
   { to: "/dashboard", label: "Home", icon: HouseSimple, testid: "nav-home" },
   { to: "/generate/banner", label: "Feed Post", icon: ImageSquare, testid: "nav-banner", lockKey: "banner" },
+  { to: "/studio", label: "Studio", icon: Camera, testid: "nav-studio", lockKey: "studio" },
   { to: "/generate/carousel", label: "Carousel", icon: Stack, testid: "nav-carousel", lockKey: "carousel" },
-  { to: "/generate/copywriting", label: "Copy", icon: PenNib, testid: "nav-copy", lockKey: "copywriting" },
   { to: "/more", label: "More", icon: DotsThreeOutline, testid: "nav-more" },
 ];
 
@@ -43,18 +46,19 @@ const sidebarSections = [
     title: "Generate",
     items: [
       { to: "/generate/banner", label: "Feed Post", icon: ImageSquare, testid: "nav-banner", lockKey: "banner" },
+      { to: "/studio", label: "Studio", icon: Camera, testid: "nav-studio", lockKey: "studio" },
       { to: "/generate/carousel", label: "Carousel", icon: Stack, testid: "nav-carousel", lockKey: "carousel" },
       { to: "/generate/copywriting", label: "Copywriting", icon: PenNib, testid: "nav-copy", lockKey: "copywriting" },
       { to: "/generate/reels", label: "Reels", icon: FilmSlate, testid: "nav-reels", lockKey: "reels" },
-      { to: "/generate/food", label: "F&B Menu", icon: ForkKnife, testid: "nav-food", adminOnly: true, lockKey: "food" },
+      { to: "/generate/talking-avatar", label: "Talking Avatar", icon: Microphone, testid: "nav-talking-avatar", lockKey: "talking-avatar" },
       { to: "/generate/marketplace", label: "Marketplace", icon: Storefront, testid: "nav-marketplace", lockKey: "marketplace" },
+      { to: "/generate/food", label: "F&B Menu", icon: ForkKnife, testid: "nav-food", adminOnly: true, lockKey: "food" },
     ],
   },
   {
     title: "Planning & QA",
     items: [
-      { to: "/grid-planner", label: "Grid Planner", icon: GridFour, testid: "nav-grid", lockKey: "grid-planner" },
-      { to: "/consistency", label: "Consistency", icon: ShieldCheck, testid: "nav-consistency", lockKey: "consistency" },
+      { to: "/growth-consultant", label: "Growth Consultant", icon: Brain, testid: "nav-growth", lockKey: "growth-consultant" },
       { to: "/calendar", label: "Calendar Planner", icon: CalendarBlank, testid: "nav-calendar", lockKey: "calendar" },
     ],
   },
@@ -71,9 +75,13 @@ export default function AppShell() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [activeBrand, setActiveBrand] = useState(null);
+  const [collapsedSections, setCollapsedSections] = useState({});
   const { credits } = useCredits();
   const lockStatus = useMenuLockStatus();
-  const isHidden = (item) => item.lockKey && menuMode(lockStatus, item.lockKey) === "hidden";
+  const isAdmin = user?.role === "admin";
+  const isHidden = (item) => !isAdmin && item.lockKey && menuMode(lockStatus, item.lockKey) === "hidden";
+  const isMaintenance = (item) => item.lockKey && menuMode(lockStatus, item.lockKey) === "maintenance";
+  const toggleSection = (title) => setCollapsedSections(prev => ({ ...prev, [title]: !prev[title] }));
   const balance = credits?.balance ?? credits?.credits_remaining ?? null;
 
   const fetchBrand = () => {
@@ -116,33 +124,73 @@ export default function AppShell() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-4 overflow-y-auto">
-          {sidebarSections.map((section, si) => (
-            <div key={si}>
-              {section.title && (
-                <div className="px-4 mb-1.5 text-[10px] uppercase tracking-[0.2em] text-brand-cream/35 font-bold">{section.title}</div>
-              )}
-              <div className="space-y-0.5">
-                {section.items.filter(item => (!item.adminOnly || user?.role === "admin") && !isHidden(item)).map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    data-testid={item.testid}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                        isActive
-                          ? "bg-brand-gold/20 text-brand-gold border border-brand-gold/25"
-                          : "text-brand-cream/70 hover:bg-white/10 hover:text-brand-cream"
-                      }`
-                    }
-                  >
-                    <item.icon size={18} weight={location.pathname === item.to ? "fill" : "regular"} />
-                    {item.label}
-                  </NavLink>
-                ))}
+        <nav className="flex-1 px-3 py-4 overflow-y-auto">
+          {sidebarSections.map((section, si) => {
+            const eligible = section.items.filter(item => (!item.adminOnly || isAdmin) && !isHidden(item));
+            const activeItems = eligible.filter(i => !isMaintenance(i));
+            const maintItems  = eligible.filter(i =>  isMaintenance(i));
+            const sorted = [...activeItems, ...maintItems];
+            const isCollapsed = !!collapsedSections[section.title];
+
+            return (
+              <div key={si} className={section.title ? "mt-1" : ""}>
+                {section.title ? (
+                  <>
+                    {/* Divider + collapsible section header */}
+                    <div className="mx-1 h-px bg-white/8 mb-3" />
+                    <button
+                      onClick={() => toggleSection(section.title)}
+                      className="w-full flex items-center gap-2 px-3 mb-2 group"
+                    >
+                      <span className="text-brand-gold/70 text-[8px] leading-none">✦</span>
+                      <span className="flex-1 text-left text-[10px] uppercase tracking-[0.22em] font-semibold text-brand-cream/40 group-hover:text-brand-cream/60 transition-colors">
+                        {section.title}
+                      </span>
+                      <CaretDown
+                        size={10}
+                        weight="bold"
+                        className={`text-brand-cream/25 transition-transform duration-200 ${isCollapsed ? "-rotate-90" : ""}`}
+                      />
+                    </button>
+                  </>
+                ) : (
+                  <div className="mb-1" />
+                )}
+
+                {!isCollapsed && (
+                  <div className="space-y-0.5">
+                    {sorted.map((item) => {
+                      const underMaintenance = isMaintenance(item);
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          data-testid={item.testid}
+                          className={({ isActive }) =>
+                            `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                              underMaintenance
+                                ? "opacity-50 text-brand-cream/55 hover:bg-white/8 hover:opacity-70"
+                                : isActive
+                                  ? "bg-brand-gold/20 text-brand-gold border border-brand-gold/25"
+                                  : "text-brand-cream/70 hover:bg-white/10 hover:text-brand-cream"
+                            }`
+                          }
+                        >
+                          <item.icon size={18} weight={location.pathname === item.to ? "fill" : "regular"} />
+                          <span className="flex-1 truncate">{item.label}</span>
+                          {underMaintenance && (
+                            <span className="flex items-center gap-1 bg-amber-500/20 text-amber-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-amber-500/25 flex-shrink-0">
+                              <Wrench size={9} weight="fill" /> maint
+                            </span>
+                          )}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Credit badge */}
@@ -266,19 +314,26 @@ export default function AppShell() {
         <div className="grid grid-cols-5 px-1 py-1.5 safe-area-inset-bottom">
           {mobileNav.filter(item => !isHidden(item)).map((item) => {
             const isActive = location.pathname === item.to;
+            const underMaintenance = isMaintenance(item);
+            const maintenanceIcon = underMaintenance && (
+              <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-amber-500 border-2 border-brand flex items-center justify-center">
+                <Wrench size={7} weight="fill" className="text-white" />
+              </span>
+            );
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 data-testid={`${item.testid}-mobile`}
                 className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl text-[10px] font-medium transition-all btn-touch ${
-                  isActive ? "text-brand-gold" : "text-brand-cream/55"
+                  underMaintenance && !isAdmin ? "text-brand-cream/55" : isActive ? "text-brand-gold" : "text-brand-cream/55"
                 }`}
               >
-                <div className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all ${
-                  isActive ? "bg-white/15" : "bg-transparent"
+                <div className={`relative h-9 w-9 rounded-xl flex items-center justify-center transition-all ${
+                  isActive && !underMaintenance ? "bg-white/15" : "bg-transparent"
                 }`}>
                   <item.icon size={20} weight={isActive ? "fill" : "regular"} />
+                  {maintenanceIcon}
                 </div>
                 <span className="leading-none">{item.label}</span>
               </NavLink>

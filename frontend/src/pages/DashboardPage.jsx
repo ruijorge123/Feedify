@@ -1,363 +1,539 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useCredits } from "@/lib/credits";
+import { toast } from "react-toastify";
 import {
-  ImageSquare,
-  Stack,
-  PenNib,
-  ClockCounterClockwise,
-  ArrowRight,
-  TrendUp,
-  Sparkle,
-  Palette,
-  ForkKnife,
-  GridFour,
-  ShieldCheck,
-  CalendarBlank,
-  Lightning,
+  ImageSquare, Sparkle, Palette, Lightning,
+  ArrowRight, ArrowClockwise, Camera, FilmSlate,
+  Stack, PenNib, Storefront, CaretDown, CaretUp,
 } from "@phosphor-icons/react";
 
-export default function DashboardPage() {
-  const { user } = useAuth();
-  const { credits } = useCredits();
-  const [stats, setStats] = useState({ total: 0, banner: 0, carousel: 0, copywriting: 0 });
-  const [recent, setRecent] = useState([]);
-  const [brand, setBrand] = useState(null);
-  const [recommendation, setRecommendation] = useState(null);
+// ── Pure helpers ───────────────────────────────────────────────────────────────
 
+function getTimeGreeting() {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 11) return "Selamat pagi";
+  if (h >= 11 && h < 14) return "Selamat siang";
+  if (h >= 14 && h < 18) return "Selamat sore";
+  return "Selamat malam";
+}
+
+function getSubtitle(h) {
+  if (h >= 5  && h < 11) return "siap tampil beda hari ini? ☀️";
+  if (h >= 11 && h < 14) return "yuk tambah satu konten produktif!";
+  if (h >= 14 && h < 18) return "konsisten sore ini = brand authority besok.";
+  return "masih semangat? satu konten lagi boleh! 🌙";
+}
+
+function computeHealth(brand, stats, recent) {
+  const visual =
+    10 +
+    (brand?.visual_style ? 22 : 0) +
+    (brand?.brand_personality?.length > 0 ? 22 : 0) +
+    (brand?.color_primary ? 22 : 0) +
+    (brand?.target_audience ? 14 : 0) +
+    (brand?.brand_donts?.length > 0 ? 10 : 0);
+  const types = [stats?.banner, stats?.carousel, stats?.copywriting, stats?.marketplace].filter(Boolean).length;
+  const diversity = Math.min(types * 25, 100);
+  let momentum = 20;
+  if (recent?.length > 0) {
+    const days = (Date.now() - new Date(recent[0].created_at)) / 86400000;
+    momentum = days < 1 ? 95 : days < 3 ? 82 : days < 7 ? 66 : days < 14 ? 50 : 35;
+  }
+  const mkt = stats?.marketplace > 0 ? Math.min(50 + stats.marketplace * 12, 92) : 28;
+  const score = Math.min(Math.round(visual * 0.3 + diversity * 0.3 + momentum * 0.25 + mkt * 0.15), 99);
+  return {
+    score,
+    breakdown: {
+      "Visual Consistency":    Math.min(visual, 100),
+      "Content Diversity":     diversity,
+      "Posting Momentum":      momentum,
+      "Marketplace Readiness": mkt,
+    },
+  };
+}
+
+function healthMeta(s) {
+  if (s >= 80) return { label: "Brand Kuat",  emoji: "🔥", color: "#0B3D2E" };
+  if (s >= 60) return { label: "Berkembang",  emoji: "📈", color: "#1A5F4A" };
+  if (s >= 40) return { label: "Baru Mulai",  emoji: "🌱", color: "#E5C158" };
+  return              { label: "Mari Mulai",  emoji: "🌱", color: "#C28E6E" };
+}
+
+function barColor(v) {
+  if (v >= 70) return "#0B3D2E";
+  if (v >= 40) return "#E5C158";
+  return "#D45F3C";
+}
+
+function computeStreak(prompts) {
+  if (!prompts?.length) return { streak: 0, todayActive: false };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = new Set(prompts.map(p => { const d = new Date(p.created_at); d.setHours(0,0,0,0); return d.getTime(); }));
+  const todayActive = days.has(today.getTime());
+  let streak = 0, day = today.getTime();
+  while (days.has(day)) { streak++; day -= 86400000; }
+  if (streak === 0) { day = today.getTime() - 86400000; while (days.has(day)) { streak++; day -= 86400000; } }
+  return { streak, todayActive };
+}
+
+const BREAKDOWN_HINTS = {
+  "Visual Consistency":    { text: "Lengkapi Brand DNA",       to: "/settings" },
+  "Content Diversity":     { text: "Coba format Carousel",     to: "/generate/carousel" },
+  "Posting Momentum":      { text: "Generate konten hari ini", to: "/generate/banner" },
+  "Marketplace Readiness": { text: "Bikin foto marketplace",   to: "/generate/marketplace" },
+};
+
+// ── Count-up animation hook ────────────────────────────────────────────────────
+
+function useCountUp(target, duration = 1200, delay = 0) {
+  const [val, setVal] = useState(0);
   useEffect(() => {
-    api.get("/stats").then(({ data }) => setStats(data)).catch(() => {});
-    api.get("/prompts").then(({ data }) => setRecent(data.slice(0, 5))).catch(() => {});
-    api.get("/brand-profile").then(({ data }) => setBrand(data)).catch(() => {});
-    api.get("/content-recommendation").then(({ data }) => setRecommendation(data)).catch(() => {});
-  }, []);
+    if (!target) { setVal(0); return; }
+    let raf, t0 = null;
+    const run = (ts) => {
+      if (!t0) t0 = ts;
+      const el = ts - t0 - delay;
+      if (el < 0) { raf = requestAnimationFrame(run); return; }
+      const p = Math.min(el / duration, 1);
+      setVal(Math.round((1 - Math.pow(1 - p, 3)) * target));
+      if (p < 1) raf = requestAnimationFrame(run);
+    };
+    raf = requestAnimationFrame(run);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration, delay]);
+  return val;
+}
 
-  const goalToDashboard = {
-    launch: "/generate/banner",
-    promo: "/generate/banner",
-    testimonial: "/generate/carousel",
-    edukasi: "/generate/carousel",
-    best_seller: "/generate/banner",
-    brand_awareness: "/generate/carousel",
-    restock: "/generate/banner",
-  };
+// ── Animated ring (for expanded brand pulse) ───────────────────────────────────
 
-  const goalIcon = {
-    launch: "🚀", promo: "💸", testimonial: "🌟",
-    edukasi: "💡", best_seller: "🏆", brand_awareness: "🎯", restock: "🔄",
-  };
-
-  const actions = [
-    {
-      to: "/generate/banner",
-      title: "Banner Generator",
-      desc: "Visual banner promosi premium siap posting.",
-      icon: ImageSquare,
-      tone: "bg-brand text-brand-cream",
-      testid: "action-banner",
-    },
-    {
-      to: "/generate/carousel",
-      title: "Carousel Builder",
-      desc: "3–7 slide storytelling otomatis.",
-      icon: Stack,
-      tone: "bg-brand-gold text-brand",
-      testid: "action-carousel",
-    },
-    {
-      to: "/generate/copywriting",
-      title: "Copywriting",
-      desc: "Headline, caption, hashtag siap pakai.",
-      icon: PenNib,
-      tone: "bg-brand-clay text-white",
-      testid: "action-copywriting",
-    },
-    {
-      to: "/generate/food",
-      title: "F&B Menu Visual",
-      desc: "Food photography prompt khusus UMKM kuliner.",
-      icon: ForkKnife,
-      tone: "bg-amber-700 text-amber-50",
-      testid: "action-food",
-    },
-    {
-      to: "/grid-planner",
-      title: "Grid Planner",
-      desc: "Rencanakan 3×3 feed Instagram Anda.",
-      icon: GridFour,
-      tone: "bg-emerald-700 text-emerald-50",
-      testid: "action-grid",
-    },
-    {
-      to: "/consistency",
-      title: "Consistency Checker",
-      desc: "Skor konsistensi visual vs Brand DNA Anda.",
-      icon: ShieldCheck,
-      tone: "bg-rose-700 text-rose-50",
-      testid: "action-consistency",
-    },
-  ];
-
+function HealthRingExpanded({ score }) {
+  const r = 44, sw = 9, circ = 2 * Math.PI * r;
+  const display = useCountUp(score, 1400);
+  const { color } = healthMeta(score);
   return (
-    <div className="space-y-8" data-testid="dashboard-page">
-      {/* Greeting */}
-      <div className="animate-fade-up">
-        <div className="text-xs uppercase tracking-[0.2em] text-brand-light font-semibold mb-2">Dashboard</div>
-        <h1 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold text-brand tracking-tight">
-          Halo, {user?.name?.split(" ")[0] || "kreator"}.
-        </h1>
-        <p className="text-stone-600 mt-2 text-lg">
-          Siap bikin konten brand <span className="text-brand font-semibold">{brand?.brand_name || "Anda"}</span> yang konsisten?
-        </p>
+    <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: 112, height: 112 }}>
+      <svg width="112" height="112" viewBox="0 0 112 112" style={{ transform: "rotate(-90deg)" }}>
+        <circle cx="56" cy="56" r={r} fill="none" stroke="#E5ECE7" strokeWidth={sw} />
+        <circle cx="56" cy="56" r={r} fill="none" stroke={color} strokeWidth={sw}
+          strokeDasharray={circ} strokeDashoffset={circ - (display / 100) * circ} strokeLinecap="round" />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="font-heading font-black text-2xl leading-none tabular-nums" style={{ color }}>{display}</div>
+        <div className="text-[9px] text-stone-400 font-semibold mt-0.5">Score</div>
       </div>
+    </div>
+  );
+}
 
-      {/* Credits balance card */}
-      <CreditBalanceCard credits={credits} />
+// ── Animated metric bar ────────────────────────────────────────────────────────
 
-      {/* Content Recommendation — always first, even for new users */}
-      {recommendation && (
-        <div
-          className={`feedify-card animate-fade-up overflow-hidden ${recommendation.is_new_user ? "" : "border-l-4 border-brand-gold"}`}
-          data-testid="content-recommendation"
-        >
-          {recommendation.is_new_user ? (
-            /* New user — full onboarding card */
-            <div className="p-6 sm:p-7">
-              <div className="flex items-start gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-brand flex items-center justify-center flex-shrink-0 shadow-md">
-                  <Sparkle size={22} weight="fill" className="text-brand-gold" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-brand-light font-bold mb-1">Langkah Pertama</div>
-                  <div className="font-heading font-bold text-brand text-lg leading-tight">Mulai dengan konten <span className="text-brand-gold">{recommendation.recommended_name}</span></div>
-                  <p className="text-sm text-stone-500 mt-1.5 leading-relaxed">{recommendation.reason}</p>
-                  {recommendation.tip && (
-                    <div className="mt-3 inline-flex items-center gap-1.5 text-xs text-brand bg-brand/8 px-3 py-1.5 rounded-full font-medium">
-                      <Lightning size={12} weight="fill" className="text-brand-gold" />
-                      {recommendation.tip}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="mt-5 flex flex-col sm:flex-row gap-2.5">
-                <Link
-                  to={goalToDashboard[recommendation.recommended_goal] || "/generate/banner"}
-                  data-testid="recommendation-cta"
-                  className="flex-1 py-3 bg-brand text-brand-cream rounded-full font-bold text-sm hover:bg-brand-light btn-lift inline-flex items-center justify-center gap-2 shadow-md"
-                >
-                  <Sparkle size={16} weight="fill" /> Buat Konten {recommendation.recommended_name}
-                </Link>
-                <Link to="/generate/carousel" className="flex-1 py-3 border-2 border-brand-sand text-brand rounded-full font-semibold text-sm hover:border-brand hover:bg-brand-sand/40 inline-flex items-center justify-center gap-2 transition-all">
-                  <Stack size={16} weight="duotone" /> Coba Carousel
-                </Link>
-              </div>
-            </div>
-          ) : (
-            /* Returning user — compact rotation card */
-            <div className="p-5 flex items-start gap-4">
-              <div className="h-10 w-10 rounded-xl bg-brand-gold/15 flex items-center justify-center flex-shrink-0 text-lg">
-                {goalIcon[recommendation.recommended_goal] || "🎯"}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-brand-light font-bold mb-0.5">Saran Konten Berikutnya</div>
-                <div className="font-heading font-bold text-brand text-base">{recommendation.recommended_name}</div>
-                <div className="text-xs text-stone-500 mt-0.5">{recommendation.reason}</div>
-              </div>
-              <Link
-                to={goalToDashboard[recommendation.recommended_goal] || "/generate/banner"}
-                data-testid="recommendation-cta"
-                className="flex-shrink-0 text-xs font-bold text-brand hover:text-brand-light px-4 py-2 rounded-full border border-brand-sand hover:border-brand transition-all whitespace-nowrap"
-              >
-                Buat →
-              </Link>
-            </div>
-          )}
-        </div>
+function AnimBar({ label, value, delay = 0 }) {
+  const [filled, setFilled] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setFilled(true), delay + 200); return () => clearTimeout(t); }, [delay]);
+  const color = barColor(value);
+  const hint = value < 70 ? BREAKDOWN_HINTS[label] : null;
+  return (
+    <div>
+      <div className="flex justify-between mb-1">
+        <span className="text-[11px] text-stone-500 font-medium">{label}</span>
+        <span className="text-[11px] font-bold tabular-nums" style={{ color }}>{value}%</span>
+      </div>
+      <div className="h-1 bg-stone-100 rounded-full overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: filled ? `${value}%` : "0%", background: color, transition: "width 0.9s cubic-bezier(0.25,0.46,0.45,0.94)" }} />
+      </div>
+      {hint && (
+        <Link to={hint.to} className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-semibold text-stone-400 hover:text-brand transition-colors">
+          → {hint.text}
+        </Link>
       )}
+    </div>
+  );
+}
 
-      {/* Stats — only when user has content */}
-      {stats.total > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 animate-fade-up">
-          <StatCard label="Total Konten" value={stats.total} icon={Sparkle} />
-          <StatCard label="Feed Post" value={stats.banner} icon={ImageSquare} />
-          <StatCard label="Carousel" value={stats.carousel} icon={Stack} />
-          <StatCard label="Copywriting" value={stats.copywriting} icon={PenNib} />
-        </div>
-      )}
+// ── Brand Pulse pill (collapsible) ─────────────────────────────────────────────
 
-      {/* Brand DNA card */}
-      {brand && (
-        <Link to="/settings" className="block animate-fade-up" data-testid="brand-dna-card">
-          <div className="feedify-card p-6 flex items-center gap-5">
-            <div className="h-16 w-16 rounded-2xl border border-brand-sand flex items-center justify-center overflow-hidden" style={{ background: brand.color_secondary }}>
-              {brand.logo_base64 ? (
-                <img src={brand.logo_base64} alt="logo" className="h-full w-full object-cover" />
-              ) : (
-                <Palette size={26} style={{ color: brand.color_primary }} weight="duotone" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs uppercase tracking-[0.18em] text-stone-500 font-semibold">Brand Visual DNA</div>
-              <div className="font-heading text-xl font-bold text-brand truncate">{brand.brand_name}</div>
-              <div className="text-xs text-stone-500 mt-0.5">{brand.category}</div>
-            </div>
-            <div className="hidden sm:flex gap-1.5">
-              {[brand.color_primary, brand.color_secondary].map((c, i) => (
-                <div key={i} className="h-8 w-8 rounded-lg border border-white shadow-sm" style={{ background: c }} />
+function BrandPulsePill({ health, expanded, onToggle }) {
+  const { label, emoji, color } = healthMeta(health.score);
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        data-testid="brand-pulse-pill"
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all hover:brightness-105"
+        style={{ borderColor: color + "45", background: color + "12", color }}
+      >
+        <span>{emoji}</span>
+        Brand Score: {health.score}
+        <span className="text-[9px] opacity-60 ml-0.5">{label}</span>
+        {expanded ? <CaretUp size={10} /> : <CaretDown size={10} />}
+      </button>
+
+      {expanded && (
+        <div className="mt-3 p-4 rounded-2xl bg-white border border-stone-100 shadow-sm animate-fade-up">
+          <div className="flex items-start gap-5">
+            <HealthRingExpanded score={health.score} />
+            <div className="flex-1 space-y-3 min-w-0">
+              {Object.entries(health.breakdown).map(([label, val], i) => (
+                <AnimBar key={label} label={label} value={val} delay={i * 100} />
               ))}
             </div>
           </div>
-        </Link>
+        </div>
       )}
+    </div>
+  );
+}
 
-      {/* Quick actions */}
-      <div className="animate-fade-up">
-        <h2 className="font-heading text-2xl font-bold text-brand mb-4 tracking-tight">Generate konten</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {actions.map((a) => (
-            <Link
-              key={a.to}
-              to={a.to}
-              data-testid={a.testid}
-              className="feedify-card p-6 group flex flex-col"
-            >
-              <div className={`h-12 w-12 rounded-xl ${a.tone} flex items-center justify-center mb-4 shadow-sm`}>
-                <a.icon size={24} weight="duotone" />
-              </div>
-              <h3 className="font-heading text-xl font-semibold text-brand mb-1">{a.title}</h3>
-              <p className="text-sm text-stone-600 leading-relaxed flex-1">{a.desc}</p>
-              <div className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-brand">
-                Mulai <ArrowRight size={16} weight="bold" className="group-hover:translate-x-1 transition-transform" />
-              </div>
-            </Link>
-          ))}
+// ── Daily Recommendation Card ──────────────────────────────────────────────────
+
+function RecommendationCard({ rec, loading, onRefresh }) {
+  const navigate = useNavigate();
+  return (
+    <div
+      className="rounded-2xl border border-brand/15 bg-gradient-to-br from-white to-brand-sand/30 p-6 shadow-sm animate-fade-up"
+      style={{ animationDelay: "120ms" }}
+      data-testid="daily-recommendation"
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-7 h-7 rounded-xl bg-brand-gold/20 flex items-center justify-center flex-shrink-0">
+          <Sparkle size={14} weight="fill" className="text-brand-gold" />
+        </div>
+        <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-light">
+          Rekomendasi hari ini
         </div>
       </div>
 
-      {/* Recent prompts */}
-      <div className="animate-fade-up">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-heading text-2xl font-bold text-brand tracking-tight">Riwayat terakhir</h2>
-          <Link to="/history" className="text-sm font-semibold text-brand hover:underline" data-testid="see-all-history">
-            Lihat semua →
-          </Link>
-        </div>
-        {recent.length === 0 ? (
-          <div className="feedify-card p-10 text-center">
-            <ClockCounterClockwise size={32} className="mx-auto text-stone-400 mb-3" />
-            <p className="text-stone-500">Belum ada prompt. Generate yang pertama yuk!</p>
+      {/* Recommendation text */}
+      <div className="min-h-[60px] mb-5">
+        {loading ? (
+          <div className="space-y-2 pt-1">
+            <div className="h-3.5 bg-stone-100 rounded-full animate-pulse w-full" />
+            <div className="h-3.5 bg-stone-100 rounded-full animate-pulse w-5/6" />
+            <div className="h-3.5 bg-stone-100 rounded-full animate-pulse w-3/5" />
           </div>
+        ) : rec?.recommendation ? (
+          <p className="text-sm text-stone-700 leading-relaxed animate-fade-up">
+            {rec.recommendation}
+          </p>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {recent.map((p) => {
-              const thumb = p.image_base64 || (p.slide_images && p.slide_images[0]);
-              return (
-                <Link key={p.id} to="/history" data-testid={`recent-${p.id}`} className="feedify-card overflow-hidden group">
-                  <div className="aspect-square bg-brand-sand/40 relative">
-                    {thumb ? (
-                      <img src={`data:image/png;base64,${thumb}`} alt={p.title} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center text-brand-light/50">
-                        {p.dashboard_type === "banner" && <ImageSquare size={28} weight="duotone" />}
-                        {p.dashboard_type === "carousel" && <Stack size={28} weight="duotone" />}
-                        {p.dashboard_type === "copywriting" && <PenNib size={28} weight="duotone" />}
-                        {p.dashboard_type === "food-menu" && <ForkKnife size={28} weight="duotone" />}
-                      </div>
-                    )}
-                    <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-white/90 text-[9px] uppercase tracking-wider font-bold text-brand">
-                      {p.dashboard_type === "food-menu" ? "F&B" : p.dashboard_type}
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <div className="text-xs font-semibold text-brand truncate">{p.title}</div>
-                    <div className="text-[10px] text-stone-500 mt-0.5">{new Date(p.created_at).toLocaleDateString("id-ID")}</div>
-                  </div>
-                </Link>
-              );
-            })}
+          <p className="text-sm text-stone-400 italic">
+            Tidak bisa memuat rekomendasi saat ini.
+          </p>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => rec?.action_route && navigate(rec.action_route)}
+          disabled={loading || !rec}
+          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-brand text-brand-cream rounded-full font-bold text-sm hover:bg-brand-light btn-lift shadow-sm shadow-brand/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          data-testid="rec-action-btn"
+        >
+          <Sparkle size={14} weight="fill" /> Bikin Sekarang
+        </button>
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border-2 border-stone-200 text-stone-500 text-sm font-semibold hover:border-brand hover:text-brand transition-all disabled:opacity-40"
+          data-testid="rec-refresh-btn"
+        >
+          <ArrowClockwise size={14} className={loading ? "animate-spin" : ""} /> Ide Lain
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Action tiles ───────────────────────────────────────────────────────────────
+
+const ACTION_TILES = [
+  {
+    emoji:    "📸",
+    label:    "Foto Produk",
+    sub:      "Feed & banner premium",
+    to:       "/generate/banner",
+    gradient: "from-[#0B3D2E] to-[#1E6B50]",
+    textDark: false,
+    Icon:     Camera,
+  },
+  {
+    emoji:    "🎬",
+    label:    "Video Reels",
+    sub:      "Iklan produk otomatis",
+    to:       "/generate/reels",
+    gradient: "from-[#1A1614] to-[#3D3020]",
+    textDark: false,
+    Icon:     FilmSlate,
+  },
+  {
+    emoji:    "📊",
+    label:    "Carousel",
+    sub:      "Multi-slide storytelling",
+    to:       "/generate/carousel",
+    gradient: "from-[#B8860B] to-[#E5C158]",
+    textDark: true,
+    Icon:     Stack,
+  },
+  {
+    emoji:    "✍️",
+    label:    "Caption",
+    sub:      "Copy yang mengkonversi",
+    to:       "/generate/copywriting",
+    gradient: "from-[#6B3A2A] to-[#C17B3C]",
+    textDark: false,
+    Icon:     PenNib,
+  },
+  {
+    emoji:    "🛒",
+    label:    "Marketplace",
+    sub:      "Foto listing Shopee/Tokped",
+    to:       "/generate/marketplace",
+    gradient: "from-[#2D4A3E] to-[#557A66]",
+    textDark: false,
+    Icon:     Storefront,
+  },
+];
+
+function ActionTile({ emoji, label, sub, to, gradient, textDark, Icon }) {
+  const textBase  = textDark ? "text-[#0B3D2E]"     : "text-white";
+  const textMuted = textDark ? "text-[#0B3D2E]/65"  : "text-white/65";
+  const arrowCls  = textDark ? "text-[#0B3D2E]/50"  : "text-white/50";
+
+  return (
+    <Link
+      to={to}
+      className={`group flex-shrink-0 flex flex-col bg-gradient-to-br ${gradient} rounded-2xl p-5
+        hover:shadow-xl hover:-translate-y-1 hover:brightness-110
+        transition-all duration-300 cursor-pointer
+        w-[160px] sm:w-auto sm:flex-1`}
+      style={{ minHeight: 180 }}
+    >
+      <div className="text-3xl mb-3 group-hover:scale-110 transition-transform duration-200">
+        {emoji}
+      </div>
+      <div className={`font-heading font-bold text-base leading-tight mb-1 ${textBase}`}>
+        {label}
+      </div>
+      <div className={`text-[11px] leading-snug flex-1 ${textMuted}`}>
+        {sub}
+      </div>
+      <div className={`mt-4 flex items-center gap-1 text-[11px] font-bold group-hover:gap-2 transition-all duration-200 ${arrowCls}`}>
+        Buat <ArrowRight size={11} />
+      </div>
+    </Link>
+  );
+}
+
+function ActionTiles() {
+  return (
+    <div className="animate-fade-up" style={{ animationDelay: "200ms" }}>
+      <div className="text-[10px] uppercase tracking-[0.22em] text-stone-400 font-bold mb-4">
+        Apa yang mau kamu bikin hari ini?
+      </div>
+      {/* Horizontal scroll on mobile, flex row on desktop */}
+      <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible sm:grid sm:grid-cols-5">
+        {ACTION_TILES.map(tile => <ActionTile key={tile.to} {...tile} />)}
+      </div>
+    </div>
+  );
+}
+
+// ── Continue strip ─────────────────────────────────────────────────────────────
+
+const TYPE_LABEL = {
+  banner: "Feed", carousel: "Carousel",
+  copywriting: "Copy", marketplace: "Mkt",
+  studio: "Studio", reels: "Reels",
+};
+
+function ContinueStrip({ recent }) {
+  const stripRef = useRef(null);
+  return (
+    <div className="animate-fade-up" style={{ animationDelay: "280ms" }}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-[0.22em] text-stone-400 font-bold">
+          Lanjutkan kerjamu
+        </div>
+        <Link to="/history" className="text-xs font-semibold text-brand hover:underline" data-testid="see-all-history">
+          Lihat semua →
+        </Link>
+      </div>
+
+      <div
+        ref={stripRef}
+        className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide"
+      >
+        {recent.map(item => {
+          const thumb = item.image_base64 || (item.slide_images?.[0]);
+          return (
+            <Link
+              key={item.id}
+              to="/history"
+              className="group flex-shrink-0 relative overflow-hidden rounded-xl border border-stone-100 hover:border-brand/20 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
+              style={{ width: 88, height: 88 }}
+              data-testid={`recent-${item.id}`}
+            >
+              {thumb ? (
+                <img
+                  src={`data:image/png;base64,${thumb}`}
+                  alt=""
+                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+              ) : (
+                <div className="h-full w-full bg-brand-sand/50 flex items-center justify-center">
+                  <ImageSquare size={20} weight="duotone" className="text-brand-light/30" />
+                </div>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-brand/60 via-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-full bg-white/90 text-[8px] uppercase tracking-wider font-bold text-brand">
+                {TYPE_LABEL[item.dashboard_type] ?? item.dashboard_type}
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const { user }    = useAuth();
+  const { credits } = useCredits();
+  const navigate    = useNavigate();
+
+  const [stats,         setStats]         = useState(null);
+  const [recent,        setRecent]        = useState([]);
+  const [brand,         setBrand]         = useState(null);
+  const [streakData,    setStreakData]    = useState({ streak: 0, todayActive: false });
+  const [dailyRec,      setDailyRec]     = useState(null);
+  const [recLoading,    setRecLoading]   = useState(true);
+  const [pulseExpanded, setPulseExpanded]= useState(false);
+
+  useEffect(() => {
+    api.get("/stats").then(r => setStats(r.data)).catch(() => setStats({}));
+    api.get("/prompts").then(r => {
+      setRecent(r.data.slice(0, 8));
+      setStreakData(computeStreak(r.data));
+    }).catch(() => {});
+    api.get("/brand-profile").then(r => setBrand(r.data)).catch(() => {});
+
+    setRecLoading(true);
+    api.get("/dashboard/daily-recommendation")
+      .then(r => setDailyRec(r.data))
+      .catch(() => setDailyRec(null))
+      .finally(() => setRecLoading(false));
+  }, []);
+
+  const handleRefreshRec = useCallback(async () => {
+    setRecLoading(true);
+    try {
+      const { data } = await api.get("/dashboard/daily-recommendation?force=true");
+      setDailyRec(data);
+    } catch {
+      toast.error("Gagal refresh rekomendasi. Coba lagi.");
+    } finally {
+      setRecLoading(false);
+    }
+  }, []);
+
+  const health   = computeHealth(brand, stats, recent);
+  const balance  = credits?.balance ?? credits?.credits_remaining ?? null;
+  const { color: scoreColor, emoji: scoreEmoji } = healthMeta(health.score);
+  const brandName = brand?.brand_name || user?.name?.split(" ")[0] || "Brand Kamu";
+  const h         = new Date().getHours();
+  const greeting  = getTimeGreeting();
+  const subtitle  = getSubtitle(h);
+
+  return (
+    <div className="space-y-7 pb-14" data-testid="dashboard-page">
+
+      {/* ── GREETING HERO ────────────────────────────────────────────────────── */}
+      <div className="animate-fade-up">
+        {/* Main greeting */}
+        <div className="mb-5">
+          <div className="text-sm text-stone-400 font-medium mb-1">{greeting}</div>
+          <h1 className="font-heading font-black text-brand tracking-tight leading-none" style={{ fontSize: "clamp(2rem, 5vw, 3.25rem)" }}>
+            {brandName} <span className="inline-block">👋</span>
+          </h1>
+          <p className="text-stone-500 mt-2 text-base font-medium leading-snug">
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Micro indicator row */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Streak */}
+          {streakData.streak > 0 && (
+            <div
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200 text-xs font-bold text-orange-700 ${streakData.todayActive ? "" : "opacity-60"}`}
+            >
+              <span style={streakData.todayActive ? { animation: "glow-pulse 2s ease-in-out infinite" } : {}}>🔥</span>
+              {streakData.streak} hari
+            </div>
+          )}
+
+          {/* Credits */}
+          {balance !== null && (
+            balance === 0 ? (
+              <Link
+                to="/credits"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-xs font-bold text-amber-700 hover:bg-amber-100 transition-colors"
+              >
+                <Lightning size={12} weight="fill" className="text-amber-500" /> Top Up Kredit
+              </Link>
+            ) : (
+              <div
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold ${balance <= 5 ? "bg-brand-gold/15 border-brand-gold/40 text-brand" : "bg-brand/8 border-brand/15 text-brand"}`}
+              >
+                <Lightning size={12} weight="fill" className="text-brand-gold" />
+                {balance} kredit
+              </div>
+            )
+          )}
+
+          {/* Brand Pulse pill */}
+          <BrandPulsePill
+            health={health}
+            expanded={pulseExpanded}
+            onToggle={() => setPulseExpanded(v => !v)}
+          />
+        </div>
+
+        {/* Expanded brand pulse (below micro row) */}
+        {pulseExpanded && (
+          <div className="mt-3 p-5 rounded-2xl bg-white border border-stone-100 shadow-sm animate-fade-up">
+            <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-light mb-4">Brand Health Detail</div>
+            <div className="flex items-start gap-6">
+              <HealthRingExpanded score={health.score} />
+              <div className="flex-1 space-y-3.5 min-w-0">
+                {Object.entries(health.breakdown).map(([lbl, val], i) => (
+                  <AnimBar key={lbl} label={lbl} value={val} delay={i * 100} />
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
-    </div>
-  );
-}
 
-function CreditBalanceCard({ credits }) {
-  const balance = credits?.balance ?? credits?.credits_remaining ?? 0;
-  const totalBought = credits?.total_purchased ?? 0;
-  const [history, setHistory] = useState([]);
-  useEffect(() => {
-    api.get("/credits/history").then(({ data }) => setHistory(data.slice(0, 5))).catch(() => {});
-  }, []);
+      {/* ── DAILY AI RECOMMENDATION ──────────────────────────────────────────── */}
+      <RecommendationCard
+        rec={dailyRec}
+        loading={recLoading}
+        onRefresh={handleRefreshRec}
+      />
 
-  const typeLabel = (t) => ({ purchase: "Beli kredit", usage: "Generate", refund: "Refund", bonus: "Bonus" })[t] || t;
-  const typeColor = (t) => ({ purchase: "text-green-600", usage: "text-stone-500", refund: "text-blue-500", bonus: "text-brand-gold" })[t] || "text-stone-500";
+      {/* ── ACTION TILES ─────────────────────────────────────────────────────── */}
+      <ActionTiles />
 
-  return (
-    <div className="feedify-card p-6 animate-fade-up" data-testid="credits-card">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
-        <div>
-          <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold flex items-center gap-1.5 mb-2">
-            <Lightning size={14} weight="fill" /> Kredit Kamu
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-11 w-11 rounded-2xl bg-brand-gold/15 flex items-center justify-center flex-shrink-0">
-              <Lightning size={22} weight="fill" className="text-brand-gold" />
-            </div>
-            <span className="font-heading text-5xl font-bold text-brand" data-testid="credits-remaining">{balance}</span>
-          </div>
-          <div className="text-xs text-stone-500 mt-1">
-            kredit tersisa · tidak expired · total dibeli: <strong>{totalBought}</strong>
-          </div>
-        </div>
-        <Link to="/credits" data-testid="buy-credits-link"
-          className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-brand-gold text-brand hover:bg-brand-amber rounded-full font-bold text-sm btn-lift shadow-md shadow-brand-gold/20 whitespace-nowrap flex-shrink-0">
-          + Beli Kredit
-        </Link>
-      </div>
+      {/* ── CONTINUE STRIP (only if has projects) ────────────────────────────── */}
+      {recent.length > 0 && <ContinueStrip recent={recent} />}
 
-      {/* Last 5 transactions */}
-      {history.length > 0 && (
-        <div className="border-t border-stone-100 pt-4">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-brand-light font-bold mb-3">Riwayat Terakhir</div>
-          <div className="space-y-1.5">
-            {history.map((tx, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span className={`font-medium ${typeColor(tx.type)}`}>{typeLabel(tx.type)}</span>
-                  {tx.description && <span className="text-stone-400 text-xs hidden sm:inline truncate max-w-[180px]">{tx.description}</span>}
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className={`font-mono font-semibold ${tx.amount > 0 ? "text-green-600" : "text-stone-500"}`}>
-                    {tx.type === "bonus" ? "+🎁" : tx.amount > 0 ? `+${tx.amount}` : tx.amount}
-                  </span>
-                  <span className="text-stone-400 text-xs">{new Date(tx.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {balance === 0 && (
-        <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
-          Kredit kamu habis. <Link to="/credits" className="font-semibold underline">Beli kredit sekarang →</Link>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StatCard({ label, value, icon: Icon }) {
-  return (
-    <div className="feedify-card p-5" data-testid={`stat-${label.toLowerCase().replace(/\s+/g, '-')}`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-xs uppercase tracking-[0.15em] text-stone-500 font-semibold">{label}</div>
-        <Icon size={18} className="text-brand-light" weight="duotone" />
-      </div>
-      <div className="font-heading text-3xl font-bold text-brand">{value}</div>
     </div>
   );
 }

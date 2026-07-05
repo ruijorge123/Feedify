@@ -2,12 +2,11 @@ import { useState } from "react"; // eslint-disable-line
 import { useNavigate, Link } from "react-router-dom";
 import {
   Lightning, Check, ArrowLeft, Sparkle,
-  ImageSquare, Stack, PenNib, ForkKnife,
-  ChartBar, CaretDown, CaretUp, Coin,
-  ArrowRight, Clock, ShieldCheck, Headset,
+  ImageSquare, Stack, PenNib, Storefront,
+  ChartBar, Coin,
+  Clock, ShieldCheck, Headset,
 } from "@phosphor-icons/react";
 import { useCredits } from "@/lib/credits";
-import SupportChatWidget from "@/components/SupportChatWidget";
 
 function fmtRp(n) {
   return "Rp " + n.toLocaleString("id-ID");
@@ -15,21 +14,13 @@ function fmtRp(n) {
 
 const CREDIT_PKGS = [
   {
-    id: "starter",
-    name: "Coba Dulu",
-    credits: 10,
-    price: 15000,
-    perCredit: 1500,
-    tagline: "10 konten siap posting",
-    popular: false,
-    highlight: null,
-  },
-  {
     id: "monthly",
     name: "1 Bulan Full",
     credits: 30,
-    price: 40000,
-    perCredit: 1333,
+    price: 43000,
+    originalPrice: 54000,
+    savings: 11000,
+    perCredit: 1433,
     tagline: "1 foto/hari selama 30 hari",
     popular: true,
     highlight: "Paling Populer",
@@ -39,6 +30,8 @@ const CREDIT_PKGS = [
     name: "2 Bulan Full",
     credits: 60,
     price: 79000,
+    originalPrice: 99000,
+    savings: 20000,
     perCredit: 1317,
     tagline: "2 bulan posting tanpa bolos",
     popular: false,
@@ -48,8 +41,10 @@ const CREDIT_PKGS = [
     id: "pro",
     name: "Pro Pack",
     credits: 300,
-    price: 350000,
-    perCredit: 1167,
+    price: 379000,
+    originalPrice: 474000,
+    savings: 95000,
+    perCredit: 1263,
     tagline: "Untuk brand aktif & agensi",
     popular: false,
     highlight: "Harga termurah/kredit",
@@ -57,10 +52,10 @@ const CREDIT_PKGS = [
 ];
 
 const USAGE_EXAMPLES = [
-  { icon: ImageSquare, label: "Feed Post / Banner", credits: 1, color: "text-brand" },
+  { icon: ImageSquare, label: "Feed Post / Banner",   credits: 1, color: "text-brand" },
   { icon: Stack,       label: "Carousel (per slide)", credits: 1, color: "text-indigo-600" },
-  { icon: ForkKnife,   label: "F&B Menu Visual", credits: 1, color: "text-amber-600" },
-  { icon: PenNib,      label: "Copywriting", credits: 0, color: "text-emerald-600", free: true },
+  { icon: Storefront,  label: "Marketplace Listing",  credits: 1, color: "text-amber-600" },
+  { icon: PenNib,      label: "Copywriting",          credits: 0, color: "text-emerald-600", free: true },
 ];
 
 
@@ -119,7 +114,7 @@ export default function BuyCreditsPage() {
       {/* Paket Kredit */}
       <div className="animate-fade-up">
         <div className="text-xs uppercase tracking-[0.15em] font-bold text-stone-400 mb-4">Pilih Paket</div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid sm:grid-cols-3 gap-4">
           {CREDIT_PKGS.map(pkg => (
             <div
               key={pkg.id}
@@ -135,7 +130,10 @@ export default function BuyCreditsPage() {
                 </div>
               )}
               <div className="p-5 flex flex-col flex-1">
-                <div className="font-heading font-bold text-brand text-base">{pkg.name}</div>
+                <div className="flex items-start justify-between gap-2 mb-0.5">
+                  <div className="font-heading font-bold text-brand text-base">{pkg.name}</div>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-500 text-white flex-shrink-0">-20%</span>
+                </div>
                 <div className="text-xs text-stone-500 mt-0.5 mb-4">{pkg.tagline}</div>
 
                 <div className="mt-auto">
@@ -143,8 +141,15 @@ export default function BuyCreditsPage() {
                     <span className="font-heading text-3xl font-bold text-brand">{pkg.credits}</span>
                     <span className="text-stone-400 text-sm mb-1">kredit</span>
                   </div>
-                  <div className="font-heading text-xl font-bold text-brand-gold mb-0.5">{fmtRp(pkg.price)}</div>
-                  <div className="text-[10px] text-stone-400 mb-4">{fmtRp(pkg.perCredit)} / kredit</div>
+                  {/* Harga coret + diskon */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm line-through text-stone-400">{fmtRp(pkg.originalPrice)}</span>
+                    <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full border border-red-100">
+                      Hemat {fmtRp(pkg.savings)}
+                    </span>
+                  </div>
+                  <div className="font-heading text-xl font-bold text-brand mb-0.5">{fmtRp(pkg.price)}</div>
+                  <div className="text-[10px] text-stone-400 mb-4">💡 {fmtRp(pkg.perCredit)}/foto · tidak expired</div>
 
                   <button
                     onClick={() => goCheckout(pkg.id)}
@@ -185,8 +190,8 @@ export default function BuyCreditsPage() {
         </div>
         <div className="grid sm:grid-cols-3 gap-4">
           {[
-            { credits: 10,  days: "~10 hari",  note: "Posting 1x sehari" },
             { credits: 30,  days: "~1 bulan",  note: "Konsisten tiap hari" },
+            { credits: 60,  days: "~2 bulan",  note: "Posting tanpa bolos" },
             { credits: 300, days: "~10 bulan", note: "Multi-brand atau agensi" },
           ].map(({ credits, days, note }) => (
             <div key={credits} className="bg-brand-sand/40 rounded-xl p-4 text-center">
@@ -198,28 +203,6 @@ export default function BuyCreditsPage() {
         </div>
       </div>
 
-      {/* Chat Support */}
-      <div className="feedify-card p-6 animate-fade-up">
-        <SupportChatWidget
-          title="Masih ada pertanyaan?"
-          subtitle="Tanya soal kredit, paket, atau cara bayar — Ara siap jawab."
-        />
-      </div>
-
-      {/* Bottom CTA */}
-      <div className="feedify-card p-6 text-center animate-fade-up">
-        <Sparkle size={28} weight="duotone" className="text-brand-gold mx-auto mb-3" />
-        <div className="font-heading font-bold text-brand text-lg mb-1">Ada pertanyaan sebelum beli?</div>
-        <p className="text-sm text-stone-500 mb-4">Tim Feedify siap membantu kamu memilih paket yang paling sesuai.</p>
-        <a
-          href="https://wa.me/6282171277376?text=Halo+Feedify,+saya+mau+tanya+soal+kredit"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#25D366] text-white rounded-full font-semibold text-sm hover:bg-[#1db954] btn-touch"
-        >
-          Chat via WhatsApp <ArrowRight size={14} weight="bold" />
-        </a>
-      </div>
 
     </div>
   );

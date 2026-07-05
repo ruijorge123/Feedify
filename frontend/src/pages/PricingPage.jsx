@@ -1,81 +1,190 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Sparkle, Check, Copy, CheckCircle,
-  WhatsappLogo, InstagramLogo, TiktokLogo, Gift,
-  Users, Lightning, Star, X, Tag,
+  Sparkle, CheckCircle,
+  InstagramLogo, Gift,
+  Users, X, Tag, Fire, Shield,
 } from "@phosphor-icons/react";
 import { toast } from 'react-toastify';
 import api from "@/lib/api";
-import SupportChatWidget from "@/components/SupportChatWidget";
 
-/* ─── Social proof popup data ─────────────────────── */
-const SOCIAL_PROOF = [
-  { name: "Rina", city: "Jakarta", action: "baru beli 50 kredit Popular Pack", time: "2 mnt lalu", avatar: "👩" },
-  { name: "Brand Glowskin", city: "Bandung", action: "baru generate 12 foto produk", time: "5 mnt lalu", avatar: "✨" },
-  { name: "Dian", city: "Surabaya", action: "baru daftar dan beli kredit pertama", time: "1 mnt lalu", avatar: "🧑" },
-  { name: "Toko FreshFrozen", city: "Semarang", action: "selesai buat 8 konten carousel", time: "7 mnt lalu", avatar: "🧊" },
-  { name: "Mira", city: "Yogyakarta", action: "beli Pro Pack 300 kredit", time: "3 mnt lalu", avatar: "👩‍💼" },
-  { name: "Studio Rasa", city: "Bali", action: "baru generate menu F&B", time: "4 mnt lalu", avatar: "🍽️" },
+/* ─── Social proof popup data — plays once each ──────────────────────────── */
+const _SP_NAMES = [
+  "Rina","Dian","Sari","Ayu","Rini","Dewi","Citra","Nana",
+  "Yuli","Maya","Tari","Indah","Reza","Bayu","Wika","Lina",
+  "Hani","Siti","Novi","Desi","Rani","Lia","Tina","Nita",
+  "Eka","Mega","Putri","Dina","Vika","Rara","Gita","Nisa",
+  "Tyas","Rosi","Bela","Fira","Hera","Irma","Jeni","Kiki",
+  "Laras","Mila","Nina","Risa","Sela","Tika","Vera","Wati",
+  "Yola","Andri","Bagas","Doni","Evan","Fajar","Gilang",
+  "Hendra","Ivan","Joko","Kevin","Lukman",
+];
+const _SP_BRANDS = [
+  "Glowskin Studio","FreshFrozen Store","Studio Rasa","Hijab Cantik ID",
+  "Café Kenangan","Warung Barokah","Brand Aura","Skincare Alami ID",
+  "Fashion Lokal ID","Kuliner Nusa","Bu Rini Frozen Food","Olshop Mama Dinda",
+  "Kue Artisan","Warung Digital","Batik Jogja Store","Makanan Sehat ID",
+  "Body Care ID","Parfum Nusantara","Aksesoris Lucu","Fashion Hijab ID",
+  "Kuliner Kekinian","Toko Baju Murah","Jajan Enak ID","Kosmetik Lokal",
+  "Keripik Mamak","Bumbu Rahasia ID","Herbal Natural","Sweet Bakery ID",
+  "Mom's Kitchen","Organic Beauty ID",
+];
+const _SP_CITIES = [
+  "Jakarta Selatan","Bandung","Surabaya","Yogyakarta","Semarang",
+  "Denpasar","Medan","Makassar","Malang","Solo","Depok","Bekasi",
+  "Tangerang","Bogor","Palembang","Pekanbaru","Balikpapan","Manado",
+  "Padang","Lampung","Banjarmasin","Batam","Kupang","Pontianak",
+  "Samarinda","Tasikmalaya","Cirebon","Sukabumi","Kediri","Mataram",
+];
+const _SP_ACTIONS = [
+  "baru beli 10 kredit untuk coba pertama",
+  "baru beli paket 1 Bulan Full (30 kredit)",
+  "baru beli paket 2 Bulan Full (60 kredit)",
+  "baru beli Pro Pack 300 kredit",
+  "baru daftar dan langsung beli kredit",
+  "baru generate foto produk skincare",
+  "baru generate foto produk fashion",
+  "baru generate foto produk F&B",
+  "baru generate foto listing marketplace",
+  "selesai buat 5 slide carousel produk",
+  "selesai buat 8 konten carousel bulan ini",
+  "baru pakai fitur Copywriting Indonesia",
+  "baru coba Commercial Studio foto model",
+  "selesai generate konten untuk 30 hari",
+  "baru download foto banner promo diskon",
+  "selesai setup Brand DNA dan generate pertama",
+  "baru generate konten launch produk baru",
+  "baru pakai Growth Consultant AI",
+  "selesai buat carousel konten testimoni",
+  "baru generate foto feed Instagram",
+];
+const _SP_AVATARS = [
+  "👩","🧑","👩‍💼","👨‍💼","✨","🧊","🍽️","💄",
+  "👗","🌸","💫","🎀","🛍️","🌟","💅","🧴","👜","🎂",
+];
+const _SP_TIMES = [
+  "baru saja","1 mnt lalu","2 mnt lalu","3 mnt lalu",
+  "4 mnt lalu","5 mnt lalu","7 mnt lalu","8 mnt lalu",
+  "10 mnt lalu","12 mnt lalu","15 mnt lalu","18 mnt lalu",
+  "20 mnt lalu","25 mnt lalu","30 mnt lalu","45 mnt lalu",
+  "1 jam lalu",
 ];
 
-/* ─── Credit packages ──────────────────────────────── */
+function _buildProof() {
+  const entities = [
+    ..._SP_NAMES.map((n, i)  => ({ name: n, avatar: _SP_AVATARS[i % _SP_AVATARS.length] })),
+    ..._SP_BRANDS.map((n, i) => ({ name: n, avatar: _SP_AVATARS[(i + 9) % _SP_AVATARS.length] })),
+  ];
+  return entities.map((e, i) => ({
+    name:   e.name,
+    city:   _SP_CITIES[i % _SP_CITIES.length],
+    action: _SP_ACTIONS[(i * 7) % _SP_ACTIONS.length],
+    time:   _SP_TIMES[(i * 5 + 3) % _SP_TIMES.length],
+    avatar: e.avatar,
+  }));
+}
+
+function _shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const SOCIAL_PROOF = _buildProof();
+
+/* ─── Live activity feed messages ──────────────────── */
+const LIVE_FEED = [
+  "🔥 Rina dari Bandung baru beli paket 1 Bulan Full",
+  "✨ Glowskin Studio dari Jakarta baru beli Pro Pack",
+  "🛍️ Dewi dari Surabaya baru generate 5 konten carousel",
+  "🔥 Bayu dari Yogyakarta baru beli 2 Bulan Full",
+  "💄 Sari dari Medan baru beli paket 1 Bulan Full",
+  "🌸 Indah dari Semarang baru generate foto skincare",
+  "⚡ 14 akun baru daftar dalam 1 jam terakhir",
+  "🔥 Hanya 8 slot harga promo 1 Bulan Full tersisa!",
+  "🛍️ Fashion Hijab ID dari Depok baru beli Pro Pack",
+  "✨ Warung Barokah dari Solo baru generate konten F&B",
+  "🔥 Maya dari Makassar baru beli paket 2 Bulan Full",
+  "💫 Skincare Alami ID dari Bandung baru beli Pro Pack",
+];
+
+/* ─── Credit packages with FOMO pricing ────────────── */
 const CREDIT_PKGS = [
   {
     id: "starter",
     name: "Coba Dulu",
     credits: 10,
-    price: 15000,
-    savings: 0,
-    perCredit: 1500,
-    tagline: "Trial sebelum komit",
+    price: 28000,
+    originalPrice: 35000,
+    savings: 7000,
+    discountPct: 20,
+    perCredit: 2800,
+    tagline: "Trial tanpa risiko · akses langsung",
+    cta: "Coba Gratis Dulu →",
     value: null,
     popular: false,
+    riskNote: "Kredit tidak expired · Akses langsung",
   },
   {
     id: "monthly",
     name: "1 Bulan Full",
     credits: 30,
-    price: 40000,
-    savings: 5000,
-    perCredit: 1333,
-    tagline: "1 foto/hari · 30 hari tanpa bolong",
+    price: 43000,
+    originalPrice: 54000,
+    savings: 11000,
+    discountPct: 20,
+    perCredit: 1433,
+    tagline: "1 foto/hari · 30 hari non-stop",
+    cta: "Ya, Saya Mau Hemat Rp 11.000 →",
     value: {
       headline: "= 1 bulan konten IG penuh",
-      sub: "Rp 40rb vs Rp 300–500rb/bulan jasa desainer",
+      sub: "Rp 43rb vs Rp 300–500rb/bulan jasa desainer",
       days: 30,
     },
     popular: true,
+    slotsLeft: 8,
+    riskNote: "Kredit tidak expired · Auto-refund jika gagal",
   },
   {
     id: "bimonthly",
     name: "2 Bulan Full",
     credits: 60,
     price: 79000,
-    savings: 11000,
+    originalPrice: 99000,
+    savings: 20000,
+    discountPct: 20,
     perCredit: 1317,
-    tagline: "2 bulan posting tanpa bolos",
+    tagline: "2 bulan posting non-stop",
+    cta: "Ambil Harga Ini Sekarang →",
     value: {
       headline: "= 2 bulan konten IG non-stop",
-      sub: "Hemat Rp 11rb vs beli 2x paket bulanan",
+      sub: "Hemat Rp 20rb vs beli 2x paket bulanan",
       days: 60,
     },
     popular: false,
+    riskNote: "Kredit tidak expired · Auto-refund jika gagal",
   },
   {
     id: "pro",
     name: "Pro Pack",
     credits: 300,
-    price: 350000,
-    savings: 100000,
-    perCredit: 1167,
+    price: 379000,
+    originalPrice: 474000,
+    savings: 95000,
+    discountPct: 20,
+    perCredit: 1263,
     tagline: "Untuk agensi & brand multi-produk",
+    cta: "Kunci Harga Pro Sekarang →",
     value: {
       headline: "= 10 bulan konten atau 5 brand sekaligus",
-      sub: "Harga kredit termurah — Rp 1.167/foto",
+      sub: "Harga kredit termurah — Rp 1.263/foto",
       days: 300,
     },
     popular: false,
+    riskNote: "Kredit tidak expired · Auto-refund jika gagal",
   },
 ];
 
@@ -96,13 +205,21 @@ function calcDiscount(price, voucher) {
 }
 
 function getCountdownTarget() {
+  const KEY = "_feedify_promo_end";
+  try {
+    const stored = localStorage.getItem(KEY);
+    if (stored) {
+      const d = new Date(stored);
+      if (d > new Date()) return d;
+    }
+  } catch {}
   const d = new Date();
-  d.setDate(d.getDate() + 7);
-  d.setHours(23, 59, 59, 0);
+  d.setHours(d.getHours() + 47);
+  try { localStorage.setItem(KEY, d.toISOString()); } catch {}
   return d;
 }
 
-/* ─── WA / IG / TikTok links — ISI OLEH OWNER ──── */
+/* ─── WA / IG / TikTok links ──── */
 const WA_LINK     = "https://wa.me/6281234567890?text=Halo+saya+mau+gabung+komunitas+Feedify";
 const IG_LINK     = "https://instagram.com/feedify.id";
 const TIKTOK_LINK = "https://tiktok.com/@feedify.id";
@@ -155,8 +272,8 @@ export default function PricingPage() {
 
       {/* Hero */}
       <div className="max-w-[1280px] mx-auto px-5 lg:px-10 pt-14 pb-6 text-center">
-        <div className="inline-flex items-center gap-2 mb-5 px-3.5 py-1.5 rounded-full bg-brand-gold/15 border border-brand-gold/30 text-brand text-[10px] font-bold uppercase tracking-[0.2em]">
-          <Lightning size={12} weight="fill" className="text-brand-gold" /> Early Bird Pricing
+        <div className="inline-flex items-center gap-2 mb-5 px-3.5 py-1.5 rounded-full bg-red-50 border border-red-200 text-red-600 text-[10px] font-bold uppercase tracking-[0.2em]">
+          <Fire size={12} weight="fill" className="animate-pulse" /> Flash Sale — Hemat 20% · Terbatas
         </div>
         <h1 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95]"
           style={{ fontSize: "clamp(2.4rem, 5.5vw, 4.5rem)" }}>
@@ -167,17 +284,25 @@ export default function PricingPage() {
           1 kredit = 1 foto siap posting. Beli sekali, pakai kapan saja — kredit tidak expired.
         </p>
         {/* Value anchor pill */}
-        <div className="mt-6 inline-flex items-center gap-3 px-5 py-3 rounded-2xl bg-white border border-brand-sand shadow-sm text-sm">
+        <div className="mt-6 inline-flex items-center gap-3 px-5 py-3 rounded-2xl bg-white border border-brand-sand shadow-sm text-sm flex-wrap justify-center">
           <span className="text-2xl">📅</span>
           <div className="text-left">
             <div className="font-bold text-brand text-sm">30 kredit = 30 foto = 1 bulan full konten IG</div>
-            <div className="text-stone-500 text-xs">hanya Rp 40.000 · vs Rp 300–500rb/bulan jasa desainer</div>
+            <div className="text-stone-500 text-xs">hanya Rp 43.000 · vs Rp 300–500rb/bulan jasa desainer</div>
+          </div>
+          <div className="hidden sm:flex items-center gap-1 pl-3 border-l border-brand-sand">
+            <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
+              Hemat Rp 11.000 hari ini!
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Countdown */}
+      {/* Countdown — urgent red */}
       <CountdownBanner />
+
+      {/* Live activity feed */}
+      <LiveActivityFeed />
 
       {/* Agency vs Feedify comparison bar */}
       <div className="max-w-[1280px] mx-auto px-5 lg:px-10 mb-6">
@@ -197,7 +322,7 @@ export default function PricingPage() {
             </div>
             <div className="px-5 py-4 bg-brand-gold/5">
               <div className="text-[9px] uppercase tracking-[0.2em] font-bold text-brand-light mb-2">✅ Feedify</div>
-              <div className="font-heading font-bold text-xl text-brand">Rp 40.000</div>
+              <div className="font-heading font-bold text-xl text-brand">Rp 43.000</div>
               <div className="text-xs text-stone-500 mt-0.5">1 bulan penuh · tanpa brief</div>
               <div className="mt-2 space-y-0.5">
                 {["30 foto dalam hitungan menit", "999+ inspirasi foto siap pakai", "Beli sekali, tidak expired"].map((t, i) => (
@@ -213,12 +338,12 @@ export default function PricingPage() {
 
       {/* Credit package cards */}
       <div className="max-w-[1280px] mx-auto px-5 lg:px-10 pb-10">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5 items-stretch pt-10">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5 items-start pt-12">
           {CREDIT_PKGS.map(pkg => (
             <CreditCard key={pkg.id} pkg={pkg} voucher={appliedVoucher} onSelect={() => goCheckout(pkg.id)} />
           ))}
         </div>
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-xs text-stone-500">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-xs text-stone-500">
           <span>✅ 1 kredit = 1 foto siap posting</span>
           <span>✅ Tidak perlu bayar bulanan</span>
           <span>✅ Kredit tidak expired · beli lagi kapan saja</span>
@@ -226,7 +351,7 @@ export default function PricingPage() {
         </div>
       </div>
 
-      {/* Voucher section — combined earn + input */}
+      {/* Voucher section */}
       <VoucherSection
         voucher={appliedVoucher}
         voucherInput={voucherInput}
@@ -241,8 +366,8 @@ export default function PricingPage() {
       {/* Referral section */}
       <ReferralSection />
 
-      {/* Mini FAQ */}
-      <MiniFAQ />
+      {/* FOMO banner before footer */}
+      <FomoBanner onPickPopular={() => goCheckout("monthly")} />
 
       {/* Footer */}
       <footer className="border-t border-brand-sand py-8 text-center text-xs text-stone-500">
@@ -258,24 +383,284 @@ export default function PricingPage() {
 
       {/* Voucher modal */}
       {voucherOpen && (
-        <VoucherModal
-          onClose={() => setVoucherOpen(false)}
-        />
+        <VoucherModal onClose={() => setVoucherOpen(false)} />
       )}
     </div>
   );
 }
 
+/* ─── Countdown banner — urgent red ───────────────── */
+function CountdownBanner() {
+  const [time, setTime] = useState({ h: "00", m: "00", s: "00" });
+  const [colon, setColon] = useState(true);
+
+  useEffect(() => {
+    const target = getCountdownTarget();
+    const tick = () => {
+      const diff = Math.max(0, target - Date.now());
+      setTime({
+        h: String(Math.floor(diff / 3600000)).padStart(2, "0"),
+        m: String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0"),
+        s: String(Math.floor((diff % 60000) / 1000)).padStart(2, "0"),
+      });
+      setColon(c => !c);
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div className="max-w-[1280px] mx-auto px-5 lg:px-10 mb-5">
+      <div className="rounded-2xl bg-gradient-to-r from-red-600 to-red-500 text-white px-5 py-4 flex items-center justify-center gap-4 flex-wrap shadow-lg shadow-red-500/20">
+        <div className="flex items-center gap-2">
+          <Fire size={15} weight="fill" className="animate-pulse" />
+          <span className="text-sm font-bold">⚡ Harga naik setelah timer habis!</span>
+        </div>
+        <div className="flex items-center gap-1">
+          {[time.h, time.m, time.s].map((val, i) => (
+            <span key={i} className="inline-flex items-center gap-0.5">
+              <span className="font-heading font-bold text-xl bg-white/20 rounded-lg px-2.5 py-1 min-w-[2.5rem] text-center">
+                {val}
+              </span>
+              {i < 2 && (
+                <span className={`font-bold text-lg mx-0.5 transition-opacity duration-100 ${colon ? "opacity-100" : "opacity-20"}`}>
+                  :
+                </span>
+              )}
+            </span>
+          ))}
+        </div>
+        <span className="text-xs text-white/75">jam : menit : detik</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Live activity feed ───────────────────────────── */
+function LiveActivityFeed() {
+  const [idx, setIdx] = useState(0);
+  const [show, setShow] = useState(true);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setShow(false);
+      setTimeout(() => {
+        setIdx(i => (i + 1) % LIVE_FEED.length);
+        setShow(true);
+      }, 350);
+    }, 3500);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div className="max-w-[1280px] mx-auto px-5 lg:px-10 mb-5">
+      <div className="flex items-center justify-center gap-3 py-2.5 px-5 bg-white rounded-2xl border border-brand-sand shadow-sm">
+        <span className="relative flex h-2 w-2 flex-shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+        </span>
+        <span
+          className={`text-xs text-stone-600 font-medium text-center transition-all duration-300 ${
+            show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
+          }`}
+        >
+          {LIVE_FEED[idx]}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Credit package card — FOMO redesign ─────────── */
+function CreditCard({ pkg, voucher, onSelect }) {
+  const isDark = pkg.popular;
+  const finalPrice = calcDiscount(pkg.price, voucher);
+  const hasVoucherDiscount = voucher && finalPrice !== pkg.price;
+  const displaySavings = pkg.originalPrice - finalPrice;
+  const finalPerCredit = Math.round(finalPrice / pkg.credits);
+
+  return (
+    <div
+      className={`relative rounded-3xl flex flex-col transition-all duration-300
+        ${pkg.popular ? "mt-6 lg:mt-0" : ""}
+        ${isDark
+          ? "bg-brand text-brand-cream shadow-[0_8px_50px_-5px_rgba(229,193,88,0.3)] ring-2 ring-brand-gold/50 lg:scale-[1.05] lg:z-10"
+          : "bg-white border border-brand-sand hover:border-brand/20 hover:shadow-lg"
+        }`}
+      data-testid={`pkg-${pkg.id}`}
+    >
+      {/* Popular badge */}
+      {pkg.popular && (
+        <div className="absolute -top-5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-brand-gold text-brand text-[10px] uppercase tracking-[0.2em] font-bold shadow-lg z-10 whitespace-nowrap">
+          <Fire size={11} weight="fill" className="animate-pulse" />
+          Paling Laku · Habis Cepat
+        </div>
+      )}
+
+      {/* Discount badge */}
+      <div className={`absolute top-3 right-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-sm
+        ${isDark ? "bg-brand-gold text-brand" : "bg-red-500 text-white"}`}>
+        -{pkg.discountPct}% OFF
+      </div>
+
+      <div className="p-6 pt-8 flex-1 flex flex-col">
+        {/* Package name + tagline */}
+        <div className={`text-[10px] uppercase tracking-[0.2em] font-bold mb-0.5 ${isDark ? "text-brand-gold" : "text-brand-light"}`}>
+          {pkg.name}
+        </div>
+        <div className={`text-xs mb-5 leading-snug ${isDark ? "text-brand-cream/65" : "text-stone-500"}`}>
+          {pkg.tagline}
+        </div>
+
+        {/* Credits — hero */}
+        <div className={`font-heading font-bold leading-none mb-1 ${isDark ? "text-brand-cream" : "text-brand"}`}
+          style={{ fontSize: "clamp(2.2rem, 3.5vw, 3rem)" }}>
+          {pkg.credits}
+          <span className={`text-base font-normal ml-1.5 ${isDark ? "text-brand-cream/50" : "text-stone-500"}`}>kredit</span>
+        </div>
+        <div className={`text-xs mb-5 ${isDark ? "text-brand-cream/50" : "text-stone-400"}`}>
+          = {pkg.credits} foto siap posting
+        </div>
+
+        {/* Pricing — FOMO display */}
+        <div className="mb-2">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span className={`text-sm font-medium line-through ${isDark ? "text-brand-cream/35" : "text-stone-400"}`}>
+              {fmtRp(pkg.originalPrice)}
+            </span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full leading-none
+              ${isDark ? "bg-brand-gold/25 text-brand-gold" : "bg-red-50 text-red-600 border border-red-100"}`}>
+              Hemat {fmtRp(displaySavings)}
+            </span>
+          </div>
+          <div className={`font-heading font-bold ${isDark ? "text-brand-cream" : "text-brand"}`}
+            style={{ fontSize: "clamp(1.75rem, 3vw, 2.25rem)" }}>
+            {fmtRp(finalPrice)}
+          </div>
+          {hasVoucherDiscount && (
+            <div className={`text-[10px] mt-0.5 ${isDark ? "text-brand-gold/70" : "text-green-600"}`}>
+              ✓ Voucher ekstra diterapkan!
+            </div>
+          )}
+        </div>
+        <div className={`text-xs mb-5 font-medium ${isDark ? "text-brand-gold/80" : "text-brand-light"}`}>
+          💡 {fmtRp(finalPerCredit)}/foto · tidak expired
+        </div>
+
+        {/* Value frame */}
+        {pkg.value && (
+          <div className={`rounded-2xl p-3.5 mb-4 ${isDark ? "bg-white/10 border border-white/15" : "bg-brand-gold/8 border border-brand-gold/20"}`}>
+            <div className={`font-semibold text-sm leading-snug mb-1 ${isDark ? "text-brand-gold" : "text-brand"}`}>
+              📅 {pkg.value.headline}
+            </div>
+            <div className={`text-xs leading-relaxed ${isDark ? "text-brand-cream/55" : "text-stone-500"}`}>
+              {pkg.value.sub}
+            </div>
+          </div>
+        )}
+
+        {/* Scarcity bar — popular only */}
+        {pkg.slotsLeft !== undefined && (
+          <div className="mb-5">
+            <div className="flex items-center justify-between text-[10px] mb-1.5">
+              <span className={isDark ? "text-brand-cream/60" : "text-stone-500"}>Slot harga promo</span>
+              <span className={`font-bold ${isDark ? "text-brand-gold" : "text-red-500"}`}>
+                ⚡ {pkg.slotsLeft} slot tersisa!
+              </span>
+            </div>
+            <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? "bg-white/15" : "bg-stone-100"}`}>
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-red-500 to-orange-400"
+                style={{ width: `${(pkg.slotsLeft / 50) * 100}%` }}
+              />
+            </div>
+            <div className={`text-[9px] mt-1 ${isDark ? "text-brand-cream/40" : "text-stone-400"}`}>
+              dari 50 slot tersedia di harga promo ini
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1" />
+
+        {/* Risk note */}
+        <div className={`flex items-start gap-1.5 text-[10px] mb-3 leading-snug ${isDark ? "text-brand-cream/50" : "text-stone-400"}`}>
+          <Shield size={11} weight="fill" className={`mt-0.5 flex-shrink-0 ${isDark ? "text-brand-gold/60" : "text-green-500"}`} />
+          <span>{pkg.riskNote}</span>
+        </div>
+
+        {/* CTA */}
+        <button
+          onClick={onSelect}
+          data-testid={`buy-${pkg.id}`}
+          className={`w-full py-3 rounded-full font-bold text-sm btn-lift transition-all duration-200
+            ${isDark
+              ? "bg-brand-gold text-brand hover:bg-brand-amber shadow-lg shadow-brand-gold/25"
+              : "bg-brand text-brand-cream hover:bg-brand-light"
+            }`}
+        >
+          {pkg.cta}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── FOMO banner before footer ───────────────────── */
+function FomoBanner({ onPickPopular }) {
+  return (
+    <section className="max-w-[1280px] mx-auto px-5 lg:px-10 pb-10">
+      <div className="rounded-3xl bg-gradient-to-br from-brand to-[#0f5c43] text-brand-cream px-8 py-10 lg:px-14 lg:py-12 relative overflow-hidden text-center">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_70%_at_50%_-10%,rgba(229,193,88,0.12),transparent)] pointer-events-none" />
+        <div className="absolute top-0 right-0 h-56 w-56 rounded-full bg-brand-gold/10 blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/3" />
+
+        <div className="relative z-10">
+          <div className="inline-flex items-center gap-2 mb-4 px-3.5 py-1.5 rounded-full bg-red-500/20 border border-red-400/30 text-red-300 text-[10px] font-bold uppercase tracking-[0.2em]">
+            <Fire size={11} weight="fill" className="animate-pulse" />
+            Harga Promo — Timer Berjalan
+          </div>
+
+          <h2 className="font-heading text-2xl lg:text-3xl font-bold mb-3 leading-tight">
+            Jangan Tunggu Harganya Naik
+          </h2>
+
+          <p className="text-brand-cream/65 text-sm mb-2 max-w-lg mx-auto leading-relaxed">
+            Ini harga paling murah yang pernah kami tawarkan. Setelah timer habis, harga kembali ke normal dan promo ini tidak ada lagi.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs text-brand-gold/80 font-medium mb-7 mt-4">
+            <span>✓ Kredit tidak expired</span>
+            <span>✓ Auto-refund jika gagal</span>
+            <span>✓ Akses langsung setelah bayar</span>
+          </div>
+
+          <button
+            onClick={onPickPopular}
+            className="inline-flex items-center gap-2 px-8 py-4 bg-brand-gold text-brand rounded-full font-bold text-base hover:bg-brand-amber shadow-lg shadow-brand-gold/20 btn-lift transition-all"
+          >
+            Ambil Paket 1 Bulan Full — Hemat Rp 11.000 →
+          </button>
+
+          <div className="mt-4 text-xs text-brand-cream/40">
+            Atau scroll ke atas untuk pilih paket lain
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ─── Social proof floating popup ─────────────────── */
 function SocialProofPopup() {
-  const [idx, setIdx]           = useState(0);
+  const [queue]                 = useState(() => _shuffle(SOCIAL_PROOF));
+  const [cursor, setCursor]     = useState(0);
   const [visible, setVisible]   = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const timerRef = useRef(null);
 
   useEffect(() => {
-    const first = setTimeout(() => setVisible(true), 3000);
-    return () => clearTimeout(first);
+    const t = setTimeout(() => setVisible(true), 3000);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -283,15 +668,18 @@ function SocialProofPopup() {
     timerRef.current = setTimeout(() => {
       setVisible(false);
       setTimeout(() => {
-        setIdx(i => (i + 1) % SOCIAL_PROOF.length);
-        setVisible(true);
+        const next = cursor + 1;
+        if (next < queue.length) {
+          setCursor(next);
+          setVisible(true);
+        }
       }, 700);
     }, 5500);
     return () => clearTimeout(timerRef.current);
-  }, [visible, idx, dismissed]);
+  }, [visible, cursor, queue, dismissed]);
 
-  if (dismissed) return null;
-  const item = SOCIAL_PROOF[idx];
+  if (dismissed || cursor >= queue.length) return null;
+  const item = queue[cursor];
 
   return (
     <div className={`fixed bottom-6 left-5 z-50 max-w-[300px] transition-all duration-500 ease-out
@@ -320,122 +708,7 @@ function SocialProofPopup() {
   );
 }
 
-/* ─── Countdown banner ──────────────────────────── */
-function CountdownBanner() {
-  const [time, setTime] = useState({ h: "00", m: "00", s: "00" });
-  useEffect(() => {
-    const target = getCountdownTarget();
-    const tick = () => {
-      const diff = Math.max(0, target - Date.now());
-      setTime({
-        h: String(Math.floor(diff / 3600000)).padStart(2, "0"),
-        m: String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0"),
-        s: String(Math.floor((diff % 60000) / 1000)).padStart(2, "0"),
-      });
-    };
-    tick();
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <div className="max-w-[1280px] mx-auto px-5 lg:px-10 mb-6">
-      <div className="rounded-2xl bg-brand-gold/15 border border-brand-gold/30 px-5 py-3 flex items-center justify-center gap-4 flex-wrap">
-        <Lightning size={15} weight="fill" className="text-brand-gold flex-shrink-0" />
-        <span className="text-sm font-semibold text-brand">Harga early bird berakhir dalam</span>
-        <div className="flex items-center gap-1.5">
-          {[time.h, time.m, time.s].map((val, i) => (
-            <span key={i} className="inline-flex items-center gap-1">
-              <span className="font-heading font-bold text-brand text-xl bg-white rounded-lg px-2.5 py-1 shadow-sm min-w-[2.5rem] text-center">{val}</span>
-              {i < 2 && <span className="font-bold text-brand-light text-lg">:</span>}
-            </span>
-          ))}
-        </div>
-        <span className="text-xs text-stone-600">jam : menit : detik</span>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Credit package card ────────────────────────── */
-function CreditCard({ pkg, voucher, onSelect }) {
-  const isDark = pkg.popular;
-  const finalPrice = calcDiscount(pkg.price, voucher);
-  const hasDiscount = voucher && finalPrice !== pkg.price;
-  const finalPerCredit = Math.round(finalPrice / pkg.credits);
-
-  return (
-    <div className={`relative rounded-3xl flex flex-col transition-all duration-300
-      ${isDark ? "bg-brand text-brand-cream shadow-2xl ring-2 ring-brand-gold/40 scale-[1.02]" : "bg-white border border-brand-sand"}`}
-      data-testid={`pkg-${pkg.id}`}>
-
-      {pkg.popular && (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-brand-gold text-brand text-[10px] uppercase tracking-[0.2em] font-bold shadow-lg z-10">
-          <Star size={11} weight="fill" /> Paling Laku
-        </div>
-      )}
-      {hasDiscount && (
-        <div className="absolute top-3 right-3 inline-flex items-center px-2.5 py-0.5 rounded-full bg-green-500 text-white text-[10px] font-bold shadow animate-fade-up">
-          -{voucher.value}{voucher.type === "percent" ? "%" : ""}
-        </div>
-      )}
-      {!hasDiscount && pkg.savings > 0 && (
-        <div className="absolute top-3 right-3 inline-flex items-center px-2.5 py-0.5 rounded-full bg-brand-gold text-brand text-[9px] font-bold shadow">
-          Hemat {fmtRp(pkg.savings)}
-        </div>
-      )}
-
-      <div className="p-6 flex-1 flex flex-col">
-        {/* Package name + tagline */}
-        <div className={`text-[10px] uppercase tracking-[0.2em] font-bold mb-0.5 ${isDark ? "text-brand-gold" : "text-brand-light"}`}>{pkg.name}</div>
-        <div className={`text-xs mb-4 ${isDark ? "text-brand-cream/65" : "text-stone-500"}`}>{pkg.tagline}</div>
-
-        {/* Credit count — hero */}
-        <div className={`font-heading font-bold leading-none mb-1 ${isDark ? "text-brand-cream" : "text-brand"}`}
-          style={{ fontSize: "clamp(2.5rem, 4vw, 3.5rem)" }}>
-          {pkg.credits}
-          <span className={`text-base font-normal ml-1.5 ${isDark ? "text-brand-cream/50" : "text-stone-500"}`}>kredit</span>
-        </div>
-        <div className={`text-xs mb-4 ${isDark ? "text-brand-cream/50" : "text-stone-400"}`}>= {pkg.credits} foto siap posting</div>
-
-        {/* Price */}
-        <div className="mb-1">
-          {hasDiscount && (
-            <div className={`text-sm line-through mb-0.5 ${isDark ? "text-brand-cream/40" : "text-stone-400"}`}>{fmtRp(pkg.price)}</div>
-          )}
-          <span className={`font-heading font-bold text-2xl ${isDark ? "text-brand-cream" : "text-brand"}`}>{fmtRp(finalPrice)}</span>
-        </div>
-        <div className={`text-xs mb-5 ${isDark ? "text-brand-cream/50" : "text-stone-400"}`}>
-          {fmtRp(finalPerCredit)} / foto · tidak expired
-        </div>
-
-        {/* Value frame — only for non-starter */}
-        {pkg.value && (
-          <div className={`rounded-2xl p-3.5 mb-5 ${isDark ? "bg-white/10 border border-white/15" : "bg-brand-gold/8 border border-brand-gold/20"}`}>
-            <div className={`font-semibold text-sm leading-snug mb-1 ${isDark ? "text-brand-gold" : "text-brand"}`}>
-              📅 {pkg.value.headline}
-            </div>
-            <div className={`text-xs leading-relaxed ${isDark ? "text-brand-cream/55" : "text-stone-500"}`}>
-              {pkg.value.sub}
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1" />
-
-        <button onClick={onSelect} data-testid={`buy-${pkg.id}`}
-          className={`w-full py-3 rounded-full font-bold text-sm btn-lift transition-all ${
-            isDark
-              ? "bg-brand-gold text-brand hover:bg-brand-amber shadow-lg shadow-brand-gold/20"
-              : "bg-brand text-brand-cream hover:bg-brand-light"
-          }`}>
-          Pilih Paket Ini
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Voucher section — combined ───────────────── */
+/* ─── Voucher section ───────────────────────────── */
 function VoucherSection({ voucher, voucherInput, setVoucherInput, voucherError, setVoucherError, onApply, onRemove, onOpenModal }) {
   return (
     <section className="max-w-[1280px] mx-auto px-5 lg:px-10 py-12">
@@ -443,7 +716,6 @@ function VoucherSection({ voucher, voucherInput, setVoucherInput, voucherError, 
         <div className="absolute -top-10 -right-10 h-48 w-48 rounded-full bg-brand-gold/15 blur-3xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row lg:items-center gap-7">
-          {/* Left: label + desc */}
           <div className="flex items-center gap-4 flex-1">
             <div className="h-12 w-12 rounded-2xl bg-brand-gold/20 flex items-center justify-center flex-shrink-0">
               <Gift size={22} weight="duotone" className="text-brand-gold" />
@@ -455,10 +727,8 @@ function VoucherSection({ voucher, voucherInput, setVoucherInput, voucherError, 
             </div>
           </div>
 
-          {/* Right: input OR applied state */}
           <div className="flex-shrink-0 w-full lg:w-auto">
             {voucher ? (
-              /* Applied state */
               <div className="flex items-center gap-3 bg-white/10 border border-white/20 rounded-2xl px-4 py-3">
                 <CheckCircle size={20} weight="fill" className="text-brand-gold flex-shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -471,7 +741,6 @@ function VoucherSection({ voucher, voucherInput, setVoucherInput, voucherError, 
                 </button>
               </div>
             ) : (
-              /* Input state */
               <div className="space-y-2">
                 <div className="flex gap-2">
                   <input
@@ -543,7 +812,6 @@ function VoucherModal({ onClose }) {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90dvh] sm:max-h-none overflow-hidden">
 
-        {/* Header */}
         <div className="relative bg-brand px-6 pt-8 pb-6 overflow-hidden">
           <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-brand-gold/15 blur-2xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 right-0 h-px bg-white/10" />
@@ -565,40 +833,35 @@ function VoucherModal({ onClose }) {
           </p>
         </div>
 
-        {/* Scrollable body — only on mobile */}
         <div className="overflow-y-auto sm:overflow-y-visible overscroll-contain flex-1 sm:flex-none">
-        {/* Steps */}
-        <div className="p-6 space-y-1">
-          {STEPS.map((s, i) => (
-            <div key={i} className="flex gap-4">
-              {/* line */}
-              <div className="flex flex-col items-center">
-                <div className="h-9 w-9 rounded-2xl bg-brand-sand flex items-center justify-center flex-shrink-0 border border-brand-sand">
-                  {s.icon}
+          <div className="p-6 space-y-1">
+            {STEPS.map((s, i) => (
+              <div key={i} className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div className="h-9 w-9 rounded-2xl bg-brand-sand flex items-center justify-center flex-shrink-0 border border-brand-sand">
+                    {s.icon}
+                  </div>
+                  {i < STEPS.length - 1 && <div className="w-px flex-1 bg-stone-100 my-1.5" />}
                 </div>
-                {i < STEPS.length - 1 && <div className="w-px flex-1 bg-stone-100 my-1.5" />}
-              </div>
-              {/* content */}
-              <div className="pb-5 flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-300">{s.num}</span>
+                <div className="pb-5 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-stone-300">{s.num}</span>
+                  </div>
+                  <div className="font-heading font-semibold text-brand text-sm leading-snug">{s.title}</div>
+                  <div className="text-stone-500 text-xs leading-relaxed mt-1">{s.desc}</div>
+                  {s.action}
                 </div>
-                <div className="font-heading font-semibold text-brand text-sm leading-snug">{s.title}</div>
-                <div className="text-stone-500 text-xs leading-relaxed mt-1">{s.desc}</div>
-                {s.action}
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        {/* Footer note */}
-        <div className="mx-6 mb-6 p-4 rounded-2xl bg-brand-sand/60 border border-brand-sand flex items-start gap-3">
-          <span className="text-base flex-shrink-0 mt-0.5">💡</span>
-          <p className="text-xs text-stone-600 leading-relaxed">
-            Kode voucher di Story bersifat <span className="font-semibold text-brand">terbatas</span> — hanya berlaku untuk beberapa pengguna tercepat. Aktifkan notifikasi postingan IG kami agar tidak kehabisan.
-          </p>
+          <div className="mx-6 mb-6 p-4 rounded-2xl bg-brand-sand/60 border border-brand-sand flex items-start gap-3">
+            <span className="text-base flex-shrink-0 mt-0.5">💡</span>
+            <p className="text-xs text-stone-600 leading-relaxed">
+              Kode voucher di Story bersifat <span className="font-semibold text-brand">terbatas</span> — hanya berlaku untuk beberapa pengguna tercepat. Aktifkan notifikasi postingan IG kami agar tidak kehabisan.
+            </p>
+          </div>
         </div>
-        </div>{/* end scrollable */}
       </div>
     </div>
   );
@@ -694,18 +957,6 @@ function ReferralSection() {
           </>
         )}
       </div>
-    </section>
-  );
-}
-
-/* ─── Mini FAQ (Chat) ──────────────────────────────────── */
-function MiniFAQ() {
-  return (
-    <section className="max-w-3xl mx-auto px-5 lg:px-10 pb-16">
-      <SupportChatWidget
-        title="Masih ada pertanyaan?"
-        subtitle="Tanya langsung — Ara siap jawab soal harga, fitur, atau cara mulai."
-      />
     </section>
   );
 }

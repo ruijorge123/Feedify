@@ -5,9 +5,17 @@ import { resetConfigCache } from "@/lib/config";
 
 const AuthContext = createContext(null);
 
+function getCachedUser() {
+  try {
+    const raw = localStorage.getItem("feedify_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Seed immediately from localStorage so the app renders without waiting for API
+  const [user, setUser]       = useState(getCachedUser);
+  const [loading, setLoading] = useState(!!localStorage.getItem("feedify_token"));
 
   const loadUser = useCallback(async () => {
     const token = localStorage.getItem("feedify_token");
@@ -16,12 +24,23 @@ export function AuthProvider({ children }) {
       return;
     }
     try {
-      const { data } = await api.get("/auth/me");
+      // 5-second timeout — if backend is unreachable, fall back to cached user
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      const { data } = await api.get("/auth/me", { signal: controller.signal });
+      clearTimeout(timer);
       setUser(data);
       localStorage.setItem("feedify_user", JSON.stringify(data));
-    } catch {
-      localStorage.removeItem("feedify_token");
-      localStorage.removeItem("feedify_user");
+    } catch (err) {
+      if (err.name === "AbortError" || err.code === "ERR_CANCELED") {
+        // Timeout — keep cached user, don't log out
+      } else if (err?.response?.status === 401) {
+        // Token genuinely invalid — clear everything
+        localStorage.removeItem("feedify_token");
+        localStorage.removeItem("feedify_user");
+        setUser(null);
+      }
+      // Any other network error — keep cached user
     } finally {
       setLoading(false);
     }
@@ -41,8 +60,7 @@ export function AuthProvider({ children }) {
 
   const register = async (name, email, password) => {
     const { data } = await api.post("/auth/register", { name, email, password });
-    // Backend now returns requires_verification instead of token
-    return data; // { requires_verification: true, email }
+    return data;
   };
 
   const loginWithToken = (token, userData) => {

@@ -97,11 +97,20 @@ Content generation uses a two-step pipeline:
 2. `_build_natural_prompt()` / `_natural_*()` converts that JSON spec to a natural language string for `gpt-image-1`.
 
 ### Frontend API & Config
-- All API calls go through `frontend/src/lib/api.js` (the default axios export).
+- All API calls go through `frontend/src/lib/api.js` (the default axios export). The `@` import alias resolves to `src/` (configured in `craco.config.js` and `jsconfig.json`).
 - Plan/archetype/purposes data is fetched once from `GET /api/config` and cached module-level. Use `useConfig()` or `fetchConfig()` from `src/lib/config.js`.
 
+### Module-Level Cache + Listener Pattern
+`config.js`, `credits.js`, and `menuLock.js` all use a `let _cache / _state = null` module-level variable with a `Set` or array of listener callbacks as the app's lightweight global state (no Redux/Zustand/Context). To propagate a credit update after generation, call `notifyCreditsUpdate(newCredits)` from `credits.js`; it pushes the new value to every mounted `useCredits()` consumer. Similarly, `invalidateMenuLockCache()` from `menuLock.js` forces a re-fetch of the lockdown status.
+
+### Auth Caching (Offline Resilience)
+`AuthContext.jsx` seeds `user` state immediately from `feedify_user` in localStorage (no loading flash). On mount it fires `GET /api/auth/me` with a 5-second abort timeout — if the backend is unreachable, the cached user remains; only a genuine 401 clears it. JWT is stored separately as `feedify_token`.
+
 ### Admin Role
-Backend `require_admin` dependency checks `user.role == "admin"`. Admin routes (`/admin/*`) expose user management, credit adjustments, analytics, and daily voucher management. The `AdminPage` is accessible at `/admin` for admin users.
+Backend `require_admin` dependency checks `user.role == "admin"`. Admin routes (`/admin/*`) expose user management, credit adjustments, analytics, and daily voucher management. The `/admin` route in React is protected by **both** `AdminRoute` (role check) and `AdminPinGate` (a PIN challenge rendered inside the route), so admin users must enter a PIN on each session before seeing `AdminPage`.
+
+### Menu Lockdown (Per-Menu Feature Flags)
+Admins can lock individual menus via `POST /api/admin/menu-lockdown` (payload: `{ menuKey, mode }` where mode is `"active"` | `"maintenance"` | `"coming_soon"`). The status is stored in the `app_settings` collection under key `"menu_lockdown"`. `GET /api/menu-lockdown-status` is public and returns a dict keyed by `menuKey`. On the frontend, every generator route is wrapped in `<MenuLockGate menuKey="...">` (see `App.js` and `MenuLockGate.jsx`) which reads from `menuLock.js` and renders a blocking overlay when not `"active"`. Admins always bypass the gate. `MaintenancePage` (`/maintenance`) polls `GET /api/maintenance-status` until the site-wide maintenance flag is cleared.
 
 ### Scheduling & Notifications
 `POST /api/schedule` creates a scheduled post. A background `_reminder_loop()` task fires on startup and sends reminders via Telegram (`TELEGRAM_BOT_TOKEN`) or WhatsApp (`FONNTE_TOKEN`). Notification preferences are saved per-user at `PUT /api/notifications/settings`.
@@ -123,16 +132,29 @@ Source of truth: `design_guidelines.json`. Never deviate from these:
 
 ## Content Dashboards
 
-The app has six generation dashboards (routes under `/generate/*`):
+The app has seven generation dashboards:
 - **Banner** (`/generate/banner`) — single static promotional image
 - **Carousel** (`/generate/carousel`) — multi-slide Instagram carousel (3–7 slides, each costs 1 credit)
 - **Copywriting** (`/generate/copywriting`) — text only via Gemini, no image credit consumed
-- **Food Menu** (`/generate/food`) — F&B specific image with mood/layout presets
+- **Food Menu** (`/generate/food`) — F&B specific image with mood/layout presets; **admin-only** (wrapped in `AdminRoute`)
 - **Marketplace** (`/generate/marketplace`) — marketplace product listing image
-- **Reels** (`ReelsGeneratorPage.jsx`) — image-to-video ad (fal.ai Kling), see Video generation above
+- **Reels** (`/generate/reels`) — image-to-video ad (fal.ai Kling), see Video generation above
+- **Growth Consultant** (`/growth-consultant`) — AI-powered business growth advice (`GrowthConsultantPage.jsx`)
 
-Plus planning tools: **Grid Planner** (9-slot Instagram feed preview), **Content Calendar**, **Consistency Checker**, and **History**.
+Plus planning tools: **Grid Planner** (`GridPlannerPage.jsx`), **Content Calendar** (`/calendar`), **Consistency Checker** (`/consistency`), and **History** (`/history`).
+
+All generator routes (and most planning tools) are wrapped in `<MenuLockGate>` — see Menu Lockdown above.
 
 ## Onboarding Gate
 
 New users must complete `OnboardingPage` (creates a Brand Profile) before accessing any dashboard. `ProtectedRoute` in `App.js` enforces this by checking `user.has_brand_profile`.
+
+## Brand DNA Vocabulary
+
+`frontend/src/lib/brandDna.js` exports the selectable options used in onboarding and brand profile creation:
+- `VISUAL_STYLES_LIST` — 12 visual aesthetics (e.g. `"minimal-clean"`, `"neon-street"`, `"luxury-editorial"`)
+- `BRAND_POSITIONINGS_LIST` — 30 market positioning options (e.g. `"affordable_quality"`, `"local_pride"`)
+- `BRAND_PERSONALITIES_LIST` — 37 personality traits (e.g. `"friendly"`, `"luxurious"`, `"playful"`)
+- `BRAND_DONTS_CATEGORIES` — 6 categories of visual "don'ts" (tampilan, warna, latar, objek, suasana, ai)
+
+These IDs flow from brand profile → `_build_*_prompt()` → the final `gpt-image-1` natural-language prompt. Adding or renaming a value here requires matching changes in the backend prompt builders.

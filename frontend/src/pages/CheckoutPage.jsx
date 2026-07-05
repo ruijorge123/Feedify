@@ -10,10 +10,10 @@ import { useAuth } from "@/context/AuthContext";
 import { notifyCreditsUpdate } from "@/lib/credits";
 
 const CREDIT_PKGS = {
-  starter:   { name: "Coba Dulu",    credits: 10,  price: 15000,  savings: 0 },
-  monthly:   { name: "1 Bulan Full", credits: 30,  price: 40000,  savings: 5000,   popular: true },
-  bimonthly: { name: "2 Bulan Full", credits: 60,  price: 79000,  savings: 11000 },
-  pro:       { name: "Pro Pack",     credits: 300, price: 350000, savings: 100000 },
+  starter:   { name: "Coba Dulu",    credits: 10,  price: 28000,  savings: 7000 },
+  monthly:   { name: "1 Bulan Full", credits: 30,  price: 43000,  savings: 11000,  popular: true },
+  bimonthly: { name: "2 Bulan Full", credits: 60,  price: 79000,  savings: 20000 },
+  pro:       { name: "Pro Pack",     credits: 300, price: 379000, savings: 95000 },
 };
 
 

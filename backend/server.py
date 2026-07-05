@@ -55,7 +55,11 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'change-me')
 JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'HS256')
 JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', '168'))
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+HEYGEN_API_KEY = os.environ.get('HEYGEN_API_KEY', '')
 GROQ_API_KEY_LOCAL = os.environ.get('GROQ_API_KEY_LOCAL', '')
 GROQ_API_KEYS = [k for k in [
     os.environ.get('GROQ_API_KEY_1', ''),
@@ -167,6 +171,7 @@ class CarouselPromptIn(BaseModel):
     final_cta: str = ""
 
     # Section 2 — Product
+    brand_name: str = ""                    # explicit brand name from frontend form
     product_name: Optional[str] = None      # optional — from brand profile if omitted
 
     # Section 3 — Story Structure
@@ -206,6 +211,12 @@ class CarouselPromptIn(BaseModel):
     human_mode: str = "auto"
     model_character: str = ""
     model_age: str = ""
+    model_gender: str = ""
+    model_ethnicity: str = ""
+    model_fashion: str = ""
+    model_expression: str = ""
+    model_interaction: str = ""
+    mixed_allow_human: bool = True
     interaction_style: str = ""
     composition_style_human: str = ""
     outfit_style: str = ""
@@ -289,6 +300,23 @@ class MarketplaceIn(BaseModel):
     outfit_style: str = ""
     expression_style: str = ""
     save: bool = True
+
+
+class StudioIn(BaseModel):
+    product_image_base64: Optional[str] = None
+    product_category: str = "general"       # general|fashion|skincare|parfum|tas|sepatu|aksesori|fnb|elektronik
+    business_goal: str = "brand_campaign"   # marketplace|social_media|brand_campaign|product_launch|website_banner|advertisement|packaging
+    photography_style: str = "commercial"   # commercial|lifestyle|luxury|editorial|minimal
+    composition: str = "hero_product"       # hero_product|flat_lay|floating|macro_detail|closeup|holding_product|splash|symmetrical|rule_of_thirds|eye_level|top_down|45_degree|low_angle|high_angle|full_body|three_quarter|lookbook|detail_texture|sitting|walking
+    model_type: str = "no_model"            # no_model|female|hijab_female|male|couple|family
+    wearing_product: bool = False           # True for fashion: model wears the garment
+    output_count: int = 4                   # 1|2|4|8|16
+    is_campaign_pack: bool = False
+    # Advanced
+    background: str = "auto"               # auto|white_studio|gradient|luxury_marble|wood|concrete|kitchen|bathroom|cafe|modern_interior|luxury_interior|nature|minimal_studio|transparent
+    lighting: str = "auto"                 # auto|soft_studio|luxury_rim|natural_window|golden_hour|high_key|low_key|moody|hard_light|back_light|cinematic
+    color_tone: str = "auto"               # auto|warm|neutral|cool
+    depth: str = "auto"                    # auto|shallow|medium|deep
 
 
 class CalendarIdeasIn(BaseModel):
@@ -412,10 +440,10 @@ def now_iso() -> str:
 
 # ============= CREDITS (top-up system, no expiry) =============
 CREDIT_PACKAGES = {
-    "starter":   {"name": "Coba Dulu",   "credits": 10,  "price": 15000,  "savings": 0},
-    "monthly":   {"name": "1 Bulan Full","credits": 30,  "price": 40000,  "savings": 5000},
-    "bimonthly": {"name": "2 Bulan Full","credits": 60,  "price": 79000,  "savings": 11000},
-    "pro":       {"name": "Pro Pack",    "credits": 300, "price": 350000, "savings": 100000},
+    "starter":   {"name": "Coba Dulu",   "credits": 10,  "price": 28000,  "savings": 7000},
+    "monthly":   {"name": "1 Bulan Full","credits": 30,  "price": 43000,  "savings": 11000},
+    "bimonthly": {"name": "2 Bulan Full","credits": 60,  "price": 79000,  "savings": 20000},
+    "pro":       {"name": "Pro Pack",    "credits": 300, "price": 379000, "savings": 95000},
 }
 
 # ============= CONTENT MODERATION =============
@@ -677,7 +705,7 @@ def _extract_hex(color: str) -> str:
 
 # ============= IMAGE GENERATION =============
 def _aspect_to_size(aspect_ratio: str) -> str:
-    """Map aspect ratio string to gpt-image-2 size."""
+    """Map aspect ratio string to gpt-image-1 size."""
     ar = aspect_ratio.lower()
     if "1:1" in ar or "square" in ar:
         return "1024x1024"
@@ -690,7 +718,7 @@ def _aspect_to_size(aspect_ratio: str) -> str:
 
 
 def _build_natural_prompt(json_prompt: dict) -> str:
-    """Convert deterministic JSON spec to natural language prompt for gpt-image-2.
+    """Convert deterministic JSON spec to natural language prompt for gpt-image-1.
     Dispatches to type-specific prompt builders for best results per dashboard."""
     task_type = json_prompt.get("task_type", "")
 
@@ -1162,6 +1190,457 @@ def _natural_marketplace(j: dict) -> str:
     return p
 
 
+_CAMPAIGN_SHOTS = [
+    ("hero",        "Hero Shot"),
+    ("lifestyle",   "Lifestyle"),
+    ("holding",     "Holding Product"),
+    ("studio",      "Studio Shot"),
+    ("closeup",     "Close Up"),
+    ("marketplace", "Marketplace Thumbnail"),
+    ("instagram",   "Instagram Feed"),
+    ("banner",      "Advertising Banner"),
+]
+
+_FASHION_CAMPAIGN_SHOTS = [
+    ("full_body_front",  "Full Body Front"),
+    ("full_body_back",   "Full Body Back"),
+    ("three_quarter",    "Three Quarter"),
+    ("detail_texture",   "Detail Tekstur"),
+    ("lifestyle_wear",   "Lifestyle Outfit"),
+    ("flat_lay_outfit",  "Flat Lay"),
+    ("closeup_detail",   "Close-up & Aksesori"),
+    ("editorial",        "Editorial Campaign"),
+]
+
+
+def _build_studio_prompt(payload: "StudioIn", shot_focus: str = None) -> dict:
+    """Studio prompt is fully independent — no Brand DNA, no brand context."""
+    wearing = payload.wearing_product or (
+        payload.product_category == "fashion" and payload.model_type != "no_model"
+    )
+    return {
+        "task_type": "studio_commercial_photography",
+        "product_category": payload.product_category,
+        "business_goal": payload.business_goal,
+        "photography_style": payload.photography_style,
+        "composition": payload.composition,
+        "model_type": payload.model_type,
+        "wearing_product": wearing,
+        "shot_focus": shot_focus,
+        "advanced": {
+            "background": payload.background,
+            "lighting": payload.lighting,
+            "color_tone": payload.color_tone,
+            "depth": payload.depth,
+        },
+    }
+
+
+def _natural_studio(j: dict) -> str:
+    """Award-winning commercial photography prompt engine — fully independent of Brand DNA.
+    Inputs: product_category, business_goal, photography_style, composition, model_type, wearing_product, advanced, shot_focus."""
+    category    = j.get("product_category", "general")
+    goal        = j.get("business_goal", "brand_campaign")
+    style       = j.get("photography_style", "commercial")
+    composition = j.get("composition", "hero_product")
+    model       = j.get("model_type", "no_model")
+    wearing     = j.get("wearing_product", False)
+    adv         = j.get("advanced", {})
+    shot        = j.get("shot_focus")
+
+    # ── ROLE + ABSOLUTE PRODUCT PRESERVATION ────────────────────────────────────
+    product_preservation = (
+        "You are a world-class commercial photographer shooting on a real camera in a real location. "
+        "This is a genuine photograph — not generated, not rendered, not illustrated. "
+        "ABSOLUTE PRODUCT PRESERVATION: The uploaded product must appear completely identical to the reference. "
+        "Never redesign. Never reinterpret. Never replace. Never simplify. Never hallucinate new details. "
+        "Preserve exactly: packaging, shapes, dimensions, caps, materials, labels, logos, typography, colors, "
+        "illustrations, barcode placement, reflections, textures, printing quality, proportions, stitching, patterns. "
+        "Product identity is the supreme priority. "
+        "Intelligently isolate the product while maintaining realistic contact shadows and natural edge fidelity. "
+    )
+
+    # ── PHOTOGRAPHY QUALITY (natural, NOT over-processed) ───────────────────────
+    photo_quality = (
+        "CRITICAL — THIS MUST LOOK LIKE A REAL PHOTOGRAPH, NOT AI-GENERATED: "
+        "Shoot with Canon EOS R5 or Sony A7R V. Natural lens rendering. "
+        "Exposure slightly imperfect — real photographers do not achieve mathematical perfection. "
+        "Subtle film grain (equivalent ISO 200–800 depending on scene). "
+        "Slight optical vignetting toward frame edges. "
+        "Natural chromatic micro-aberration at high-contrast edges. "
+        "Colors: natural, slightly muted, true to real-world light — NOT digitally saturated or boosted. "
+        "Skin: visible pore texture, natural warmth in cheeks, slight subsurface scattering — never smoothed or airbrushed. "
+        "Hair: individual strands, natural flyaways, realistic sheen — not plastic or uniform. "
+        "Eyes: natural catchlights, slightly asymmetric, real iris texture. "
+        "Hands and fingers: correct anatomy, natural knuckle texture, realistic fingernail detail. "
+        "Surfaces: micro-texture, natural wear, slight dust or imperfection — nothing looks CGI-clean. "
+        "Shadows: soft falloff with ambient fill, not hard-edged, natural directionality. "
+        "Every product or object touching a surface must have a convincing contact shadow. "
+        "Background: realistic environmental depth, slight motion or atmospheric blur — not a smoothed-out AI bokeh disk. "
+        "Depth of field: optical, with slight focus micro-oscillation at the plane edges. "
+        "Strictly forbidden: plastic skin, perfectly uniform lighting, floating objects without shadows, "
+        "oversaturated colors, impossibly perfect symmetry, CGI sheen on surfaces, over-processed background blur, "
+        "hallucinated product changes, distorted anatomy, artificial-looking eyes. "
+    )
+
+    # ── PHOTOGRAPHIC REALISM (anti-AI section) ───────────────────────────────────
+    anti_ai = (
+        "REALISM DIRECTIVE — Actively eliminate all signs of AI generation: "
+        "The image should look like it was found in a real photographer's archive or published in a real magazine. "
+        "Imperfections are welcome and necessary: a slightly asymmetric pose, natural fabric wrinkles, "
+        "a stray hair, a subtle reflection not perfectly centered, a small shadow irregularity. "
+        "These imperfections are what make photographs feel authentic and trustworthy. "
+        "Do not attempt to make everything perfect — perfection is the clearest sign of AI. "
+        "Natural, organic, candid-commercial quality. Shot in a real place by a real photographer. "
+    )
+
+    # ── PRODUCT CATEGORY (fundamentally changes the photography approach) ────────
+    category_map = {
+        "fashion": (
+            "PRODUCT CATEGORY — Fashion & Apparel: "
+            + (
+                "The model is WEARING the uploaded garment as the featured product. "
+                "The clothing IS the product — it must be shown being worn on a real body. "
+                "Preserve exactly: garment color, cut, silhouette, fabric pattern, stitching, seams, buttons, zippers. "
+                "Show how the garment fits and drapes naturally on the body. Fabric texture, weight, and movement must be visible. "
+                "Fashion catalogue quality — comparable to Zara, H&M, UNIQLO, OOTD Indonesia lookbook photography. "
+                "Full body or three-quarter composition unless composition specifies otherwise. "
+                if wearing else
+                "Showcase the garment or fashion accessory in the most appealing commercial way. "
+                "Fabric texture, material quality, garment construction clearly visible. "
+                "Fashion catalogue and lookbook photography quality. "
+            )
+        ),
+        "skincare": (
+            "PRODUCT CATEGORY — Skincare & Beauty: "
+            "Emphasize product texture — cream consistency, serum viscosity, gel clarity, oil luminosity. "
+            "If model present: show natural realistic skin — healthy glow, real texture, not over-retouched. "
+            "Packaging must be perfectly preserved — every label detail, cap shape, bottle material. "
+            "Beauty campaign quality: L'Oréal, Cetaphil, The Ordinary, Sulwhasoo, Wardah, Somethinc. "
+            "Ingredient-inspired backdrops, clean clinical settings, or luxurious natural environments. "
+        ),
+        "parfum": (
+            "PRODUCT CATEGORY — Fragrance & Perfume: "
+            "Glass bottle transparency MUST be photorealistic — light refracts through glass naturally with caustic patterns. "
+            "Liquid color inside bottle accurate, vivid, and luminous. Beautiful shadow and light play from the bottle geometry. "
+            "Luxury dramatic lighting ideal — rim lighting creates product silhouette against dark background. "
+            "Atmospheric mist, smoke, or bokeh particle effects appropriate. "
+            "Ultra-premium photography: Chanel No.5, Dior Sauvage, Maison Margiela, Le Labo, Zara Perfumery campaigns. "
+        ),
+        "tas": (
+            "PRODUCT CATEGORY — Bags & Leather Goods: "
+            "Leather texture, material grain, stitching, hardware (clasps, buckles, zippers, chains, studs) clearly rendered. "
+            "Bag shape and internal structure naturally maintained — no collapsing or distorting. "
+            "Show the bag being elegantly carried, held, or placed in a styled setting. "
+            "Material quality: leather sheen, canvas texture, metal hardware finish must be accurate. "
+            "Commercial quality: Coach, Charles & Keith, Tumi, Uniqlo Bag, local premium brand campaigns. "
+        ),
+        "sepatu": (
+            "PRODUCT CATEGORY — Footwear: "
+            "Shoe shown from the most flattering commercial angle — 3/4 front, side, or on-foot. "
+            "Material texture (leather grain, suede nap, mesh weave, rubber sole pattern) clearly visible. "
+            "Exact colorway preserved — no color shift. Sole details, eyelets, laces accurately rendered. "
+            "On-foot shots, styled flat lay, or premium still life on textured surfaces. "
+            "Campaign quality: Nike, Adidas, New Balance, Vans, Converse, local sneaker brand standard. "
+        ),
+        "aksesori": (
+            "PRODUCT CATEGORY — Accessories & Jewelry: "
+            "Metal finish must be accurate: gold warmth, silver brightness, rose gold hue. "
+            "Gemstones and crystals must sparkle realistically with correct light refraction. "
+            "Fine details: engravings, prong settings, chain links, bezels clearly rendered. "
+            "Dramatic lighting that makes jewelry and accessories appear luxurious and desirable. "
+            "Campaign quality: Pandora, Swarovski, local premium jewelry and accessory brands. "
+        ),
+        "fnb": (
+            "PRODUCT CATEGORY — Food & Beverage: "
+            "Food must look completely fresh, appetizing and real. Natural steam rising if hot. Condensation droplets if cold. "
+            "Natural food colors — never oversaturated. Realistic texture and imperfections that make it look truly edible. "
+            "Strictly forbidden: plastic-looking food, CGI ingredients, artificial sheen. "
+            "Professional food styling — restaurant-level plating with natural props. "
+            "Campaign quality: McDonald's, Starbucks, Chatime, Fore Coffee, local premium F&B brand campaigns. "
+        ),
+        "elektronik": (
+            "PRODUCT CATEGORY — Electronics & Technology: "
+            "Clean precise product photography emphasizing industrial design quality. "
+            "Screen reflections must appear realistic. Metal and glass surfaces accurately rendered — brushed aluminum, tempered glass. "
+            "Cables, ports, buttons precisely shown. No misrepresentation of screen content. "
+            "Tech product photography: Apple, Samsung, Sony, Xiaomi, local tech brand campaigns. "
+            "Minimal or gradient backgrounds that let the product design speak clearly. "
+        ),
+        "general": (
+            "PRODUCT CATEGORY — General: Apply best-in-class commercial product photography for this product type. "
+            "Identify and emphasize the product's most important visual attributes. "
+            "Advertising campaign quality. "
+        ),
+    }
+
+    # ── BUSINESS PURPOSE ────────────────────────────────────────────────────────
+    goal_map = {
+        "marketplace": (
+            "BUSINESS PURPOSE — Marketplace: Clean product-dominant composition. High contrast. "
+            "Product fills 70–80% of frame. Minimal distraction. Optimised for Shopee, Tokopedia, Lazada."
+        ),
+        "social_media": (
+            "BUSINESS PURPOSE — Social Media: Scroll-stopping Instagram and TikTok composition. "
+            "High engagement. Shareable lifestyle aesthetic. Authentic feel."
+        ),
+        "brand_campaign": (
+            "BUSINESS PURPOSE — Brand Campaign: Premium brand awareness photography. "
+            "Emotional storytelling. Aspirational mood. International advertising quality."
+        ),
+        "product_launch": (
+            "BUSINESS PURPOSE — Product Launch: Dramatic first-reveal energy. "
+            "Creates immediate desire. Hero moment for the product."
+        ),
+        "website_banner": (
+            "BUSINESS PURPOSE — Website Hero: Cinematic wide-format. Preserved copy space. "
+            "Premium digital brand presence."
+        ),
+        "advertisement": (
+            "BUSINESS PURPOSE — Advertisement: High-impact print and digital composition. "
+            "Clear hierarchy. Advertising agency standard."
+        ),
+        "packaging": (
+            "BUSINESS PURPOSE — Packaging Showcase: Perfect even lighting. "
+            "Crystal-clear label and typography. Every packaging detail visible."
+        ),
+    }
+
+    # ── PHOTOGRAPHY STYLE ───────────────────────────────────────────────────────
+    style_map = {
+        "commercial": (
+            "PHOTOGRAPHY STYLE — Commercial: Professional advertising photography with controlled studio lighting. "
+            "Lighting is even but NOT perfectly uniform — natural falloff at edges. "
+            "Composition is deliberate but the scene looks like it was actually set up, not CGI-assembled. "
+            "Color grading is clean but retains natural color temperature of the light source. "
+            "Apple, Nike, Samsung campaign quality — but the real versions, not AI approximations."
+        ),
+        "lifestyle": (
+            "PHOTOGRAPHY STYLE — Lifestyle: Shot on location, not in a studio. "
+            "Available or mixed ambient light — imperfect, directional, with natural color temperature shifts. "
+            "Scene looks lived-in: background has depth and environmental detail, not blurred-out. "
+            "Model's pose is caught mid-action or mid-moment, not statically posed. "
+            "Slight motion blur or focus shift acceptable — adds authenticity. "
+            "Looks like a candid documentary photograph that happens to be commercially composed."
+        ),
+        "luxury": (
+            "PHOTOGRAPHY STYLE — Luxury: Dramatic directional lighting with deep natural shadows. "
+            "Dark areas have genuine shadow detail, not crushed to pure black. "
+            "Highlights have organic bloom, not clipped white. "
+            "Textures (marble, leather, silk, glass) rendered with real surface micro-detail. "
+            "Mood is achieved through actual lighting ratios, not post-processing filters. "
+            "Dior, Chanel, Rolex aesthetic — the real thing, photographed with restraint."
+        ),
+        "editorial": (
+            "PHOTOGRAPHY STYLE — Editorial: Strong artistic concept with intentional composition. "
+            "May include unconventional framing, unexpected color, or unusual perspective. "
+            "Looks like a real editorial shoot — imperfect, expressive, human. "
+            "Vogue, Elle, Harper's Bazaar Indonesia quality. The kind of image that makes you stop scrolling."
+        ),
+        "minimal": (
+            "PHOTOGRAPHY STYLE — Minimal: Clean environment with intentional negative space. "
+            "Background is simple but has real surface texture — not a CGI void. "
+            "Lighting is soft and wraps naturally around the product. "
+            "Silence and precision without digital sterility. Apple quality — genuinely shot, not generated."
+        ),
+        "minimalist": (
+            "PHOTOGRAPHY STYLE — Minimal: Clean studio with real surface texture. "
+            "Intentional negative space. Natural soft wrapping light. Genuinely shot precision."
+        ),
+    }
+
+    # ── COMPOSITION ─────────────────────────────────────────────────────────────
+    composition_map = {
+        # General product compositions
+        "hero_product":    "COMPOSITION — Hero Product: Product as cinematic centerpiece. Maximum visual presence and impact.",
+        "flat_lay":        "COMPOSITION — Flat Lay: Top-down aerial arrangement. Products or garments styled flat on surface.",
+        "floating":        "COMPOSITION — Floating: Product levitates against background. Premium gravity-defying feel.",
+        "macro_detail":    "COMPOSITION — Macro Detail: Extreme close-up. Texture, label surface, material quality.",
+        "closeup":         "COMPOSITION — Close-up: Tight framing. Product or garment fills most of the frame.",
+        "holding_product": "COMPOSITION — Holding Product: Model holds product naturally. Anatomically correct. Product prominent.",
+        "splash":          "COMPOSITION — Splash: Dynamic liquid or particle interaction. High-energy motion.",
+        "symmetrical":     "COMPOSITION — Symmetrical: Perfect mirror composition. Balanced and architectural.",
+        "rule_of_thirds":  "COMPOSITION — Rule of Thirds: Classic commercial framing. Natural guided eye movement.",
+        "eye_level":       "COMPOSITION — Eye Level: Natural viewing angle. Relatable and authentic.",
+        "top_down":        "COMPOSITION — Top Down: Bird's-eye view. Full product or outfit layout visible.",
+        "45_degree":       "COMPOSITION — 45 Degree: Classic angle. Shows depth, dimension, and full product form.",
+        "low_angle":       "COMPOSITION — Low Angle: Heroic perspective. Product or model appears powerful and tall.",
+        "high_angle":      "COMPOSITION — High Angle: Elevated elegant perspective. Editorial and refined.",
+        # Fashion-specific compositions
+        "full_body":       "COMPOSITION — Full Body: Complete head-to-toe shot. Full outfit clearly visible. Fashion catalogue standard. Model standing naturally in good posture.",
+        "three_quarter":   "COMPOSITION — Three Quarter: Head to below knee. Classic fashion catalogue composition. Shows outfit proportion and detail.",
+        "lookbook":        "COMPOSITION — Lookbook: Model in lifestyle or architectural setting wearing the outfit. Editorial and aspirational. Environment complements the garment.",
+        "detail_texture":  "COMPOSITION — Detail Texture: Extreme macro close-up of fabric weave, stitching, buttons, hardware, or material surface. Shows craftsmanship.",
+        "sitting":         "COMPOSITION — Sitting: Model seated naturally on chair, floor, or props. Stylish and approachable. Shows garment drape while seated.",
+        "walking":         "COMPOSITION — Walking: Model in natural walking motion. Shows garment flow, movement, and energy. Street or studio setting.",
+        "holding_item":    "COMPOSITION — Holding Item: Model holding complementary accessory or prop that enhances the outfit narrative.",
+    }
+
+    # ── MODEL ───────────────────────────────────────────────────────────────────
+    wearing_note = (
+        "The model is WEARING the uploaded garment as the main product — clothing is ON the body, fitted naturally. " if wearing else
+        "Natural interaction with the product. "
+    )
+    model_map = {
+        "no_model": "MODEL — Product Only: No human model. Pure product photography. Product is the sole subject.",
+        "female": (
+            "MODEL — Indonesian/Asian Female: Real-looking Indonesian or Asian female. "
+            "Natural commercial appearance — not overly glamorous, not plastic-perfect. "
+            "Visible skin pores and natural skin texture. Slight asymmetry in face and pose (as real humans have). "
+            "Natural expression — genuine, not forced-smile. Real hair with natural movement and flyaways. "
+            "Anatomically correct hands with natural finger joints and nails. "
+            "Natural weight distribution — not a rigid pose. " + wearing_note + "Product remains the visual hero."
+        ),
+        "hijab_female": (
+            "MODEL — Indonesian Hijab Female: Real-looking Indonesian female wearing hijab. "
+            "Hijab draped naturally with realistic fabric folds and slight imperfections in arrangement. "
+            "Natural skin visible on face and hands — pores, warmth, real texture. "
+            "Genuine expression, not posed. Slight pose asymmetry. Anatomically correct hands. "
+            "Modest styling that looks genuinely worn, not studio-styled. " + wearing_note + "Product remains the visual hero."
+        ),
+        "male": (
+            "MODEL — Indonesian/Asian Male: Real-looking Indonesian or Asian male. "
+            "Natural commercial appearance. Visible skin texture, natural stubble or grooming as appropriate. "
+            "Slight pose asymmetry. Genuine expression. Real hair. Anatomically correct hands. "
+            + wearing_note + "Product remains the visual hero."
+        ),
+        "couple": (
+            "MODEL — Indonesian/Asian Couple: Real-looking couple with genuine, unforced interaction. "
+            "Natural body language, not symmetrically posed. Real skin texture on both. "
+            "Clothing has natural wrinkles and movement. "
+            + ("Both wearing/using the featured product naturally. " if wearing else "") + "Product remains the visual hero."
+        ),
+        "family": (
+            "MODEL — Indonesian/Asian Family: Real-looking family with warm, natural interaction. "
+            "Children have real expressions — not overly posed. Adults show natural aging and texture. "
+            "Clothing has natural wrinkles. Real environmental interaction. Product remains the visual hero."
+        ),
+    }
+
+    # ── BACKGROUND (non-auto only) ───────────────────────────────────────────────
+    bg_map = {
+        "white_studio":    "BACKGROUND — White Studio: Pure white seamless studio background.",
+        "gradient":        "BACKGROUND — Gradient: Smooth elegant gradient. Premium minimal feel.",
+        "luxury_marble":   "BACKGROUND — Luxury Marble: Polished marble. Ultra-premium aesthetic.",
+        "wood":            "BACKGROUND — Wood: Warm natural wood surface. Organic lifestyle context.",
+        "concrete":        "BACKGROUND — Concrete: Clean architectural concrete. Modern urban aesthetic.",
+        "kitchen":         "BACKGROUND — Kitchen: Premium modern kitchen. F&B and lifestyle context.",
+        "bathroom":        "BACKGROUND — Bathroom: Premium bathroom. Beauty and personal care setting.",
+        "cafe":            "BACKGROUND — Cafe: Modern premium cafe. Warm ambient atmosphere.",
+        "modern_interior": "BACKGROUND — Modern Interior: Contemporary premium home or office.",
+        "luxury_interior": "BACKGROUND — Luxury Interior: High-end luxury space. Aspirational positioning.",
+        "nature":          "BACKGROUND — Nature: Natural outdoor environment. Fresh and organic.",
+        "minimal_studio":  "BACKGROUND — Minimal Studio: Clean studio. Maximum negative space.",
+        "transparent":     "BACKGROUND — Transparent: Clean product isolation. White or transparent.",
+        # backward compatibility
+        "luxury":       "BACKGROUND — Luxury Marble: Polished premium material surface.",
+        "minimal":      "BACKGROUND — Minimal: Minimal clean gradient background.",
+        "studio_white": "BACKGROUND — White Studio: Pure white studio seamless.",
+        "home":         "BACKGROUND — Home: Premium home interior.",
+        "office":       "BACKGROUND — Office: Contemporary premium office.",
+        "hotel":        "BACKGROUND — Luxury Interior: Luxury hotel interior.",
+        "gym":          "BACKGROUND — Fitness: Modern premium fitness facility.",
+    }
+
+    # ── LIGHTING (non-auto only) ─────────────────────────────────────────────────
+    light_map = {
+        "soft_studio":      "LIGHTING — Soft Studio: Ultra-diffused even light. Beauty-dish quality. Flattering skin and surface.",
+        "luxury_rim":       "LIGHTING — Luxury Rim Light: Dramatic rim lighting. Deep chiaroscuro fill ratio. Dior-quality drama.",
+        "natural_window":   "LIGHTING — Natural Window: Soft natural daylight. Warm authentic ambient light.",
+        "golden_hour":      "LIGHTING — Golden Hour: Warm golden sunlight. Cinematic warmth and aspiration.",
+        "high_key":         "LIGHTING — High Key: Bright even illumination. Clean and fresh. Minimal harsh shadows.",
+        "low_key":          "LIGHTING — Low Key: Dramatic dark lighting. Deep shadows. Premium mysterious luxury mood.",
+        "moody":            "LIGHTING — Moody: Atmospheric dramatic lighting. Cinematic and deeply emotive.",
+        "hard_light":       "LIGHTING — Hard Light: Sharp directional source. Strong defined shadows. High-contrast editorial.",
+        "back_light":       "LIGHTING — Back Light: Source behind subject. Halo rim effect. Dreamy and premium separation.",
+        "cinematic":        "LIGHTING — Cinematic: Film-grade anamorphic lighting quality. Hollywood colorist grading.",
+        # backward compatibility
+        "natural":          "LIGHTING — Natural Window: Soft natural window light.",
+        "studio":           "LIGHTING — Soft Studio: Even controlled studio illumination.",
+        "luxury":           "LIGHTING — Luxury Rim: Dramatic directional key. Chiaroscuro.",
+        "soft":             "LIGHTING — Soft: Ultra-soft diffused beauty-dish quality.",
+        "commercial_flash": "LIGHTING — Commercial Flash: Ring flash and softbox. Even product-optimised light.",
+    }
+
+    tone_map = {
+        "warm":    "COLOR TONE — Warm: Warm golden temperature. Inviting and aspirational.",
+        "neutral": "COLOR TONE — Neutral: Balanced true-to-life color reproduction.",
+        "cool":    "COLOR TONE — Cool: Clean cool temperature. Modern and premium.",
+    }
+    depth_map = {
+        "shallow": "DEPTH OF FIELD — Shallow f/1.4: Creamy bokeh. Strong subject-background separation.",
+        "medium":  "DEPTH OF FIELD — Medium f/4: Balanced front-to-back sharpness.",
+        "deep":    "DEPTH OF FIELD — Deep f/11: Maximum sharpness throughout the frame.",
+    }
+
+    # ── CAMPAIGN SHOT FOCUS (category-aware) ────────────────────────────────────
+    fashion_shot_map = {
+        "full_body_front":  "SHOT — Full Body Front: Complete outfit from front, head to toe. Primary fashion catalogue shot. Clear posture, natural standing pose.",
+        "full_body_back":   "SHOT — Full Body Back: Complete outfit viewed from behind. Shows back construction, cut, and rear details.",
+        "three_quarter":    "SHOT — Three Quarter: Head to below knee. Classic fashion catalogue composition showing outfit proportion.",
+        "detail_texture":   "SHOT — Detail Texture: Extreme macro of fabric weave, stitching, embroidery, or material craftsmanship.",
+        "lifestyle_wear":   "SHOT — Lifestyle: Model in natural lifestyle setting wearing the outfit. Authentic and aspirational environment.",
+        "flat_lay_outfit":  "SHOT — Flat Lay: Garment laid flat, styled with accessories and props. Overhead styled editorial composition.",
+        "closeup_detail":   "SHOT — Close-up Detail: Close-up of face with accessories, or key design element of the garment.",
+        "editorial":        "SHOT — Editorial Campaign: Creative fashion editorial. Strong visual statement. Vogue-level magazine quality.",
+    }
+    product_shot_map = {
+        "hero":        "SHOT — Hero: Product as cinematic centerpiece. Maximum visual impact.",
+        "lifestyle":   "SHOT — Lifestyle: Product naturally integrated into real-world context.",
+        "holding":     "SHOT — Holding: Model holds product with correct hand anatomy. Product clearly visible.",
+        "studio":      "SHOT — Studio: Clean seamless background. Maximum product detail clarity.",
+        "closeup":     "SHOT — Close-up: Extreme macro. Product texture and packaging surface detail.",
+        "marketplace": "SHOT — Marketplace: Clean bright background. Product dominant. High contrast.",
+        "instagram":   "SHOT — Instagram: Lifestyle composition. Social engagement aesthetic.",
+        "banner":      "SHOT — Banner: Cinematic wide-format. Advertising campaign quality.",
+    }
+
+    # ── FINAL GOAL ───────────────────────────────────────────────────────────────
+    final_quality = (
+        "FINAL GOAL: The result must look like a real photograph discovered in a professional photographer's portfolio — "
+        "not something generated by software. Someone looking at this image should think 'this was shot on location' or "
+        "'this came from a real studio session', never 'this is AI'. "
+        "Reference quality: the editorial and campaign photography of foto.laku, actcreative.id, syscatalogue Indonesia — "
+        "real commercial photographers shooting real products with real models in real locations. "
+        "Natural. Authentic. Grounded in reality. With all the organic imperfections that make photography trustworthy."
+    )
+
+    # ── ASSEMBLE PROMPT ──────────────────────────────────────────────────────────
+    parts = [
+        product_preservation,
+        photo_quality,
+        anti_ai,
+        category_map.get(category, category_map["general"]),
+        goal_map.get(goal, goal_map["brand_campaign"]),
+        style_map.get(style, style_map["commercial"]),
+        composition_map.get(composition, composition_map["hero_product"]),
+        model_map.get(model, model_map["no_model"]),
+    ]
+
+    bg = adv.get("background", "auto")
+    if bg != "auto" and bg in bg_map:
+        parts.append(bg_map[bg])
+    lt = adv.get("lighting", "auto")
+    if lt != "auto" and lt in light_map:
+        parts.append(light_map[lt])
+    tone = adv.get("color_tone", "auto")
+    if tone != "auto" and tone in tone_map:
+        parts.append(tone_map[tone])
+    depth = adv.get("depth", "auto")
+    if depth != "auto" and depth in depth_map:
+        parts.append(depth_map[depth])
+
+    if shot:
+        shot_map_to_use = fashion_shot_map if category == "fashion" else product_shot_map
+        resolved = shot_map_to_use.get(shot) or composition_map.get(shot)
+        if resolved:
+            parts.append(resolved)
+
+    parts.append(final_quality)
+
+    return " ".join(p for p in parts if p)
+
+
 def _append_reference_hint(prompt: str, has_reference: bool) -> str:
     if not has_reference:
         return prompt
@@ -1174,33 +1653,139 @@ def _append_reference_hint(prompt: str, has_reference: bool) -> str:
 
 
 async def _call_openai_image(prompt: str, aspect_ratio: str = "1:1") -> str:
-    """Call OpenAI gpt-image-2. Returns base64 string (no data: prefix)."""
-    try:
-        from emergentintegrations.llm.openai.image_generation import OpenAIImageGeneration
-    except Exception as e:
-        logger.error(f"OpenAIImageGeneration import failed: {e}")
-        raise HTTPException(status_code=500, detail="Image generation service unavailable")
+    """Call OpenAI gpt-image-1 (text-only generate). Returns base64 string (no data: prefix)."""
+    from openai import AsyncOpenAI
 
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
+    key = OPENAI_API_KEY or EMERGENT_LLM_KEY
+    if not key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
 
-    image_gen = OpenAIImageGeneration(api_key=EMERGENT_LLM_KEY)
-    # Truncate prompt if too long (OpenAI limit ~4000 chars)
     safe_prompt = prompt[:3800] if len(prompt) > 3800 else prompt
+    size = _aspect_to_size(aspect_ratio)
     try:
-        images = await image_gen.generate_images(
+        client = AsyncOpenAI(api_key=key)
+        response = await client.images.generate(
+            model="gpt-image-1",
             prompt=safe_prompt,
-            model="gpt-image-2",
-            number_of_images=1,
+            n=1,
+            size=size,
         )
+        item = response.data[0]
+        if item.b64_json:
+            return item.b64_json
+        if item.url:
+            import httpx as _httpx
+            import base64 as _b64
+            async with _httpx.AsyncClient(timeout=60) as hc:
+                r = await hc.get(item.url)
+                r.raise_for_status()
+                return _b64.b64encode(r.content).decode("utf-8")
+        raise ValueError("No image data in response")
     except Exception as e:
         logger.error(f"OpenAI image gen failed: {e}")
         raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Gagal generate gambar. Coba lagi."))
 
-    if not images or not images[0]:
-        raise HTTPException(status_code=500, detail="No image returned by AI")
-    import base64
-    return base64.b64encode(images[0]).decode("utf-8")
+
+def _remove_background_sync(image_b64: str) -> str:
+    """CPU-bound: remove background via rembg. Returns base64 PNG with transparency."""
+    import base64 as _b64
+    try:
+        from rembg import remove as rembg_remove
+        img_bytes = _b64.b64decode(image_b64)
+        result_bytes = rembg_remove(img_bytes)
+        return _b64.b64encode(result_bytes).decode("utf-8")
+    except Exception as e:
+        logger.warning(f"Background removal failed, using original: {e}")
+        return image_b64
+
+
+async def _remove_background(image_b64: str) -> str:
+    """Async wrapper: runs rembg in thread pool to avoid blocking event loop."""
+    loop = asyncio.get_event_loop()
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return await loop.run_in_executor(pool, _remove_background_sync, image_b64)
+
+
+async def _call_openai_image_edit(prompt: str, aspect_ratio: str, image_b64: str) -> str:
+    """Call gpt-image-1 edit endpoint with a product image (bg-removed PNG).
+    Falls back to text-only generate on error."""
+    import base64 as _b64
+    import io
+    key = OPENAI_API_KEY or EMERGENT_LLM_KEY
+    if not key:
+        logger.warning("OPENAI_API_KEY not configured, falling back to generate")
+        return await _call_openai_image(prompt, aspect_ratio)
+    try:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(api_key=key)
+        size = _aspect_to_size(aspect_ratio)
+        png_bytes = _b64.b64decode(image_b64)
+        response = await client.images.edit(
+            model="gpt-image-1",
+            image=("product.png", io.BytesIO(png_bytes), "image/png"),
+            prompt=prompt[:3800],
+            n=1,
+            size=size,
+        )
+        item = response.data[0]
+        if item.b64_json:
+            return item.b64_json
+        if item.url:
+            import httpx as _httpx
+            async with _httpx.AsyncClient(timeout=60) as hc:
+                r = await hc.get(item.url)
+                r.raise_for_status()
+                return _b64.b64encode(r.content).decode("utf-8")
+        raise ValueError("No image data in edit response")
+    except Exception as e:
+        logger.warning(f"Image edit endpoint failed ({e}), falling back to generate")
+        return await _call_openai_image(prompt, aspect_ratio)
+
+
+async def _openai_vision(system: str, text: str, image_base64: str = None, mime_type: str = "image/jpeg") -> str:
+    """GPT-4o vision call. Used for image analysis (Brand Audit, Photo Analyze, Auto-check)."""
+    from openai import AsyncOpenAI
+
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
+
+    client = AsyncOpenAI(api_key=OPENAI_API_KEY, timeout=120.0)
+
+    if image_base64:
+        user_content = [
+            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_base64}", "detail": "high"}},
+            {"type": "text", "text": text},
+        ]
+    else:
+        user_content = text
+
+    response = await client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
+        ],
+        max_tokens=4096,
+    )
+    return response.choices[0].message.content or ""
+
+
+async def _claude_generate(system: str, text: str) -> str:
+    """Claude Haiku call. Used for text generation (Copywriting, Calendar Ideas)."""
+    import anthropic as _anthropic
+
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
+
+    client = _anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY, timeout=90.0)
+    response = await client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=4096,
+        system=system,
+        messages=[{"role": "user", "content": text}],
+    )
+    return response.content[0].text or ""
 
 
 async def _auto_consistency_check(user_id: str, prompt_id: str, image_base64: str, dashboard_type: str):
@@ -1209,7 +1794,6 @@ async def _auto_consistency_check(user_id: str, prompt_id: str, image_base64: st
         brand = await db.brand_profiles.find_one({"user_id": user_id}, {"_id": 0})
         if not brand:
             return
-        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
         system = "You are a Brand Consistency Auditor. Output ONLY valid JSON (no fence). Bahasa Indonesia."
         brand_summary = (
             f"Brand: {brand.get('brand_name','')}; Palette {brand.get('color_primary','')}, "
@@ -1223,10 +1807,8 @@ async def _auto_consistency_check(user_id: str, prompt_id: str, image_base64: st
             "summary (1-2 kalimat), strengths (list), weaknesses (list), actionable_tips (list), "
             "alignment_verdict (Sangat Konsisten/Konsisten/Cukup/Kurang/Tidak Konsisten)."
         )
-        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"autocheck-{prompt_id}", system_message=system).with_model("gemini", "gemini-3-flash-preview")
-        msg = UserMessage(text=instruction, file_contents=[ImageContent(image_base64=image_base64)])
-        response = await chat.send_message(msg)
-        raw = response.strip() if isinstance(response, str) else str(response)
+        raw = await _openai_vision(system, instruction, image_base64=image_base64)
+        raw = raw.strip()
         if raw.startswith("```"):
             lines = raw.split("\n")
             raw = "\n".join(lines[1:-1]) if lines[-1].startswith("```") else "\n".join(lines[1:])
@@ -1721,25 +2303,10 @@ async def delete_brand_profile(brand_id: str, current_user: dict = Depends(get_c
 # ============= PHOTO ANALYZE (Gemini Vision) =============
 @api_router.post("/photo/analyze")
 async def analyze_photo(payload: PhotoAnalyzeIn, current_user: dict = Depends(get_current_user)):
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-    except Exception as e:
-        logger.error(f"emergentintegrations import failed: {e}")
-        raise HTTPException(status_code=500, detail="AI vision service unavailable")
-
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
-
     system = (
         "Anda adalah AI Art Director profesional yang menganalisis foto produk untuk konten marketing. "
         "Berikan output JSON valid dengan format yang diminta. Bahasa: Indonesia."
     )
-
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=f"photo-{current_user['id']}-{uuid.uuid4()}",
-        system_message=system,
-    ).with_model("gemini", "gemini-3-flash-preview")
 
     instruction = (
         "Analisis foto produk ini. Kembalikan HANYA JSON valid (tanpa markdown fence) dengan struktur:\n"
@@ -1755,17 +2322,13 @@ async def analyze_photo(payload: PhotoAnalyzeIn, current_user: dict = Depends(ge
         "}"
     )
 
-    image_content = ImageContent(image_base64=payload.image_base64)
-    user_msg = UserMessage(text=instruction, file_contents=[image_content])
-
     try:
-        response = await chat.send_message(user_msg)
+        raw = await _openai_vision(system, instruction, image_base64=payload.image_base64)
     except Exception as e:
-        logger.error(f"Gemini vision call failed: {e}")
+        logger.error(f"OpenAI vision call failed: {e}")
         raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Analisis AI gagal. Coba lagi."))
 
-    # Parse JSON from response
-    raw = response.strip() if isinstance(response, str) else str(response)
+    raw = raw.strip()
     # Strip markdown fences if any
     if raw.startswith("```"):
         lines = raw.split("\n")
@@ -3143,7 +3706,7 @@ def _build_carousel_creative_brief(payload: "CarouselPromptIn", brand: dict) -> 
     brand = brand or {}
     effective_goal = payload.content_goal if payload.content_goal in _CONTENT_GOAL_VISUAL else payload.campaign_goal
     effective_cta = payload.final_cta or payload.call_to_action or "Swipe ke kanan!"
-    effective_product = payload.product_name or brand.get("brand_name", "")
+    effective_product = payload.product_name or payload.brand_name or brand.get("brand_name", "")
     effective_audience = payload.target_audience or brand.get("target_audience", "")
 
     brand_personality = ARCHETYPE_VOICE.get(brand.get("archetype", "expert"), "professional")
@@ -3678,8 +4241,11 @@ async def generate_banner(payload: BannerPromptIn, current_user: dict = Depends(
     # Generate real image
     try:
         natural_prompt = _build_natural_prompt(prompt_obj)
-        natural_prompt = _append_reference_hint(natural_prompt, bool(payload.reference_image_base64))
-        image_b64 = await _call_openai_image(natural_prompt, payload.aspect_ratio)
+        if payload.reference_image_base64:
+            cleaned_image = await _remove_background(payload.reference_image_base64)
+            image_b64 = await _call_openai_image_edit(natural_prompt, payload.aspect_ratio, cleaned_image)
+        else:
+            image_b64 = await _call_openai_image(natural_prompt, payload.aspect_ratio)
     except HTTPException:
         # Refund
         await _refund_credit(current_user["id"], 1, "Refund banner gagal generate")
@@ -3741,13 +4307,20 @@ async def generate_carousel(payload: CarouselPromptIn, current_user: dict = Depe
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
     prompt_obj = _build_carousel_prompts(payload, brand)
 
+    # Pre-process product image once (background removal is expensive, do it once)
+    carousel_product_image = None
+    if payload.reference_image_base64:
+        carousel_product_image = await _remove_background(payload.reference_image_base64)
+
     # Generate image per slide
     images = []
     try:
         for slide in prompt_obj["slides"]:
             natural = _build_natural_prompt(slide)
-            natural = _append_reference_hint(natural, bool(payload.reference_image_base64))
-            img = await _call_openai_image(natural, payload.aspect_ratio)
+            if carousel_product_image:
+                img = await _call_openai_image_edit(natural, payload.aspect_ratio, carousel_product_image)
+            else:
+                img = await _call_openai_image(natural, payload.aspect_ratio)
             images.append(img)
     except HTTPException:
         # Refund unused credits
@@ -3840,6 +4413,11 @@ async def generate_carousel_stream(payload: CarouselPromptIn, current_user: dict
         slide_images = [""] * len(roles)
         credits_refunded = 0
 
+        # Pre-process product image once before looping slides
+        _stream_product_image = None
+        if payload.reference_image_base64:
+            _stream_product_image = await _remove_background(payload.reference_image_base64)
+
         for idx, slide in enumerate(prompt_obj["slides"]):
             role = slide["slide_role"]
 
@@ -3852,7 +4430,6 @@ async def generate_carousel_stream(payload: CarouselPromptIn, current_user: dict
 
             # Build prompt for this slide
             natural = _build_natural_prompt(slide)
-            natural = _append_reference_hint(natural, bool(payload.reference_image_base64))
 
             # ── Phase 3: Generate with retry ──────────────────────────────
             img = None
@@ -3861,7 +4438,10 @@ async def generate_carousel_stream(payload: CarouselPromptIn, current_user: dict
                 try:
                     if attempt > 0:
                         yield evt({"type": "slide_retry", "index": idx, "attempt": attempt})
-                    img = await _call_openai_image(natural, payload.aspect_ratio)
+                    if _stream_product_image:
+                        img = await _call_openai_image_edit(natural, payload.aspect_ratio, _stream_product_image)
+                    else:
+                        img = await _call_openai_image(natural, payload.aspect_ratio)
                     break
                 except Exception as e:
                     last_error = str(e)[:200]
@@ -4002,15 +4582,6 @@ async def generate_copywriting(payload: CopywritingIn, current_user: dict = Depe
     # Content moderation
     _raise_if_banned(payload.product_name, payload.product_description, payload.target_audience, payload.main_problem)
 
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-    except Exception as e:
-        logger.error(f"emergentintegrations import failed: {e}")
-        raise HTTPException(status_code=500, detail="AI service unavailable")
-
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
-
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0}) or {}
     brand_name = brand.get("brand_name", "brand Anda")
     auto_tone = PURPOSE_TONE.get(payload.content_purpose, "friendly")
@@ -4030,9 +4601,13 @@ async def generate_copywriting(payload: CopywritingIn, current_user: dict = Depe
     purpose_label = purpose_map.get(payload.content_purpose, purpose_map["soft_selling"])
 
     system = (
-        "Anda adalah copywriter senior spesialis konten Instagram/sosial media untuk UMKM Indonesia. "
-        "Anda menulis dalam Bahasa Indonesia yang natural, persuasif, dan sesuai brand. "
-        "Output HARUS dalam format JSON valid tanpa markdown fence."
+        "Kamu adalah Senior Copywriter Indonesia spesialis e-commerce dan media sosial untuk UMKM. "
+        "Tugas: buat copy yang emosional, persuasif, dan mengkonversi dalam Bahasa Indonesia yang natural dan authentic. "
+        "Panduan kualitas: headline harus ada trigger emosi/angka/manfaat konkret; "
+        "caption storytelling gunakan rumus Problem → Agitate → Solve → CTA; "
+        "hook lines harus stop-scroll dalam 2 detik pertama; "
+        "CTA harus spesifik, urgent, dan actionable. "
+        "Output HARUS dalam format JSON valid tanpa markdown fence, tanpa penjelasan apapun."
     )
 
     user_prompt = f"""Buat copywriting konten {payload.platform} untuk brand "{brand_name}".
@@ -4067,22 +4642,44 @@ Kembalikan HANYA JSON valid (tanpa fence) dengan struktur:
   "hook_lines": ["...", "...", "..."]
 }}"""
 
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=f"copy-{current_user['id']}-{uuid.uuid4()}",
-        system_message=system,
-    ).with_model("gemini", "gemini-3-flash-preview")
+    from groq import AsyncGroq, RateLimitError as _GroqRateLimit
+    _copy_keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
+    if not _copy_keys:
+        raise HTTPException(status_code=500, detail="AI service unavailable")
 
-    try:
-        response = await chat.send_message(UserMessage(text=user_prompt))
-    except Exception as e:
-        logger.error(f"Gemini copy call failed: {e}")
-        raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Gagal generate copywriting. Coba lagi."))
+    response = None
+    _last_err = None
+    for _key in _copy_keys:
+        if not _key:
+            continue
+        try:
+            _groq = AsyncGroq(api_key=_key)
+            _groq_msg = await _groq.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=1400,
+                temperature=0.7,
+            )
+            response = _groq_msg.choices[0].message.content
+            break
+        except _GroqRateLimit as e:
+            _last_err = e
+            continue
+        except Exception as e:
+            _last_err = e
+            break
 
-    raw = response.strip() if isinstance(response, str) else str(response)
+    if response is None:
+        logger.error(f"Groq copy call failed: {_last_err}")
+        raise HTTPException(status_code=500, detail=_ai_error_detail(_last_err, "Gagal generate copywriting. Coba lagi."))
+
+    raw = response.strip()
     if raw.startswith("```"):
-        lines = raw.split("\n")
-        raw = "\n".join(lines[1:-1]) if lines[-1].startswith("```") else "\n".join(lines[1:])
+        lines_r = raw.split("\n")
+        raw = "\n".join(lines_r[1:-1]) if lines_r[-1].startswith("```") else "\n".join(lines_r[1:])
         raw = raw.strip()
     if raw.startswith("json"):
         raw = raw[4:].strip()
@@ -4121,13 +4718,6 @@ Kembalikan HANYA JSON valid (tanpa fence) dengan struktur:
 @api_router.post("/prompt/generate-caption-bundle")
 async def generate_caption_bundle(payload: CaptionBundleIn, current_user: dict = Depends(get_current_user)):
     """Generate 4 caption variants + hooks + hashtags via Gemini. No credits consumed."""
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="AI service unavailable")
-
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
 
     brand = await _get_active_brand(current_user["id"]) or {}
     brand_name = brand.get("brand_name", "brand Anda")
@@ -4173,14 +4763,8 @@ Kembalikan HANYA JSON valid (tanpa fence):
   "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5", "#tag6", "#tag7", "#tag8", "#tag9", "#tag10"]
 }}"""
 
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=f"caption-{current_user['id']}-{uuid.uuid4()}",
-        system_message=system,
-    ).with_model("gemini", "gemini-3-flash-preview")
-
     try:
-        response = await chat.send_message(UserMessage(text=user_prompt))
+        response = await _claude_generate(system, user_prompt)
     except Exception as e:
         logger.error(f"Caption bundle call failed: {e}")
         raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Gagal generate caption. Coba lagi."))
@@ -4295,6 +4879,123 @@ async def content_recommendation(current_user: dict = Depends(get_current_user))
     }
 
 
+# ============= DAILY RECOMMENDATION (AI, cached per day) =============
+
+_REC_ROUTE_KEYWORDS = {
+    "/generate/reels":       ["reels", "video", "reel"],
+    "/generate/carousel":    ["carousel", "slide"],
+    "/generate/copywriting": ["caption", "copywriting", "teks"],
+    "/generate/marketplace": ["marketplace", "shopee", "tokopedia"],
+}
+
+@api_router.get("/dashboard/daily-recommendation")
+async def daily_recommendation(
+    force: bool = False,
+    current_user: dict = Depends(get_current_user),
+):
+    """AI-powered daily content recommendation. Cached per user per day."""
+    user_id = current_user["id"]
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    if not force:
+        cached = await db.daily_recommendations.find_one(
+            {"user_id": user_id, "date": today}, {"_id": 0}
+        )
+        if cached:
+            return {
+                "recommendation": cached["recommendation"],
+                "action_route":   cached.get("action_route", "/generate/banner"),
+                "cached": True,
+            }
+
+    brand = await db.brand_profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
+    recent_types = [
+        d.get("dashboard_type", "")
+        for d in await db.generated_prompts.find(
+            {"user_id": user_id}, {"dashboard_type": 1}
+        ).sort("created_at", -1).limit(30).to_list(30)
+    ]
+    created = set(recent_types)
+    gaps = {"banner", "carousel", "copywriting", "marketplace", "reels"} - created
+
+    brand_name = brand.get("brand_name", "brand kamu")
+    category   = brand.get("category", "produk")
+    gaps_str   = ", ".join(gaps) if gaps else "semua format sudah dicoba"
+
+    system_prompt = (
+        "Kamu adalah asisten kreatif premium untuk UMKM Indonesia. "
+        "Bantu mereka membuat konten media sosial yang efektif dan menarik. "
+        "Rekomendasimu harus spesifik untuk kategori bisnis, bukan generik. "
+        "Sertakan kenapa strategi itu bekerja secara singkat."
+    )
+    user_prompt = (
+        f"Brand: '{brand_name}' kategori '{category}'. "
+        f"Format konten yang belum pernah dibuat: {gaps_str}. "
+        f"Beri 1 rekomendasi konten yang spesifik dan actionable. "
+        f"2-3 kalimat. Santai, memotivasi. Langsung ke intinya tanpa salam pembuka."
+    )
+
+    recommendation = None
+    try:
+        recommendation = await asyncio.wait_for(
+            _claude_generate(system_prompt, user_prompt),
+            timeout=8.0,
+        )
+    except Exception as _e:
+        logging.info(f"Daily rec AI skipped ({type(_e).__name__}), using fallback")
+
+    if not recommendation:
+        if "carousel" in gaps:
+            recommendation = (
+                f"Bikin carousel 'behind the scenes' proses {category} kamu — "
+                "brand yang tunjukkan proses nyata dapat kepercayaan 2× lebih cepat "
+                "dibanding foto produk biasa."
+            )
+        elif "reels" in gaps:
+            recommendation = (
+                f"Coba Reels singkat menampilkan {category} dalam aksi nyata — "
+                "video pendek dapat reach organik 3–5× lebih tinggi dari foto statis."
+            )
+        elif "copywriting" in gaps:
+            recommendation = (
+                f"Tulis caption storytelling tentang perjalanan brand {category} kamu — "
+                "narasi personal meningkatkan koneksi emosional pelanggan dan "
+                "boosting organic engagement secara signifikan."
+            )
+        else:
+            recommendation = (
+                f"Buat konten social proof bergambar — tampilkan ulasan pelanggan {category} "
+                "dalam visual yang menarik. Social proof visual adalah cara tercepat untuk "
+                "meningkatkan konversi brand kamu."
+            )
+
+    rec_lower = recommendation.lower()
+    action_route = "/generate/banner"
+    for route, keywords in _REC_ROUTE_KEYWORDS.items():
+        if any(kw in rec_lower for kw in keywords):
+            action_route = route
+            break
+
+    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+    await db.daily_recommendations.update_one(
+        {"user_id": user_id, "date": today},
+        {"$set": {
+            "user_id": user_id,
+            "date": today,
+            "recommendation": recommendation,
+            "action_route": action_route,
+            "created_at": now_dt,
+        }},
+        upsert=True,
+    )
+
+    return {
+        "recommendation": recommendation,
+        "action_route":   action_route,
+        "cached": False,
+    }
+
+
 # ============= STATS =============
 @api_router.get("/stats")
 async def stats(current_user: dict = Depends(get_current_user)):
@@ -4308,12 +5009,16 @@ async def stats(current_user: dict = Depends(get_current_user)):
     carousel = await db.generated_prompts.count_documents({"user_id": user_id, "dashboard_type": "carousel", "slide_images": {"$exists": True}})
     copy = await db.generated_prompts.count_documents({"user_id": user_id, "dashboard_type": "copywriting"})
     food = await db.generated_prompts.count_documents({"user_id": user_id, "dashboard_type": "food-menu", "image_base64": {"$exists": True}})
+    marketplace = await db.generated_prompts.count_documents({"user_id": user_id, "dashboard_type": "marketplace", "image_base64": {"$exists": True}})
+    studio = await db.generated_prompts.count_documents({"user_id": user_id, "dashboard_type": "studio"})
     return {
         "total": total,
         "banner": banner,
         "carousel": carousel,
         "copywriting": copy,
         "food_menu": food,
+        "marketplace": marketplace,
+        "studio": studio,
     }
 
 
@@ -4834,8 +5539,11 @@ async def generate_marketplace(payload: MarketplaceIn, current_user: dict = Depe
 
     try:
         natural_prompt = _build_natural_prompt(prompt_obj)
-        natural_prompt = _append_reference_hint(natural_prompt, bool(payload.product_photo_base64))
-        img = await _call_openai_image(natural_prompt, "1:1 (Square Feed)")
+        if payload.product_photo_base64:
+            cleaned_image = await _remove_background(payload.product_photo_base64)
+            img = await _call_openai_image_edit(natural_prompt, "1:1 (Square Feed)", cleaned_image)
+        else:
+            img = await _call_openai_image(natural_prompt, "1:1 (Square Feed)")
     except HTTPException:
         await _refund_credit(current_user["id"], 1, "Refund marketplace generate gagal")
         raise
@@ -4865,74 +5573,219 @@ async def generate_marketplace(payload: MarketplaceIn, current_user: dict = Depe
     }
 
 
+# ============= FEEDIFY STUDIO =============
+
+@api_router.post("/studio/preview")
+async def studio_preview(payload: StudioIn, current_user: dict = Depends(get_current_user)):
+    """Return the natural language prompt without generating an image. Admin only. No credits consumed."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    prompt_obj = _build_studio_prompt(payload)
+    natural = _natural_studio(prompt_obj)
+    return {"prompt_json": prompt_obj, "natural_prompt": natural}
+
+
+@api_router.post("/studio/generate")
+async def studio_generate(payload: StudioIn, current_user: dict = Depends(get_current_user)):
+    await _block_if_menu_locked("studio")
+
+    n = max(1, min(16, payload.output_count))
+    if not await _consume_credit(current_user["id"], n, current_user.get("role", "user")):
+        raise HTTPException(status_code=402, detail=f"Butuh {n} kredit. Top-up di halaman pricing.")
+
+    prompt_obj = _build_studio_prompt(payload)
+    natural = _natural_studio(prompt_obj)
+
+    # Background removal — run once before the generation loop
+    product_image = None
+    if payload.product_image_base64:
+        product_image = await _remove_background(payload.product_image_base64)
+
+    images = []
+    try:
+        for _ in range(n):
+            if product_image:
+                img = await _call_openai_image_edit(natural, "1:1", product_image)
+            else:
+                img = await _call_openai_image(natural, "1:1")
+            images.append(img)
+    except HTTPException:
+        refund = n - len(images)
+        if refund > 0:
+            await _refund_credit(current_user["id"], refund, "Refund Studio generate gagal")
+        if not images:
+            raise
+
+    saved_id = str(uuid.uuid4())
+    await db.studio_results.insert_one({
+        "id": saved_id,
+        "user_id": current_user["id"],
+        "business_goal": payload.business_goal,
+        "photography_style": payload.photography_style,
+        "model_type": payload.model_type,
+        "is_campaign_pack": False,
+        "images": images,
+        "created_at": now_iso(),
+    })
+
+    credits_doc = await db.user_credits.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    return {"id": saved_id, "images": images, "credits": _credits_summary(credits_doc)}
+
+
+@api_router.post("/studio/campaign-pack")
+async def studio_campaign_pack(payload: StudioIn, current_user: dict = Depends(get_current_user)):
+    await _block_if_menu_locked("studio")
+
+    active_shots = _FASHION_CAMPAIGN_SHOTS if payload.product_category == "fashion" else _CAMPAIGN_SHOTS
+    n_shots = len(active_shots)
+    if not await _consume_credit(current_user["id"], n_shots, current_user.get("role", "user")):
+        raise HTTPException(status_code=402, detail=f"Campaign Pack butuh {n_shots} kredit. Top-up di halaman pricing.")
+
+    product_image = None
+    if payload.product_image_base64:
+        product_image = await _remove_background(payload.product_image_base64)
+
+    images = []
+    shot_labels = []
+    try:
+        for shot_key, shot_label in active_shots:
+            prompt_obj = _build_studio_prompt(payload, shot_focus=shot_key)
+            natural = _natural_studio(prompt_obj)
+            if product_image:
+                img = await _call_openai_image_edit(natural, "1:1", product_image)
+            else:
+                img = await _call_openai_image(natural, "1:1")
+            images.append(img)
+            shot_labels.append(shot_label)
+    except HTTPException:
+        refund = n_shots - len(images)
+        if refund > 0:
+            await _refund_credit(current_user["id"], refund, "Refund Campaign Pack gagal")
+        if not images:
+            raise
+
+    saved_id = str(uuid.uuid4())
+    await db.studio_results.insert_one({
+        "id": saved_id,
+        "user_id": current_user["id"],
+        "business_goal": payload.business_goal,
+        "photography_style": payload.photography_style,
+        "model_type": payload.model_type,
+        "is_campaign_pack": True,
+        "shot_labels": shot_labels,
+        "images": images,
+        "created_at": now_iso(),
+    })
+
+    credits_doc = await db.user_credits.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    return {
+        "id": saved_id,
+        "images": [{"label": l, "image": img} for l, img in zip(shot_labels, images)],
+        "credits": _credits_summary(credits_doc),
+    }
+
+
 # ============= BRAND CONSISTENCY CHECKER (Gemini Vision) =============
 @api_router.post("/consistency/check")
 async def consistency_check(payload: ConsistencyCheckIn, current_user: dict = Depends(get_current_user)):
     await _block_if_menu_locked("consistency")
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-    except Exception as e:
-        logger.error(f"emergentintegrations import failed: {e}")
-        raise HTTPException(status_code=500, detail="AI vision service unavailable")
-
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
-
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
-    if not brand:
-        raise HTTPException(status_code=400, detail="Brand profile belum dibuat")
+    has_brand_dna = brand is not None
 
-    brand_summary = (
-        f"Brand: {brand.get('brand_name', '')}\n"
-        f"Kategori: {brand.get('category', '')}\n"
-        f"Warna primer: {brand.get('color_primary', '')}\n"
-        f"Warna sekunder: {brand.get('color_secondary', '')}\n"
-        f"Gaya visual: {brand.get('visual_style', '')}\n"
-        + (f"Brand positioning: {brand.get('brand_positioning', '')}\n" if brand.get('brand_positioning') else "")
-        + (f"Brand personality: {', '.join(brand.get('brand_personality', []))}\n" if brand.get('brand_personality') else "")
-    )
+    if has_brand_dna:
+        brand_context = (
+            "Brand DNA tersedia:\n"
+            f"- Nama Brand: {brand.get('brand_name', '')}\n"
+            f"- Kategori: {brand.get('category', '')}\n"
+            f"- Warna primer: {brand.get('color_primary', '')}\n"
+            f"- Warna sekunder: {brand.get('color_secondary', '')}\n"
+            f"- Gaya visual: {brand.get('visual_style', '')}\n"
+            + (f"- Brand positioning: {brand.get('brand_positioning', '')}\n" if brand.get('brand_positioning') else "")
+            + (f"- Brand personality: {', '.join(brand.get('brand_personality', []))}\n" if brand.get('brand_personality') else "")
+        )
+    else:
+        brand_context = "Brand DNA: Tidak tersedia. Analisis berdasarkan standar fotografi komersial profesional saja. Untuk brand_identity scores, nilai berdasarkan prinsip desain universal."
 
     system = (
-        "Anda adalah Brand Consistency Auditor profesional yang menilai konsistensi visual antara hasil gambar dengan Brand DNA. "
-        "Output HARUS JSON valid (tanpa markdown fence). Berikan skor 0-100 dan saran perbaikan yang actionable. Bahasa: Indonesia."
+        "Anda adalah AI Creative Director dan Brand Auditor profesional kelas enterprise. "
+        "Tugas Anda: menganalisis gambar secara mendalam dari perspektif fotografi komersial, brand identity, marketplace readiness, dan psikologi konsumen. "
+        "Output HARUS JSON valid (tanpa markdown fence). Gunakan Bahasa Indonesia untuk semua teks penjelasan."
     )
 
-    instruction = (
-        f"Brand DNA pengguna:\n{brand_summary}\n"
-        f"Catatan user (opsional): {payload.note or '-'}\n\n"
-        "Analisis gambar terlampir dan bandingkan dengan Brand DNA di atas. "
-        "Kembalikan HANYA JSON valid dengan struktur:\n"
-        "{\n"
-        '  "overall_score": 0-100,\n'
-        '  "color_score": 0-100,\n'
-        '  "mood_score": 0-100,\n'
-        '  "composition_score": 0-100,\n'
-        '  "typography_score": 0-100,\n'
-        '  "summary": "ringkasan 1-2 kalimat",\n'
-        '  "strengths": ["kekuatan 1", "kekuatan 2"],\n'
-        '  "weaknesses": ["kelemahan 1", "kelemahan 2"],\n'
-        '  "actionable_tips": ["saran konkret 1 untuk prompt berikutnya", "saran 2", "saran 3"],\n'
-        '  "detected_dominant_colors": ["#hex1", "#hex2", "#hex3"],\n'
-        '  "alignment_verdict": "Sangat Konsisten | Konsisten | Cukup | Kurang Konsisten | Tidak Konsisten"\n'
-        "}"
-    )
+    instruction = f"""Konteks Brand:
+{brand_context}
 
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=f"consistency-{current_user['id']}-{uuid.uuid4()}",
-        system_message=system,
-    ).with_model("gemini", "gemini-3-flash-preview")
+Catatan user: {payload.note or 'Tidak ada'}
 
-    image_content = ImageContent(image_base64=payload.image_base64)
-    user_msg = UserMessage(text=instruction, file_contents=[image_content])
+Analisis gambar ini secara komprehensif. Kembalikan HANYA JSON valid dengan struktur berikut (semua field wajib diisi):
+
+{{
+  "overall_score": <angka 0-100 mencerminkan kualitas komersial keseluruhan>,
+  "status": "<Excellent jika >=85, Good jika >=70, Fair jika >=55, Poor jika <55>",
+  "summary": "<ringkasan kualitas 1-2 kalimat dalam bahasa Indonesia yang jelas dan spesifik>",
+  "star_ratings": {{
+    "commercial_readiness": <1-5>,
+    "photography_quality": <1-5>,
+    "marketplace_ready": <1-5>,
+    "luxury_impression": <1-5>,
+    "brand_consistency": <1-5>,
+    "visual_hierarchy": <1-5>,
+    "trust_score": <1-5>,
+    "conversion_potential": <1-5>
+  }},
+  "categories": {{
+    "brand_identity": [
+      {{"key": "color_palette", "label": "Color Palette", "score": <0-100>, "explanation": "<penjelasan singkat dalam bahasa Indonesia>"}},
+      {{"key": "typography", "label": "Typography", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "visual_tone", "label": "Visual Tone", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "brand_dna", "label": "Brand DNA Match", "score": <0-100>, "explanation": "<penjelasan>"}}
+    ],
+    "photography": [
+      {{"key": "lighting", "label": "Lighting", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "composition", "label": "Composition", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "camera_angle", "label": "Camera Angle", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "background_quality", "label": "Background Quality", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "negative_space", "label": "Negative Space", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "commercial_styling", "label": "Commercial Styling", "score": <0-100>, "explanation": "<penjelasan>"}}
+    ],
+    "marketplace": [
+      {{"key": "product_visibility", "label": "Product Visibility", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "thumbnail_readability", "label": "Thumbnail Readability", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "mobile_visibility", "label": "Mobile Visibility", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "conversion_potential", "label": "Conversion Potential", "score": <0-100>, "explanation": "<penjelasan>"}}
+    ],
+    "psychology": [
+      {{"key": "premium_impression", "label": "Premium Impression", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "trust", "label": "Trust", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "emotional_impact", "label": "Emotional Impact", "score": <0-100>, "explanation": "<penjelasan>"}},
+      {{"key": "purchase_intent", "label": "Purchase Intent", "score": <0-100>, "explanation": "<penjelasan>"}}
+    ]
+  }},
+  "recommendations": [
+    {{"text": "<saran konkret dan actionable>", "why": "<alasan mengapa ini penting>", "expected_improvement": "<dampak yang diharapkan, mis. meningkatkan konversi 15-20%>"}},
+    {{"text": "<saran 2>", "why": "<alasan>", "expected_improvement": "<dampak>"}}
+  ],
+  "advanced_insights": {{
+    "predicted_ctr": <estimasi persentase peningkatan CTR sebagai angka bulat, mis. 18>,
+    "luxury_feeling": <0-100>,
+    "marketplace_score": <0-100>,
+    "visual_balance": <0-100>,
+    "premium_impression": <0-100>,
+    "text_readability": <0-100>,
+    "hero_product_visibility": <0-100>
+  }},
+  "detected_dominant_colors": ["<#hexcode1>", "<#hexcode2>", "<#hexcode3>"]
+}}
+
+Berikan maksimal 5 rekomendasi yang paling impactful. Skor harus realistis dan berdasarkan analisis mendalam gambar."""
 
     try:
-        response = await chat.send_message(user_msg)
+        raw = await _openai_vision(system, instruction, image_base64=payload.image_base64)
     except Exception as e:
-        logger.error(f"Consistency check failed: {e}")
-        raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Consistency check gagal. Coba lagi."))
+        logger.error(f"Brand audit failed: {e}")
+        raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Brand audit gagal. Coba lagi."))
 
-    raw = response.strip() if isinstance(response, str) else str(response)
+    raw = raw.strip()
     if raw.startswith("```"):
         lines = raw.split("\n")
         raw = "\n".join(lines[1:-1]) if lines[-1].startswith("```") else "\n".join(lines[1:])
@@ -4953,7 +5806,8 @@ async def consistency_check(payload: ConsistencyCheckIn, current_user: dict = De
         else:
             parsed = {"error": "no_json", "_raw": raw[:1500]}
 
-    # Save consistency check log
+    parsed["has_brand_dna"] = has_brand_dna
+
     if "error" not in parsed:
         await db.consistency_checks.insert_one({
             "id": str(uuid.uuid4()),
@@ -5337,13 +6191,6 @@ _MONTH_NAMES_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agu
 async def generate_calendar_ideas(payload: CalendarIdeasIn, current_user: dict = Depends(get_current_user)):
     """Generate AI content slot ideas for a full month. No credits consumed."""
     await _block_if_menu_locked("calendar")
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="AI service unavailable")
-
-    if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
 
     brand = await _get_active_brand(current_user["id"]) or {}
     brand_name = brand.get("brand_name", "brand Anda")
@@ -5393,19 +6240,13 @@ Kembalikan HANYA JSON valid dengan struktur:
   ]
 }}"""
 
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=f"cal-ideas-{current_user['id']}-{uuid.uuid4()}",
-        system_message=system,
-    ).with_model("gemini", "gemini-3-flash-preview")
-
     try:
-        response = await chat.send_message(UserMessage(text=user_prompt))
+        response = await _claude_generate(system, user_prompt)
     except Exception as e:
         logger.error(f"Calendar ideas call failed: {e}")
         raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Gagal generate ide kalender. Coba lagi."))
 
-    raw = response.strip() if isinstance(response, str) else str(response)
+    raw = response.strip()
     if raw.startswith("```"):
         lines = raw.split("\n")
         raw = "\n".join(lines[1:-1]) if lines[-1].startswith("```") else "\n".join(lines[1:])
@@ -5809,6 +6650,360 @@ async def support_chat(request: Request):
         return {"reply": "Waduh, ada kendala koneksi nih 😅 Coba lagi sebentar ya, atau langsung DM kita di @feedify.id kalau urgent!"}
 
 
+# ============= GROWTH CONSULTANT =============
+
+_GC_CATEGORY_NAMES = {
+    "increase_sales":  "Tingkatkan Penjualan",
+    "marketplace":     "Marketplace Optimization",
+    "instagram":       "Instagram & Branding",
+    "reels":           "Reels & Video Marketing",
+    "copywriting":     "Copywriting",
+    "product_launch":  "Product Launch",
+    "competitor":      "Competitor Analysis",
+    "content_ideas":   "Content Ideas",
+}
+
+
+def _gc_followup_stub(category: str, answers: dict) -> dict:
+    """Placeholder — replace body with AI call when API key is available."""
+    followups = {
+        "increase_sales": [
+            {"id": "fq1", "question": "Dari 10 orang yang lihat produkmu di media sosial, kira-kira berapa yang menghubungi kamu?"},
+            {"id": "fq2", "question": "Kapan terakhir kamu ubah harga atau penawaran, dan apa yang terjadi setelahnya?"},
+        ],
+        "marketplace": [
+            {"id": "fq1", "question": "Berapa persen foto produkmu menggunakan background putih bersih vs foto natural?"},
+            {"id": "fq2", "question": "Produk mana yang paling banyak dilihat tapi paling sedikit dibeli?"},
+        ],
+        "instagram": [
+            {"id": "fq1", "question": "Dari 10 postingan terakhir, berapa rata-rata engagement (like + komentar) per post?"},
+            {"id": "fq2", "question": "Apakah kamu punya jadwal posting yang konsisten, atau posting kalau ada waktu saja?"},
+        ],
+        "reels": [
+            {"id": "fq1", "question": "Pernah tonton Reels kompetitor yang views-nya tinggi? Apa yang berbeda dari yang kamu buat?"},
+            {"id": "fq2", "question": "Berapa jam yang kamu punya untuk membuat konten video per minggu?"},
+        ],
+        "copywriting": [
+            {"id": "fq1", "question": "Tulis kalimat pertama caption terakhir yang kamu buat — seperti apa bunyinya?"},
+            {"id": "fq2", "question": "Pernahkah pelanggan komentar atau merespons karena tertarik dengan caption kamu?"},
+        ],
+        "product_launch": [
+            {"id": "fq1", "question": "Sudah pernah kasih teaser produk ini ke siapa pun? Bagaimana reaksinya?"},
+            {"id": "fq2", "question": "Apa 1 hal yang membuat produk ini lebih baik dari yang sudah ada di pasaran?"},
+        ],
+        "competitor": [
+            {"id": "fq1", "question": "Dari kompetitor yang kamu sebut, siapa yang paling sering muncul saat pelangganmu mencari?"},
+            {"id": "fq2", "question": "Pernah tanya ke pelanggan lama kenapa mereka pilih kamu dibanding kompetitor?"},
+        ],
+        "content_ideas": [
+            {"id": "fq1", "question": "Konten seperti apa yang biasanya paling banyak dapat respons dari audiens kamu?"},
+            {"id": "fq2", "question": "Ada event atau momen tertentu dalam 2 minggu ke depan yang bisa dimanfaatkan?"},
+        ],
+    }
+    return {
+        "followup_questions": followups.get(category, [
+            {"id": "fq1", "question": "Dari semua tantangan yang kamu sebutkan, mana yang paling mendesak untuk diselesaikan bulan ini?"},
+        ]),
+        "detected_challenge": "strategi konten dan konversi",
+    }
+
+
+def _gc_action_plan_stub(category: str, answers: dict, followup_answers: dict) -> dict:
+    """Placeholder — replace body with AI call when API key is available."""
+    task_sets = {
+        "increase_sales": [
+            {"text": "Audit 5 foto produk terlaris — pastikan lighting bersih, background netral, produk jelas terlihat", "duration": "1 jam", "tool": "Studio", "tool_path": "/studio"},
+            {"text": "Buat 1 Feed Post promosi dengan penawaran spesifik dan batas waktu yang jelas", "duration": "30 menit", "tool": "Feed Post", "tool_path": "/generate/banner"},
+            {"text": "Tulis 3 variasi caption dengan hook berbeda untuk foto produk yang sama — A/B test minggu ini", "duration": "45 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+            {"text": "Buat Carousel: masalah pelanggan → solusi produk → testimonial → CTA yang kuat", "duration": "1 jam", "tool": "Carousel", "tool_path": "/generate/carousel"},
+            {"text": "Update semua foto marketplace dengan versi yang lebih premium dan deskripsi berbasis manfaat", "duration": "2 jam", "tool": "Marketplace", "tool_path": "/generate/marketplace"},
+            {"text": "Tentukan 1 penawaran bundling atau bonus kecil untuk dorong keputusan beli lebih cepat", "duration": "20 menit", "tool": None, "tool_path": None},
+        ],
+        "marketplace": [
+            {"text": "Buat 3 foto produk marketplace: hero shot (bg putih), lifestyle, dan detail close-up", "duration": "1 jam", "tool": "Marketplace", "tool_path": "/generate/marketplace"},
+            {"text": "Rewrite judul produk dengan format: [Kata Kunci] + [Benefit Utama] + [Spesifikasi Penting]", "duration": "30 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+            {"text": "Cek 5 kompetitor top di kategori kamu — catat harga, foto, dan penawaran mereka", "duration": "30 menit", "tool": None, "tool_path": None},
+            {"text": "Aktifkan promo Flash Sale atau Free Ongkir Minimum selama 7 hari untuk boost visibilitas", "duration": "15 menit", "tool": None, "tool_path": None},
+            {"text": "Hubungi 5 pembeli lama untuk minta review dengan foto — tawarkan apresiasi kecil", "duration": "30 menit", "tool": None, "tool_path": None},
+        ],
+        "instagram": [
+            {"text": "Buat Feed Post pertama hari ini dengan konsistensi warna dan gaya sesuai Brand DNA", "duration": "30 menit", "tool": "Feed Post", "tool_path": "/generate/banner"},
+            {"text": "Posting 3 hari berturut-turut di jam prime time (7-9 pagi atau 7-9 malam WIB)", "duration": "15 menit/hari", "tool": None, "tool_path": None},
+            {"text": "Buat Carousel 'Behind the Scenes' proses pembuatan produk — membangun kepercayaan dan koneksi", "duration": "1 jam", "tool": "Carousel", "tool_path": "/generate/carousel"},
+            {"text": "Tulis ulang bio IG: siapa kamu, untuk siapa, manfaat produk, dan CTA yang jelas", "duration": "20 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+            {"text": "Cek konsistensi feed kamu — pastikan semua visual on-brand sebelum posting berikutnya", "duration": "15 menit", "tool": "Consistency Checker", "tool_path": "/consistency"},
+        ],
+        "reels": [
+            {"text": "Tulis script Reels dengan formula: Hook 3 detik → Problem → Solusi → CTA", "duration": "30 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+            {"text": "Generate video produk pertama menggunakan Reels Generator Feedify", "duration": "20 menit", "tool": "Reels", "tool_path": "/generate/reels"},
+            {"text": "Buat Feed Post untuk promosikan Reels kamu di feed Instagram", "duration": "30 menit", "tool": "Feed Post", "tool_path": "/generate/banner"},
+            {"text": "Tonton 10 Reels kompetitor terbaik — catat hook yang mereka pakai sebagai referensi", "duration": "30 menit", "tool": None, "tool_path": None},
+            {"text": "Posting Reels di jam 7-9 pagi dan pantau metrik 24 jam pertama", "duration": "5 menit", "tool": None, "tool_path": None},
+        ],
+        "copywriting": [
+            {"text": "Tulis 5 variasi headline untuk produk utama menggunakan framework Copywriting Feedify", "duration": "30 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+            {"text": "Buat caption IG yang menceritakan 1 transformation story pelanggan nyata kamu", "duration": "30 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+            {"text": "Rewrite deskripsi produk marketplace — ganti fitur dengan manfaat dan hasil nyata", "duration": "45 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+            {"text": "Buat template broadcast WhatsApp yang personal dan non-spam untuk follow up pembeli lama", "duration": "20 menit", "tool": None, "tool_path": None},
+            {"text": "Test 2 CTA berbeda di postingan minggu ini: 'DM sekarang' vs 'Klik link di bio'", "duration": "Ongoing", "tool": None, "tool_path": None},
+        ],
+        "product_launch": [
+            {"text": "Buat teaser Feed Post 'Coming Soon' dengan countdown — tampilkan produk setengah tersembunyi", "duration": "30 menit", "tool": "Feed Post", "tool_path": "/generate/banner"},
+            {"text": "Buat Carousel launch story: masalah → fitur produk → harga → CTA pre-order", "duration": "1 jam", "tool": "Carousel", "tool_path": "/generate/carousel"},
+            {"text": "Tulis broadcast WA ke pelanggan lama dengan penawaran early bird eksklusif", "duration": "30 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+            {"text": "Buat foto produk premium untuk marketplace sebelum launch day", "duration": "1 jam", "tool": "Marketplace", "tool_path": "/generate/marketplace"},
+            {"text": "Hubungi 5 micro-influencer atau pelanggan loyal untuk jadi tester dan reviewer pertama", "duration": "1 jam", "tool": None, "tool_path": None},
+        ],
+        "competitor": [
+            {"text": "Audit visual kompetitor top 3 — screenshot feed IG mereka dan identifikasi pola visual mereka", "duration": "30 menit", "tool": None, "tool_path": None},
+            {"text": "Buat Feed Post yang menonjolkan 1 keunggulan unik kamu vs kompetitor (tanpa sebut nama)", "duration": "30 menit", "tool": "Feed Post", "tool_path": "/generate/banner"},
+            {"text": "Tentukan 1 posisi yang tidak dimiliki kompetitor kamu dan jadikan itu identitas brand", "duration": "1 jam", "tool": None, "tool_path": None},
+            {"text": "Buat Carousel edukasi yang memposisikan kamu sebagai authority di kategori ini", "duration": "1 jam", "tool": "Carousel", "tool_path": "/generate/carousel"},
+            {"text": "Cek konsistensi visual kamu vs kompetitor — brand yang lebih konsisten menang jangka panjang", "duration": "15 menit", "tool": "Consistency Checker", "tool_path": "/consistency"},
+        ],
+        "content_ideas": [
+            {"text": "Buat Carousel 'Tips [Kategori Produk]' — konten edukatif build authority di niche kamu", "duration": "1 jam", "tool": "Carousel", "tool_path": "/generate/carousel"},
+            {"text": "Buat Feed Post untuk produk unggulan dengan visual yang menarik perhatian", "duration": "30 menit", "tool": "Feed Post", "tool_path": "/generate/banner"},
+            {"text": "Tulis caption untuk 5 post berikutnya agar tidak blocking di hari posting", "duration": "1 jam", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+            {"text": "Jadwalkan konten ke Content Calendar untuk 2 minggu ke depan", "duration": "30 menit", "tool": "Calendar", "tool_path": "/calendar"},
+            {"text": "Generate foto produk untuk marketplace agar channel e-commerce juga aktif", "duration": "1 jam", "tool": "Marketplace", "tool_path": "/generate/marketplace"},
+        ],
+    }
+    default_tasks = [
+        {"text": "Buat 1 konten visual premium untuk produk utama kamu hari ini", "duration": "30 menit", "tool": "Feed Post", "tool_path": "/generate/banner"},
+        {"text": "Tulis caption yang menekankan manfaat, bukan fitur — test di 1 post minggu ini", "duration": "30 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
+        {"text": "Buat Carousel edukasi tentang cara memilih atau menggunakan produkmu", "duration": "1 jam", "tool": "Carousel", "tool_path": "/generate/carousel"},
+        {"text": "Update foto marketplace dengan foto yang lebih bersih dan profesional", "duration": "1 jam", "tool": "Marketplace", "tool_path": "/generate/marketplace"},
+        {"text": "Tetapkan jadwal posting rutin: minimal 3x seminggu di jam yang sama", "duration": "15 menit", "tool": None, "tool_path": None},
+    ]
+    tasks_raw = task_sets.get(category, default_tasks)
+    tasks = [
+        {
+            "id": str(uuid.uuid4()),
+            "text": t["text"],
+            "duration": t["duration"],
+            "tool": t.get("tool"),
+            "tool_path": t.get("tool_path"),
+            "completed": False,
+            "completed_at": None,
+        }
+        for t in tasks_raw
+    ]
+    return {
+        "diagnosis": "Berdasarkan analisis kondisi bisnismu, tantangan utama yang perlu segera diatasi adalah konsistensi konten visual dan strategi konversi yang lebih terstruktur. Banyak UMKM dengan produk bagus gagal bersaing bukan karena produknya — tapi karena presentasi visualnya belum membangun kepercayaan yang cukup untuk mendorong keputusan beli.",
+        "tasks": tasks,
+        "target": "Dalam 30 hari dengan action plan ini, kamu akan memiliki sistem konten yang lebih konsisten dan profesional — yang secara langsung meningkatkan kepercayaan calon pelanggan dan konversi penjualan.",
+        "quick_win": tasks[0]["text"] if tasks else "Buat foto produk yang lebih bersih dan profesional hari ini",
+    }
+
+
+@api_router.post("/growth-consultant/start")
+async def gc_start(request: Request, current_user: dict = Depends(get_current_user)):
+    """Step 1: Receive initial answers, validate credits, return follow-up questions."""
+    body = await request.json()
+    category = (body.get("category") or "").strip()
+    answers = body.get("answers") or {}
+
+    if category not in _GC_CATEGORY_NAMES:
+        raise HTTPException(status_code=400, detail="Kategori tidak dikenal")
+
+    user_id = current_user["id"]
+
+    # Free tier: first 3 consultations are free; 4th+ requires 1 credit
+    count_completed = await db.consultations.count_documents({"user_id": user_id, "status": "completed"})
+    is_free = count_completed < 3
+    free_remaining = max(0, 3 - count_completed)
+
+    if not is_free:
+        credits_doc = await db.user_credits.find_one({"user_id": user_id})
+        available = (credits_doc or {}).get("credits_remaining", 0)
+        if available < 1:
+            raise HTTPException(
+                status_code=402,
+                detail="Kamu sudah pakai 3x konsultasi gratis. Konsultasi selanjutnya butuh 1 kredit. Top up dulu ya →",
+            )
+
+    followup_data = _gc_followup_stub(category, answers)
+
+    consultation_id = str(uuid.uuid4())
+    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+    await db.consultations.insert_one({
+        "id": consultation_id,
+        "user_id": user_id,
+        "category": category,
+        "category_name": _GC_CATEGORY_NAMES[category],
+        "answers": answers,
+        "followup_questions": followup_data["followup_questions"],
+        "followup_answers": {},
+        "detected_challenge": followup_data.get("detected_challenge", ""),
+        "diagnosis": "",
+        "tasks": [],
+        "target": "",
+        "quick_win": "",
+        "status": "in_progress",
+        "created_at": now_dt,
+        "completed_at": None,
+    })
+
+    return {
+        "consultation_id": consultation_id,
+        "followup_questions": followup_data["followup_questions"],
+        "detected_challenge": followup_data.get("detected_challenge", ""),
+        "is_free": is_free,
+        "free_remaining": free_remaining,
+    }
+
+
+@api_router.post("/growth-consultant/complete")
+async def gc_complete(request: Request, current_user: dict = Depends(get_current_user)):
+    """Step 2: Receive follow-up answers, generate action plan, deduct credit atomically."""
+    body = await request.json()
+    consultation_id = (body.get("consultation_id") or "").strip()
+    followup_answers = body.get("followup_answers") or {}
+
+    user_id = current_user["id"]
+
+    consultation = await db.consultations.find_one({"id": consultation_id, "user_id": user_id})
+    if not consultation:
+        raise HTTPException(status_code=404, detail="Konsultasi tidak ditemukan")
+    if consultation.get("status") == "completed":
+        raise HTTPException(status_code=400, detail="Konsultasi sudah selesai")
+
+    category = consultation.get("category", "")
+    answers = consultation.get("answers", {})
+
+    # Determine tier: count completed consultations (current one is still in_progress)
+    count_completed = await db.consultations.count_documents({"user_id": user_id, "status": "completed"})
+    is_free = count_completed < 3
+
+    # Generate action plan FIRST — only deduct credit if generation succeeds
+    try:
+        plan = _gc_action_plan_stub(category, answers, followup_answers)
+    except Exception as e:
+        logging.error(f"GC action plan generation failed: {e}")
+        raise HTTPException(status_code=500, detail="Gagal membuat action plan. Coba lagi.")
+
+    # Deduct 1 credit only on paid tier (4th consultation onwards)
+    if not is_free:
+        if not await _consume_credit(user_id, 1, current_user.get("role", "user")):
+            raise HTTPException(status_code=402, detail="Kredit tidak cukup")
+
+    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+    await db.consultations.update_one(
+        {"id": consultation_id},
+        {"$set": {
+            "followup_answers": followup_answers,
+            "diagnosis": plan["diagnosis"],
+            "tasks": plan["tasks"],
+            "target": plan["target"],
+            "quick_win": plan["quick_win"],
+            "status": "completed",
+            "completed_at": now_dt,
+        }},
+    )
+
+    # Save / update business profile extracted from initial answers
+    product    = answers.get("produk") or answers.get("brand") or answers.get("kategori") or ""
+    channels   = answers.get("platform") or []
+    challenge  = answers.get("hambatan") or answers.get("masalah") or answers.get("kendala") or ""
+    goals      = answers.get("target") or ""
+    price_rng  = answers.get("harga") or ""
+    await db.business_profiles.update_one(
+        {"user_id": user_id},
+        {"$set": {
+            "user_id": user_id,
+            "product": product,
+            "price_range": price_rng,
+            "channels": channels if isinstance(channels, list) else ([channels] if channels else []),
+            "challenges": [challenge] if challenge else [],
+            "goals": goals,
+            "last_consultation_id": consultation_id,
+            "last_consultation_topic": _GC_CATEGORY_NAMES.get(category, category),
+            "updated_at": now_dt,
+        }},
+        upsert=True,
+    )
+
+    return {
+        "consultation_id": consultation_id,
+        "diagnosis": plan["diagnosis"],
+        "tasks": plan["tasks"],
+        "target": plan["target"],
+        "quick_win": plan["quick_win"],
+        "is_free": is_free,
+    }
+
+
+@api_router.patch("/growth-consultant/tasks/{task_id}")
+async def gc_toggle_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    """Toggle a task's completed status."""
+    user_id = current_user["id"]
+
+    consultation = await db.consultations.find_one(
+        {"user_id": user_id, "tasks.id": task_id},
+        {"_id": 0, "tasks.$": 1},
+    )
+    if not consultation:
+        raise HTTPException(status_code=404, detail="Task tidak ditemukan")
+
+    task = (consultation.get("tasks") or [{}])[0]
+    new_completed = not task.get("completed", False)
+    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    await db.consultations.update_one(
+        {"user_id": user_id, "tasks.id": task_id},
+        {"$set": {
+            "tasks.$.completed": new_completed,
+            "tasks.$.completed_at": now_dt if new_completed else None,
+        }},
+    )
+    return {"task_id": task_id, "completed": new_completed}
+
+
+@api_router.get("/growth-consultant/active")
+async def gc_active(current_user: dict = Depends(get_current_user)):
+    """Return the latest completed consultation with tasks."""
+    item = await db.consultations.find_one(
+        {"user_id": current_user["id"], "status": "completed"},
+        {"_id": 0},
+        sort=[("completed_at", -1)],
+    )
+    if not item:
+        return None
+    for field in ("created_at", "completed_at"):
+        if isinstance(item.get(field), datetime):
+            item[field] = item[field].isoformat()
+    return item
+
+
+@api_router.get("/growth-consultant/history")
+async def gc_history(current_user: dict = Depends(get_current_user)):
+    """Return last 20 completed consultations (summary only, no task details)."""
+    items = await db.consultations.find(
+        {"user_id": current_user["id"], "status": "completed"},
+        {"_id": 0, "answers": 0, "followup_answers": 0, "tasks": 0},
+    ).sort("completed_at", -1).to_list(20)
+    for item in items:
+        for field in ("created_at", "completed_at"):
+            if isinstance(item.get(field), datetime):
+                item[field] = item[field].isoformat()
+    return items
+
+
+@api_router.get("/growth-consultant/tier")
+async def gc_tier(current_user: dict = Depends(get_current_user)):
+    """Return the user's free-tier status for Growth Consultant."""
+    count = await db.consultations.count_documents(
+        {"user_id": current_user["id"], "status": "completed"}
+    )
+    free_remaining = max(0, 3 - count)
+    return {
+        "total_consultations": count,
+        "is_free": free_remaining > 0,
+        "free_remaining": free_remaining,
+    }
+
+
 # ============= AUTO CONSISTENCY HISTORY =============
 @api_router.get("/consistency/history")
 async def consistency_history(current_user: dict = Depends(get_current_user)):
@@ -6093,7 +7288,7 @@ LOCKABLE_MENUS = {
     "reels":         "Reels",
     "food":          "F&B Menu",
     "marketplace":   "Marketplace",
-    "grid-planner":  "Grid Planner",
+    "growth-consultant": "Growth Consultant",
     "consistency":   "Consistency Checker",
     "calendar":      "Calendar Planner",
 }
@@ -6485,6 +7680,211 @@ async def reels_history(
         {"_id": 0},
     ).sort("created_at", -1).limit(limit).to_list(length=limit)
     return {"videos": docs}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TALKING AVATAR  (HeyGen integration — requires HEYGEN_API_KEY)
+# ─────────────────────────────────────────────────────────────────────────────
+
+HEYGEN_BASE = "https://api.heygen.com"
+TALKING_AVATAR_CREDITS = {15: 20, 30: 40}  # seconds → credits
+
+@api_router.get("/talking-avatar/status")
+async def talking_avatar_status(current_user: dict = Depends(get_current_user)):
+    return {"available": bool(HEYGEN_API_KEY)}
+
+
+@api_router.post("/talking-avatar/generate-script")
+async def talking_avatar_generate_script(
+    payload: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """Use Claude to generate a promotional script from a product photo."""
+    photo_b64 = payload.get("photo_base64", "")
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="Script generator tidak tersedia saat ini")
+
+    system_prompt = (
+        "Kamu adalah copywriter profesional Indonesia yang membuat script promosi untuk video avatar. "
+        "Script harus natural saat dibacakan, 2-3 kalimat, maks 200 karakter. "
+        "Gunakan bahasa Indonesia yang hangat dan persuasif. Langsung tulis scriptnya saja tanpa awalan apapun."
+    )
+    user_prompt = "Buatkan script promosi singkat dan menarik untuk produk dalam foto ini. Fokus pada manfaat utama."
+
+    try:
+        script = await asyncio.wait_for(
+            _claude_generate(system_prompt, user_prompt),
+            timeout=10.0,
+        )
+        return {"script": script or "Produk terbaik untuk kebutuhanmu! Kualitas premium dengan harga terjangkau. Dapatkan sekarang sebelum kehabisan!"}
+    except Exception:
+        return {"script": "Produk terbaik untuk kebutuhanmu! Kualitas premium dengan harga terjangkau. Dapatkan sekarang sebelum kehabisan!"}
+
+
+@api_router.post("/talking-avatar/generate")
+async def talking_avatar_generate(
+    payload: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    if not HEYGEN_API_KEY:
+        raise HTTPException(status_code=503, detail="Fitur ini segera hadir — HeyGen belum dikonfigurasi")
+
+    user_id = current_user["id"]
+    duration_seconds = payload.get("duration_seconds", 15)
+    credits_needed = TALKING_AVATAR_CREDITS.get(duration_seconds, 20)
+    script = (payload.get("script") or "").strip()
+    voice_id = payload.get("voice_id", "id_budi")
+    background = payload.get("background", "blur")
+    photo_b64 = payload.get("photo_base64", "")
+
+    if not script:
+        raise HTTPException(status_code=400, detail="Script tidak boleh kosong")
+    if duration_seconds not in TALKING_AVATAR_CREDITS:
+        raise HTTPException(status_code=400, detail="Durasi tidak valid (15 atau 30 detik)")
+
+    # Pre-flight credit check
+    await _ensure_user_credits(user_id)
+    credits_doc = await db.user_credits.find_one({"user_id": user_id})
+    available = (credits_doc or {}).get("credits_remaining", 0)
+    if available < credits_needed:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Kredit tidak cukup. Butuh {credits_needed} kredit, kamu punya {available}.",
+        )
+
+    # Deduct credits atomically before API call
+    await _consume_credit(user_id, credits_needed, f"Talking Avatar {duration_seconds}s")
+
+    heygen_headers = {"X-Api-Key": HEYGEN_API_KEY, "Content-Type": "application/json"}
+
+    # HeyGen voice ID mapping
+    voice_map = {
+        "id_budi": "2d5b0e6cf36f460aa7fc47e3eee4ba54",
+        "id_siti": "1bd001e7e50f421d891986aad5158bc8",
+        "id_andi": "a7f4e17f3b7a4db2b8c1f5e6d2a9c3b1",
+        "id_dewi": "c3b2e8f1a4d6b7c9e2f3a1d5b8c7e4f2",
+    }
+    heygen_voice_id = voice_map.get(voice_id, voice_map["id_budi"])
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Build video generation request
+            video_payload = {
+                "video_inputs": [{
+                    "character": {
+                        "type": "talking_photo",
+                        "talking_photo_id": None,  # Will be set after photo upload
+                        "scale": 1.0,
+                    },
+                    "voice": {
+                        "type": "text",
+                        "input_text": script,
+                        "voice_id": heygen_voice_id,
+                    },
+                    "background": {
+                        "type": background if background in ("image", "color") else "color",
+                        "value": "#F2F6F4",
+                    },
+                }],
+                "aspect_ratio": "9:16",
+                "test": False,
+            }
+
+            # First: upload the photo to HeyGen to get a talking_photo_id
+            if photo_b64:
+                raw_b64 = photo_b64.split(",")[-1] if "," in photo_b64 else photo_b64
+                upload_resp = await client.post(
+                    f"{HEYGEN_BASE}/v1/talking_photo",
+                    headers=heygen_headers,
+                    json={"image": raw_b64},
+                )
+                if upload_resp.status_code == 200:
+                    upload_data = upload_resp.json()
+                    talking_photo_id = upload_data.get("data", {}).get("talking_photo_id")
+                    if talking_photo_id:
+                        video_payload["video_inputs"][0]["character"]["talking_photo_id"] = talking_photo_id
+
+            # Submit generation job
+            gen_resp = await client.post(
+                f"{HEYGEN_BASE}/v2/video/generate",
+                headers=heygen_headers,
+                json=video_payload,
+            )
+            gen_data = gen_resp.json()
+
+            if gen_resp.status_code not in (200, 201) or gen_data.get("error"):
+                await _refund_credit(user_id, credits_needed, "Refund talking avatar - HeyGen error")
+                raise HTTPException(status_code=500, detail="Gagal submit job ke HeyGen")
+
+            job_id = gen_data.get("data", {}).get("video_id")
+            if not job_id:
+                await _refund_credit(user_id, credits_needed, "Refund talking avatar - no job_id")
+                raise HTTPException(status_code=500, detail="HeyGen tidak mengembalikan job ID")
+
+            # Save job to DB
+            await db.talking_avatar_jobs.insert_one({
+                "user_id": user_id,
+                "job_id": job_id,
+                "status": "pending",
+                "duration_seconds": duration_seconds,
+                "credits_used": credits_needed,
+                "created_at": datetime.now(timezone.utc),
+            })
+
+            credits_doc = await db.user_credits.find_one({"user_id": user_id}, {"_id": 0})
+            return {
+                "ok": True,
+                "job_id": job_id,
+                "credits": _credits_summary(credits_doc),
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await _refund_credit(user_id, credits_needed, f"Refund talking avatar - exception: {str(e)[:80]}")
+        raise HTTPException(status_code=500, detail=f"Gagal generate talking avatar: {str(e)}")
+
+
+@api_router.get("/talking-avatar/status/{job_id}")
+async def talking_avatar_poll(
+    job_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    if not HEYGEN_API_KEY:
+        raise HTTPException(status_code=503, detail="HeyGen tidak dikonfigurasi")
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(
+                f"{HEYGEN_BASE}/v1/video_status.get?video_id={job_id}",
+                headers={"X-Api-Key": HEYGEN_API_KEY},
+            )
+            data = resp.json().get("data", {})
+            heygen_status = data.get("status", "")
+
+            if heygen_status == "completed":
+                video_url = data.get("video_url", "")
+                await db.talking_avatar_jobs.update_one(
+                    {"job_id": job_id, "user_id": current_user["id"]},
+                    {"$set": {"status": "completed", "video_url": video_url}},
+                )
+                credits_doc = await db.user_credits.find_one({"user_id": current_user["id"]}, {"_id": 0})
+                return {"status": "completed", "video_url": video_url, "credits": _credits_summary(credits_doc)}
+
+            elif heygen_status in ("failed", "error"):
+                job_doc = await db.talking_avatar_jobs.find_one({"job_id": job_id, "user_id": current_user["id"]})
+                if job_doc and job_doc.get("status") != "refunded":
+                    await _refund_credit(current_user["id"], job_doc.get("credits_used", 20), "Refund talking avatar - HeyGen failed")
+                    await db.talking_avatar_jobs.update_one({"job_id": job_id}, {"$set": {"status": "refunded"}})
+                return {"status": "failed"}
+
+            else:
+                return {"status": "processing"}
+
+    except Exception as e:
+        return {"status": "processing", "note": str(e)}
 
 
 @api_router.get("/")

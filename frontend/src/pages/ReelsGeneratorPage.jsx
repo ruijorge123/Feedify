@@ -3,10 +3,11 @@ import api from "@/lib/api";
 import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext";
 import { notifyCreditsUpdate } from "@/lib/credits";
+import NoCreditsModal from "@/components/NoCreditsModal";
 import {
-  FilmSlate, UploadSimple, Image as ImageIcon, Play, CircleNotch,
+  FilmSlate, UploadSimple, Image as ImageIcon, CircleNotch,
   CheckCircle, DownloadSimple, ArrowsClockwise, Sparkle, Lightning,
-  CaretDown, VideoCamera, Notepad, Clock, FrameCorners,
+  CaretDown, VideoCamera, Notepad, Clock, FrameCorners, XCircle,
 } from "@phosphor-icons/react";
 
 const VIDEO_GOALS = [
@@ -27,15 +28,33 @@ const DURATIONS = [
 ];
 
 const ASPECT_RATIOS = [
-  { value: "9:16", label: "9:16",  desc: "Reels · TikTok",  boxW: "w-[10px]", boxH: "h-[18px]" },
-  { value: "1:1",  label: "1:1",   desc: "Feed · WA Status", boxW: "w-[18px]", boxH: "h-[18px]" },
-  { value: "4:5",  label: "4:5",   desc: "Portrait Feed",   boxW: "w-[14px]", boxH: "h-[18px]" },
+  { value: "9:16", label: "9:16", desc: "Reels · TikTok",   w: 9,  h: 16, recommended: true },
+  { value: "1:1",  label: "1:1",  desc: "Feed · WA Status", w: 1,  h: 1  },
+  { value: "4:5",  label: "4:5",  desc: "Portrait Feed",    w: 4,  h: 5  },
+];
+
+const QUICK_IDEAS = [
+  { emoji: "✨", label: "Apple Style",  value: "buat seperti iklan Apple, clean dan cinematic" },
+  { emoji: "🎥", label: "Cinematic",    value: "cinematic dengan gerakan kamera lambat dan dramatis" },
+  { emoji: "💎", label: "Luxury",       value: "nuansa luxury premium, hitam emas, dramatic lighting" },
+  { emoji: "🔥", label: "Viral TikTok", value: "energik dan catchy seperti konten viral TikTok" },
+];
+
+const RANDOM_IDEAS = [
+  "Cinematic luxury advertisement with slow orbit camera.",
+  "Modern Apple style commercial with clean studio lighting.",
+  "Luxury perfume advertisement with dramatic shadow.",
+  "Premium product reveal with golden hour lighting.",
+  "Minimal clean commercial with smooth dolly movement.",
+  "High-end beauty advertisement with soft bokeh.",
+  "Elegant brand film with warm cafe atmosphere.",
+  "Dynamic product close-up with cinematic depth of field.",
 ];
 
 const GEN_PHASES = [
   "Feedify Video Director menganalisis produk...",
   "Menyusun brief sinematik...",
-  "Mengirim ke Kling AI...",
+  "Mengirim ke Kling Video...",
   "Merender video Reels-mu...",
   "Sentuhan akhir...",
 ];
@@ -46,17 +65,19 @@ export default function ReelsGeneratorPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
-  const [image, setImage] = useState(null);
+  const [image, setImage]               = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [isDragging, setIsDragging]     = useState(false);
+  const [directorNotes, setDirectorNotes] = useState("");
   const [form, setForm] = useState({
-    video_goal: "new_launch",
-    duration: 5,
+    video_goal:   "new_launch",
+    duration:     5,
     aspect_ratio: "9:16",
   });
   const [generating, setGenerating] = useState(false);
-  const [genPhase, setGenPhase] = useState("");
-  const [result, setResult] = useState(null);
+  const [noCredits,  setNoCredits]  = useState(false);
+  const [genPhase, setGenPhase]     = useState("");
+  const [result, setResult]         = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -84,7 +105,15 @@ export default function ReelsGeneratorPage() {
     if (file) handleFile(file);
   };
 
-  // Fake progress cycling during generation
+  const pickIdea = (value) => setDirectorNotes(value);
+
+  const randomIdea = () => {
+    const current = directorNotes.trim();
+    const pool = RANDOM_IDEAS.filter(r => r !== current);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    setDirectorNotes(pick);
+  };
+
   useEffect(() => {
     if (!generating) { setGenPhase(""); return; }
     let i = 0;
@@ -102,24 +131,29 @@ export default function ReelsGeneratorPage() {
     setResult(null);
 
     const formData = new FormData();
-    formData.append("image", image);
-    formData.append("video_goal", form.video_goal);
-    formData.append("duration", form.duration.toString());
-    formData.append("aspect_ratio", form.aspect_ratio);
+    formData.append("image",          image);
+    formData.append("video_goal",     form.video_goal);
+    formData.append("duration",       form.duration.toString());
+    formData.append("aspect_ratio",   form.aspect_ratio);
+    formData.append("director_notes", directorNotes.trim());
 
     try {
       const { data } = await api.post("/reels/generate", formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 360000, // 6 minutes — Kling can take 2-3 min
+        timeout: 360000,
       });
       setResult(data.video);
       notifyCreditsUpdate();
       toast.success("Video Reels berhasil dibuat!");
       setTimeout(() => document.getElementById("reels-result")?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (err) {
-      const msg = err?.response?.data?.detail || "Gagal generate video, coba lagi";
-      toast.error(msg);
-      notifyCreditsUpdate(); // trigger refund update
+      if (err?.response?.status === 402) {
+        setNoCredits(true);
+      } else {
+        const msg = err?.response?.data?.detail || "Gagal generate video, coba lagi";
+        toast.error(msg);
+      }
+      notifyCreditsUpdate();
     } finally {
       setGenerating(false);
     }
@@ -127,11 +161,9 @@ export default function ReelsGeneratorPage() {
 
   const reset = () => { setResult(null); };
 
-  const selectedGoal = VIDEO_GOALS.find(g => g.id === form.video_goal);
+  const selectedGoal  = VIDEO_GOALS.find(g => g.id === form.video_goal);
   const selectedRatio = ASPECT_RATIOS.find(r => r.value === form.aspect_ratio);
-  const selectedDuration = DURATIONS.find(d => d.value === form.duration);
 
-  // Aspect ratio container class for video player
   const ratioContainerClass = form.aspect_ratio === "9:16"
     ? "aspect-[9/16] max-w-[280px]"
     : form.aspect_ratio === "1:1"
@@ -139,6 +171,7 @@ export default function ReelsGeneratorPage() {
       : "aspect-[4/5] max-w-[280px]";
 
   return (
+    <>
     <div className="space-y-6" data-testid="reels-generator-page">
       {/* Header */}
       <div className="animate-fade-up">
@@ -160,11 +193,10 @@ export default function ReelsGeneratorPage() {
         {/* ── Form ── */}
         <div className="lg:col-span-2 space-y-4 animate-fade-up min-w-0">
 
-          {/* SECTION 1: PRODUCT */}
+          {/* 01 FOTO PRODUK */}
           <div className="feedify-card p-5 sm:p-6 space-y-4">
             <SectionHeader num="01" icon={<ImageIcon size={15} weight="duotone" />} title="Foto Produk" />
 
-            {/* Upload area */}
             <div
               onClick={() => fileInputRef.current?.click()}
               onDrop={handleDrop}
@@ -172,16 +204,14 @@ export default function ReelsGeneratorPage() {
               onDragLeave={() => setIsDragging(false)}
               data-testid="reels-image-upload"
               className={`relative cursor-pointer rounded-2xl border-2 border-dashed transition-all ${
-                isDragging ? "border-brand bg-brand-sand/50" : imagePreview ? "border-brand/40 bg-brand-sand/20" : "border-stone-200 hover:border-brand/40 hover:bg-brand-sand/20"
+                isDragging ? "border-brand bg-brand-sand/50"
+                : imagePreview ? "border-brand/40 bg-brand-sand/20"
+                : "border-stone-200 hover:border-brand/40 hover:bg-brand-sand/20"
               }`}
             >
               {imagePreview ? (
                 <div className="relative">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full max-h-72 object-contain rounded-2xl p-3"
-                  />
+                  <img src={imagePreview} alt="Preview" className="w-full max-h-72 object-contain rounded-2xl p-3" />
                   <div className="absolute bottom-3 right-3">
                     <span className="bg-brand/80 text-brand-cream text-[10px] font-bold uppercase tracking-[0.15em] px-3 py-1 rounded-full">
                       Ganti Foto
@@ -217,7 +247,7 @@ export default function ReelsGeneratorPage() {
             )}
           </div>
 
-          {/* SECTION 2: VIDEO GOAL */}
+          {/* 02 TUJUAN VIDEO */}
           <div className="feedify-card p-5 sm:p-6 space-y-4">
             <SectionHeader num="02" icon={<Notepad size={15} weight="duotone" />} title="Tujuan Video" />
 
@@ -239,34 +269,31 @@ export default function ReelsGeneratorPage() {
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-brand-sand/50 border border-brand-sand text-sm">
                 <Sparkle size={13} weight="fill" className="text-brand-gold flex-shrink-0" />
                 <span className="text-stone-600">
-                  GPT Video Director akan menyesuaikan gerakan kamera dan suasana untuk iklan <strong className="text-brand">{selectedGoal.label}</strong>
+                  Feedify akan menyesuaikan gerakan kamera dan suasana untuk iklan{" "}
+                  <strong className="text-brand">{selectedGoal.label}</strong>
                 </span>
               </div>
             )}
           </div>
 
-          {/* SECTION 3: VIDEO SETTINGS */}
+          {/* 03 PENGATURAN VIDEO */}
           <div className="feedify-card p-5 sm:p-6 space-y-5">
             <SectionHeader num="03" icon={<VideoCamera size={15} weight="duotone" />} title="Pengaturan Video" />
 
             {/* Duration */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-400 mb-2.5 block flex items-center gap-1.5">
+              <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-400 mb-2.5 flex items-center gap-1.5">
                 <Clock size={12} weight="duotone" /> Durasi
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {DURATIONS.map(d => (
-                  <button
-                    key={d.value}
-                    type="button"
-                    data-testid={`reels-duration-${d.value}`}
+                  <button key={d.value} type="button" data-testid={`reels-duration-${d.value}`}
                     onClick={() => upd("duration", d.value)}
                     className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition-all ${
                       form.duration === d.value
                         ? "bg-brand border-brand text-brand-cream"
                         : "bg-white border-stone-200 text-stone-600 hover:border-stone-300"
-                    }`}
-                  >
+                    }`}>
                     <span className="font-heading font-bold text-base leading-none">{d.label}</span>
                     <span className={`text-[10px] leading-none ${form.duration === d.value ? "text-brand-cream/70" : "text-stone-400"}`}>{d.desc}</span>
                   </button>
@@ -276,38 +303,129 @@ export default function ReelsGeneratorPage() {
 
             {/* Aspect Ratio */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-400 mb-2.5 block flex items-center gap-1.5">
-                <FrameCorners size={12} weight="duotone" /> Aspect Ratio
+              <label className="text-[10px] font-semibold uppercase tracking-[0.15em] text-stone-400 mb-2.5 flex items-center gap-1.5">
+                <FrameCorners size={12} weight="duotone" /> Format Video
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {ASPECT_RATIOS.map(r => {
                   const active = form.aspect_ratio === r.value;
+                  const maxW = 24, maxH = 28;
+                  const scale = Math.min(maxW / r.w, maxH / r.h);
+                  const fw = Math.round(r.w * scale);
+                  const fh = Math.round(r.h * scale);
                   return (
-                    <button
-                      key={r.value}
-                      type="button"
+                    <button key={r.value} type="button"
                       data-testid={`reels-ratio-${r.value.replace(":", "-")}`}
                       onClick={() => upd("aspect_ratio", r.value)}
-                      className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 transition-all ${
-                        active ? "bg-brand border-brand text-brand-cream" : "bg-white border-stone-200 text-stone-600 hover:border-stone-300"
-                      }`}
-                    >
-                      {/* Shape visual indicator */}
-                      <div className={`${r.boxW} ${r.boxH} rounded-sm border-2 flex-shrink-0 ${
-                        active ? "border-brand-gold bg-brand-gold/30" : "border-stone-400 bg-stone-100"
-                      }`} />
-                      <span className="font-bold text-[11px] leading-none">{r.label}</span>
-                      <span className={`text-[9px] leading-none text-center ${active ? "text-brand-cream/70" : "text-stone-400"}`}>{r.desc}</span>
+                      className={`relative flex flex-col items-center gap-2 py-3 px-2 rounded-xl border-2 transition-all ${
+                        active ? "border-brand bg-brand-sand" : "border-stone-100 bg-white hover:border-brand/30"
+                      }`}>
+                      {r.recommended && (
+                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">Rekomen</span>
+                      )}
+                      <div className="flex items-center justify-center" style={{ width: 28, height: 30 }}>
+                        <div className={`relative rounded-[3px] border-2 overflow-hidden transition-colors ${active ? "border-brand" : "border-stone-300"}`}
+                          style={{ width: fw, height: fh, background: active ? "rgba(11,61,46,0.1)" : "#f5f5f4" }}>
+                          <div className="absolute inset-0 flex flex-col justify-end p-[2px] gap-[1.5px]">
+                            <div className={`rounded-full ${active ? "bg-brand/30" : "bg-stone-300"}`} style={{ height: 1.5 }} />
+                            <div className={`rounded-full w-3/4 ${active ? "bg-brand/20" : "bg-stone-200"}`} style={{ height: 1 }} />
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`font-bold text-[11px] leading-none ${active ? "text-brand" : "text-stone-600"}`}>{r.label}</span>
+                      <span className={`text-[9px] leading-none text-center ${active ? "text-brand/60" : "text-stone-400"}`}>{r.desc}</span>
                     </button>
                   );
                 })}
               </div>
-              {form.aspect_ratio === "4:5" && (
-                <p className="text-[10px] text-stone-400 mt-2 text-center">
-                  4:5 akan dirender dalam format 9:16 oleh Kling AI
-                </p>
+            </div>
+          </div>
+
+          {/* 04 VIDEO DIRECTOR */}
+          <div className="feedify-card p-5 sm:p-6 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <span className="text-[10px] font-bold text-brand-light font-mono">04</span>
+              <span className="text-brand"><Sparkle size={15} weight="duotone" /></span>
+              <h3 className="font-heading text-base font-bold text-brand">Video Director</h3>
+              <span className="ml-auto text-[10px] text-stone-400 bg-stone-100 px-2.5 py-0.5 rounded-full font-semibold">Opsional</span>
+            </div>
+
+            <p className="text-xs text-stone-500 -mt-1">
+              Tulis jika ada keinginan khusus. Kosongkan jika ingin Feedify menentukan semuanya secara otomatis.
+            </p>
+
+            {/* Textarea */}
+            <div className="relative">
+              <textarea
+                value={directorNotes}
+                onChange={(e) => setDirectorNotes(e.target.value)}
+                rows={4}
+                data-testid="reels-director-notes"
+                className="input w-full resize-none"
+                placeholder={"Contoh:\n• buat seperti iklan Apple\n• kamera bergerak pelan mengelilingi produk\n• nuansa premium hitam emas\n• fokus memperlihatkan tekstur produk"}
+              />
+              {directorNotes.trim() && (
+                <button type="button" onClick={() => setDirectorNotes("")}
+                  className="absolute top-2.5 right-2.5 text-stone-300 hover:text-stone-400 transition-colors">
+                  <XCircle size={15} weight="fill" />
+                </button>
               )}
             </div>
+
+            {/* Quick Ideas + Acak Ide */}
+            <div className="flex flex-wrap items-center gap-2">
+              {QUICK_IDEAS.map(({ emoji, label, value }) => (
+                <button key={label} type="button"
+                  data-testid={`quick-idea-${label.replace(/\s+/g, "-").toLowerCase()}`}
+                  onClick={() => pickIdea(value)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all ${
+                    directorNotes === value
+                      ? "bg-brand text-brand-cream border-brand"
+                      : "bg-white border-stone-200 text-stone-600 hover:border-brand/30 hover:text-brand"
+                  }`}>
+                  <span>{emoji}</span> {label}
+                </button>
+              ))}
+              <button type="button" onClick={randomIdea} data-testid="random-idea-btn"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border border-dashed border-brand-gold text-brand-gold hover:bg-brand-gold/10 transition-all">
+                <Sparkle size={12} weight="fill" /> Acak Ide
+              </button>
+            </div>
+          </div>
+
+          {/* Feedify akan otomatis */}
+          <div className="rounded-2xl border border-green-100 p-5 bg-gradient-to-br from-green-50/60 to-white" data-testid="reels-ai-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkle size={14} weight="fill" className="text-brand-gold" />
+              <p className="text-sm font-semibold text-brand">Feedify akan otomatis</p>
+            </div>
+            <div className="space-y-2">
+              {[
+                "Menganalisis foto produk untuk memahami karakter visual",
+                "Menyusun prompt sinematik dengan GPT-4o Video Director",
+                "Menyesuaikan gerakan kamera dan pencahayaan otomatis",
+                "Menghasilkan video dengan Kling v2.5 resolusi tinggi",
+                "Menghasilkan video siap upload ke Reels, TikTok, atau WA Status",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-2.5">
+                  <CheckCircle size={14} weight="fill" className="text-green-500 flex-shrink-0" />
+                  <span className="text-xs text-stone-600">{item}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-stone-400 mt-4">⏱ Estimasi proses ±60–120 detik.</p>
+          </div>
+
+          {/* Desktop Generate Button */}
+          <div className="hidden lg:block space-y-2 pt-1">
+            <button onClick={generate} disabled={generating || !image} data-testid="reels-generate-btn-desktop"
+              className="w-full py-3.5 rounded-full font-heading font-bold text-base flex items-center justify-center gap-2 transition-all btn-lift disabled:opacity-50 disabled:cursor-not-allowed bg-brand text-brand-cream hover:bg-brand-light shadow-md shadow-brand/20">
+              {generating ? (
+                <><CircleNotch size={18} className="animate-spin" /> Sedang render video...</>
+              ) : (
+                <><FilmSlate size={18} weight="fill" /> Generate Video · {CREDITS_PER_VIDEO} Kredit</>
+              )}
+            </button>
           </div>
         </div>
 
@@ -318,10 +436,13 @@ export default function ReelsGeneratorPage() {
             <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold flex items-center gap-1.5">
               <FilmSlate size={13} weight="duotone" /> Video Brief
             </div>
-            <BriefRow label="Foto" value={image ? image.name.slice(0, 20) + (image.name.length > 20 ? "…" : "") : "Belum diupload"} empty={!image} />
-            <BriefRow label="Tujuan" value={selectedGoal?.label || "—"} />
-            <BriefRow label="Durasi" value={`${form.duration} detik`} />
-            <BriefRow label="Rasio" value={`${form.aspect_ratio} · ${selectedRatio?.desc}`} />
+            <BriefRow label="Foto"    value={image ? image.name.slice(0, 20) + (image.name.length > 20 ? "…" : "") : "Belum diupload"} empty={!image} />
+            <BriefRow label="Tujuan"  value={selectedGoal?.label || "—"} />
+            <BriefRow label="Durasi"  value={`${form.duration} detik`} />
+            <BriefRow label="Format"  value={`${form.aspect_ratio} · ${selectedRatio?.desc}`} />
+            {directorNotes.trim() && (
+              <BriefRow label="Arahan" value={directorNotes.slice(0, 24) + (directorNotes.length > 24 ? "…" : "")} />
+            )}
             <div className="border-t border-stone-100 pt-2 mt-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-stone-400">Biaya Generate</span>
@@ -332,40 +453,13 @@ export default function ReelsGeneratorPage() {
             </div>
           </div>
 
-          {/* Pipeline info */}
-          <div className="feedify-card p-4 space-y-2.5">
-            <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold">Pipeline</div>
-            {[
-              { step: "GPT-4o Vision", desc: "Analisis produk + brief sinematik" },
-              { step: "Kling AI v2.5", desc: "Render video dari foto" },
-            ].map((s, i) => (
-              <div key={i} className="flex items-start gap-2.5">
-                <div className="h-5 w-5 rounded-full bg-brand/10 border border-brand/20 text-brand text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</div>
-                <div>
-                  <div className="text-xs font-semibold text-stone-700">{s.step}</div>
-                  <div className="text-[10px] text-stone-400">{s.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Generate Button */}
-          <button
-            onClick={generate}
-            disabled={generating || !image}
-            data-testid="reels-generate-btn"
-            className="w-full py-4 rounded-2xl font-heading font-bold text-base flex items-center justify-center gap-2 transition-all shadow-lg btn-lift disabled:opacity-50 disabled:cursor-not-allowed bg-brand text-brand-cream hover:bg-brand-light shadow-brand/20"
-          >
+          {/* Sidebar Generate Button (desktop only — also shown here for easy access) */}
+          <button onClick={generate} disabled={generating || !image} data-testid="reels-generate-btn"
+            className="w-full py-4 rounded-2xl font-heading font-bold text-base flex items-center justify-center gap-2 transition-all shadow-lg btn-lift disabled:opacity-50 disabled:cursor-not-allowed bg-brand text-brand-cream hover:bg-brand-light shadow-brand/20">
             {generating ? (
-              <>
-                <CircleNotch size={20} className="animate-spin" />
-                Generating...
-              </>
+              <><CircleNotch size={20} className="animate-spin" /> Generating...</>
             ) : (
-              <>
-                <FilmSlate size={20} weight="fill" />
-                Generate Video · {CREDITS_PER_VIDEO} Kredit
-              </>
+              <><FilmSlate size={20} weight="fill" /> Generate Video · {CREDITS_PER_VIDEO} Kredit</>
             )}
           </button>
 
@@ -379,12 +473,25 @@ export default function ReelsGeneratorPage() {
               <p className="text-[10px] text-stone-400 mt-2">
                 Estimasi waktu: 1–3 menit. Jangan tutup halaman ini.
               </p>
-              {/* Progress bar */}
               <div className="mt-3 h-1 bg-stone-100 rounded-full overflow-hidden">
                 <div className="h-full bg-brand/60 rounded-full animate-pulse w-2/3" />
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ── Mobile Sticky Bar ── */}
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-50 backdrop-blur-md border-t border-stone-200"
+        style={{ background: "rgba(242,246,244,0.94)" }}>
+        <div className="max-w-4xl mx-auto px-4 py-2.5">
+          <button onClick={generate} disabled={generating || !image} data-testid="reels-generate-btn-mobile"
+            className="w-full h-11 bg-brand text-brand-cream rounded-full font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 shadow-md shadow-brand/20 btn-lift transition-colors">
+            {generating
+              ? <><CircleNotch size={15} className="animate-spin" /> Sedang render video...</>
+              : <><FilmSlate size={15} weight="fill" /> Generate Video · {CREDITS_PER_VIDEO} Kredit</>
+            }
+          </button>
         </div>
       </div>
 
@@ -404,33 +511,20 @@ export default function ReelsGeneratorPage() {
             <div className="lg:col-span-2">
               <div className="feedify-card p-4">
                 <div className={`${ratioContainerClass} mx-auto rounded-2xl overflow-hidden bg-stone-900`}>
-                  <video
-                    src={result.video_url}
-                    controls
-                    autoPlay
-                    loop
-                    playsInline
-                    className="w-full h-full object-contain"
-                    data-testid="reels-video-player"
-                  />
+                  <video src={result.video_url} controls autoPlay loop playsInline
+                    className="w-full h-full object-contain" data-testid="reels-video-player" />
                 </div>
 
                 <div className="flex gap-2 mt-4 justify-center">
-                  <a
-                    href={result.video_url}
+                  <a href={result.video_url}
                     download={`feedify-reels-${result.id?.slice(0, 8)}.mp4`}
-                    target="_blank"
-                    rel="noreferrer"
+                    target="_blank" rel="noreferrer"
                     data-testid="reels-download-btn"
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-brand text-brand-cream rounded-full font-bold text-sm hover:bg-brand-light transition-all btn-lift"
-                  >
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-brand text-brand-cream rounded-full font-bold text-sm hover:bg-brand-light transition-all btn-lift">
                     <DownloadSimple size={15} weight="bold" /> Download Video
                   </a>
-                  <button
-                    onClick={reset}
-                    data-testid="reels-new-btn"
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-white border border-stone-200 text-stone-700 rounded-full font-semibold text-sm hover:border-stone-300 transition-all"
-                  >
+                  <button onClick={reset} data-testid="reels-new-btn"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-white border border-stone-200 text-stone-700 rounded-full font-semibold text-sm hover:border-stone-300 transition-all">
                     <ArrowsClockwise size={14} weight="bold" /> Buat Baru
                   </button>
                 </div>
@@ -441,10 +535,10 @@ export default function ReelsGeneratorPage() {
             <div className="space-y-4">
               <div className="feedify-card p-4 space-y-3">
                 <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold">Detail Video</div>
-                <BriefRow label="Tujuan"  value={result.video_goal_label} />
-                <BriefRow label="Durasi"  value={`${result.duration} detik`} />
-                <BriefRow label="Rasio"   value={result.aspect_ratio} />
-                <BriefRow label="Provider" value="Kling AI v2.5" />
+                <BriefRow label="Tujuan"   value={result.video_goal_label} />
+                <BriefRow label="Durasi"   value={`${result.duration} detik`} />
+                <BriefRow label="Format"   value={result.aspect_ratio} />
+                <BriefRow label="Provider" value="Kling v2.5" />
               </div>
 
               {isAdmin && result.prompt_used && (
@@ -474,6 +568,8 @@ export default function ReelsGeneratorPage() {
         </div>
       )}
     </div>
+    <NoCreditsModal open={noCredits} onClose={() => setNoCredits(false)} />
+    </>
   );
 }
 

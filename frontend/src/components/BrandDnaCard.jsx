@@ -3,24 +3,42 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { Pencil } from "@phosphor-icons/react";
 
+const BRAND_CACHE_KEY = "feedify_brand_cache";
+
+function getCached() {
+  try { return JSON.parse(localStorage.getItem(BRAND_CACHE_KEY)); } catch { return null; }
+}
+
 export default function BrandDnaCard() {
-  const [brand, setBrand] = useState(null);
-  useEffect(() => { api.get("/brand-profile").then(({ data }) => setBrand(data)).catch(() => {}); }, []);
+  const [brand, setBrand] = useState(getCached);
+
+  useEffect(() => {
+    api.get("/brand-profile").then(({ data }) => {
+      setBrand(data);
+      localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(data));
+    }).catch(() => {});
+  }, []);
+
   if (!brand) return null;
+
   return (
     <div className="feedify-card p-5" data-testid="brand-dna-card">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold">Brand DNA aktif</div>
-        <Link to="/settings" data-testid="edit-brand-quick" className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-brand hover:bg-brand-sand rounded-full uppercase tracking-wider">
+        <Link to="/settings" data-testid="edit-brand-quick"
+          className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-brand hover:bg-brand-sand rounded-full uppercase tracking-wider">
           <Pencil size={11} weight="bold" /> Edit
         </Link>
       </div>
       <div className="flex items-center gap-3">
-        <div className="h-11 w-11 rounded-xl border border-brand-sand overflow-hidden flex items-center justify-center flex-shrink-0" style={{ background: brand.color_secondary || "#FDFBF7" }}>
+        <div className="h-11 w-11 rounded-xl border border-brand-sand overflow-hidden flex items-center justify-center flex-shrink-0"
+          style={{ background: brand.color_secondary || "#FDFBF7" }}>
           {brand.logo_base64 ? (
             <img src={brand.logo_base64} alt="logo" className="h-full w-full object-cover" />
           ) : (
-            <span className="font-heading font-bold text-lg" style={{ color: brand.color_primary }}>{(brand.brand_name?.[0] || "?").toUpperCase()}</span>
+            <span className="font-heading font-bold text-lg" style={{ color: brand.color_primary }}>
+              {(brand.brand_name?.[0] || "?").toUpperCase()}
+            </span>
           )}
         </div>
         <div className="flex-1 min-w-0">
@@ -43,12 +61,12 @@ export default function BrandDnaCard() {
 }
 
 const ARCHETYPE_LABELS = {
-  expert: "The Expert",
-  friend: "The Friend",
-  rebel: "The Rebel",
+  expert:    "The Expert",
+  friend:    "The Friend",
+  rebel:     "The Rebel",
   caregiver: "The Caregiver",
-  luxury: "The Luxury Icon",
+  luxury:    "The Luxury Icon",
   innovator: "The Innovator",
-  everyman: "The Everyman",
+  everyman:  "The Everyman",
 };
 function archetypeLabel(id) { return ARCHETYPE_LABELS[id] || id; }

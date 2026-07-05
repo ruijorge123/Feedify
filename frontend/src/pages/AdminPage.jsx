@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
+import { invalidateMenuLockCache } from "@/lib/menuLock";
 import { toast } from 'react-toastify';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
@@ -732,6 +733,7 @@ function MenuLockdownPanel() {
     try {
       await api.post("/admin/menu-lockdown", { menu_key: key, mode });
       setMenus((prev) => ({ ...prev, [key]: { ...prev[key], mode } }));
+      invalidateMenuLockCache();
       toast.success(`${menus[key].label} → ${MODE_META[mode].label}`);
       setConfirmTarget(null);
     } catch { toast.error("Gagal mengubah status menu"); }

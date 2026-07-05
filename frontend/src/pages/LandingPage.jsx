@@ -20,9 +20,11 @@ export default function LandingPage() {
       <main>
         <DarkHero />
         <Marquee />
+        <PainAgitation />
         <Transformation />
         <HowItWorks />
         <Bento />
+        <ComparisonTable />
         <Testimonials />
         <Pricing />
         <SupportChat />
@@ -85,32 +87,32 @@ function DarkHero() {
 
         {/* Main headline — HUGE */}
         <h1
-          className="font-heading font-bold text-white tracking-[-0.04em] leading-[0.9] max-w-[16ch]"
-          style={{ fontSize: "clamp(3rem, 9vw, 8.5rem)" }}
+          className="font-heading font-bold text-white tracking-[-0.04em] leading-[0.92] max-w-[18ch]"
+          style={{ fontSize: "clamp(2.6rem, 8vw, 7.5rem)" }}
           data-testid="hero-headline"
         >
-          Konten brand yang bikin orang{" "}
-          <span className="text-brand-gold italic font-medium">berhenti scroll.</span>
+          Capek mikir konten tiap hari,<br />
+          tapi feed tetap{" "}
+          <span className="text-brand-gold italic font-medium">sepi?</span>
         </h1>
 
         {/* Sub + CTA row */}
         <div className="mt-10 lg:mt-14 flex flex-col lg:flex-row lg:items-end gap-8 lg:gap-16">
-          <div className="max-w-md">
+          <div className="max-w-lg">
             <p className="text-white/60 leading-relaxed text-base lg:text-lg" data-testid="hero-sub">
-              Calon pembeli menilai brand kamu dalam 3 detik pertama.
-              Feedify pastikan 3 detik itu selalu berkesan — visual profesional,
-              konsisten, siap posting. Cukup ceritakan brandmu, sisanya kami yang kerjakan.
+              Setiap hari mikirin mau posting apa. Foto produk seadanya. Feed berantakan.
+              Sementara kompetitor makin rapi dan laku. Feedify ubah itu — konten brand
+              profesional, konsisten, siap posting dalam 30 detik.
             </p>
             <div className="mt-8 flex items-center gap-4 flex-wrap">
               <a href="#pricing" data-testid="hero-cta"
                 className="inline-flex items-center gap-2 px-7 py-4 bg-brand-gold text-brand hover:bg-brand-amber rounded-full font-bold text-base shadow-2xl shadow-brand-gold/25 btn-lift">
-                Lihat Paket & Mulai <ArrowRight size={18} weight="bold" />
+                Mulai Sekarang <ArrowRight size={18} weight="bold" />
               </a>
-              <Link to="/login" data-testid="hero-cta-secondary"
+              <a href="#pain" data-testid="hero-cta-secondary"
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/50 hover:text-white transition-colors">
-                Sudah punya akun?
-                <ArrowUpRight size={14} weight="bold" />
-              </Link>
+                Lihat Contoh Hasil ↓
+              </a>
             </div>
           </div>
 
@@ -219,7 +221,7 @@ function Marquee() {
 /* ============ TRANSFORMATION ============ */
 function Transformation() {
   return (
-    <section className="relative overflow-hidden bg-brand" data-testid="transformation">
+    <section id="pain" className="relative overflow-hidden bg-brand" data-testid="transformation">
       {/* Subtle texture */}
       <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "32px 32px" }} />
       <div className="absolute top-0 right-0 w-[50vw] h-[60vh] rounded-full bg-brand-gold/8 blur-[120px] pointer-events-none" />
@@ -231,6 +233,7 @@ function Transformation() {
           <div className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full bg-brand-gold/15 border border-brand-gold/25 text-brand-gold text-[10px] font-bold uppercase tracking-[0.2em]">
             <Sparkle size={10} weight="fill" /> Hasil nyata
           </div>
+          <p className="text-brand-cream/50 text-sm font-semibold uppercase tracking-[0.15em] mb-3">Ini yang berubah setelah pakai Feedify:</p>
           <h2 className="font-heading font-bold text-brand-cream leading-[1.0] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 5.5vw, 4.5rem)" }}>
             Ribuan orang scroll feed-mu<br />
             setiap hari —<br />
@@ -368,7 +371,7 @@ function Bento() {
         <div className="max-w-3xl mb-16 lg:mb-20">
           <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Yang Anda dapat</div>
           <h2 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95]" style={{ fontSize: "clamp(2rem, 5.5vw, 4.5rem)" }}>
-            Tujuh dashboard. <br /><span className="italic font-medium text-brand-light">Satu sistem brand yang utuh.</span>
+            10 dashboard. <br /><span className="italic font-medium text-brand-light">Satu sistem brand yang utuh.</span>
           </h2>
         </div>
         <div className="grid grid-cols-6 gap-4 lg:gap-5 auto-rows-[minmax(180px,auto)]">
@@ -397,10 +400,13 @@ function Bento() {
           <BentoTile testid="bento-banner" tag="Generator" title="Feed Post & Banner" desc="5 style preset, 5 placement, 4 aspect ratio. Visual setara brief art director." span="col-span-3 lg:col-span-2" />
           <BentoTile testid="bento-carousel" tag="Generator" title="Carousel Storytelling" desc="3–7 slide dengan role: hook, problem, solution, CTA — narasi siap pakai." span="col-span-3 lg:col-span-2" />
           <BentoTile testid="bento-copy" tag="Feedify Text" title="Copywriting Bahasa Indonesia" desc="Headline, 3 gaya caption, CTA, hashtag, hook lines. Natural & persuasif." span="col-span-6 lg:col-span-3" accent />
-          <BentoTile testid="bento-food" tag="Khusus F&B" title="F&B Menu Visual" desc="Food photography prompt. 5 mood, 4 layout — warung, café, frozen food." span="col-span-3 lg:col-span-3" />
-          <BentoTile testid="bento-grid" tag="Planning" title="Feed Grid Planner" desc="3×3 layout dengan drag-drop + color tagging. Visualisasi feed sebelum posting." span="col-span-3 lg:col-span-2" />
+          <BentoTile testid="bento-marketplace" tag="E-Commerce" title="Marketplace Product Photo" desc="Foto produk siap upload Tokopedia & Shopee. Background bersih, pencahayaan premium." span="col-span-6 lg:col-span-3" />
+          <BentoTile testid="bento-studio" tag="Commercial AI" title="Studio Commercial" desc="Sesi foto produk virtual bergaya brand besar — tanpa fotografer, tanpa studio fisik." span="col-span-3 lg:col-span-2" />
+          <BentoTile testid="bento-reels" tag="Video AI" title="Reels Video Generator" desc="Ubah foto produk jadi video iklan sinematik. Powered by Kling AI." span="col-span-3 lg:col-span-2" />
+          <BentoTile testid="bento-growth" tag="AI Consultant" title="Growth Consultant AI" desc="Analisis bisnis, strategi konten, dan rekomendasi tindakan dari AI business coach." span="col-span-6 lg:col-span-2" />
           <BentoTile testid="bento-consistency" tag="QA · Feedify Vision" title="Consistency Checker" desc="Upload hasil Feedify, dapat skor konsistensi vs Brand DNA + saran perbaikan." span="col-span-3 lg:col-span-2" />
-          <BentoTile testid="bento-calendar" tag="Planning" title="Calendar Planner" desc="Jadwalkan konten ke kalender, notifikasi pengingat via WA atau Telegram." span="col-span-6 lg:col-span-2" />
+          <BentoTile testid="bento-calendar" tag="Planning" title="Calendar Planner" desc="Jadwalkan konten ke kalender, notifikasi pengingat via WA atau Telegram." span="col-span-3 lg:col-span-2" />
+          <BentoTile testid="bento-grid" tag="Planning" title="Feed Grid Planner" desc="3×3 layout dengan drag-drop + color tagging. Visualisasi feed sebelum posting." span="col-span-6 lg:col-span-2" />
         </div>
       </div>
     </section>
@@ -536,18 +542,35 @@ function Pricing() {
       <div className="max-w-[1280px] mx-auto px-5 lg:px-10 text-center">
         <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Harga</div>
         <h2 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95] mb-4" style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}>
-          Mulai dari <span className="text-brand-gold">Rp 1.500</span> per konten.
+          Mulai dari <span className="text-brand-gold">Rp 1.300</span> per konten.
         </h2>
-        <p className="text-stone-500 text-base lg:text-lg max-w-2xl mx-auto mb-4 leading-relaxed">
+        <p className="text-stone-500 text-base lg:text-lg max-w-2xl mx-auto mb-8 leading-relaxed">
           Konten yang tidak konsisten bikin calon pembeli ragu — bahkan sebelum mereka lihat produknya.
-          Feedify hasilkan visual profesional dalam 30 detik, sesuai brand Anda, mulai Rp 1.500 per foto.
+          Feedify hasilkan visual profesional dalam 30 detik, sesuai brand Anda, mulai Rp 1.300 per foto.
         </p>
-        <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-stone-400 mb-10">
-          <span>❖ Tidak ada langganan bulanan</span>
-          <span>❖ Kredit tidak pernah expired</span>
-          <span>❖ Akses penuh semua fitur</span>
-          <span>❖ Bayar sesuai kebutuhan</span>
+
+        {/* Risk reversal badges */}
+        <div className="inline-flex flex-col items-start gap-2 mb-10 text-left mx-auto">
+          {[
+            "Tanpa langganan bulanan · bayar sesuai pakai",
+            "Kredit tidak pernah expired",
+            "Kalau generate gagal, kredit balik otomatis",
+            "Akses semua fitur sejak kredit pertama",
+          ].map((line) => (
+            <div key={line} className="flex items-center gap-2.5 text-sm text-stone-600">
+              <div className="w-5 h-5 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center flex-shrink-0">
+                <span className="text-brand text-[10px] font-bold">✓</span>
+              </div>
+              {line}
+            </div>
+          ))}
         </div>
+
+        {/* Urgency */}
+        <p className="text-xs text-stone-400 mb-5 italic">
+          Setiap hari nunda = kompetitormu makin jauh di depan.
+        </p>
+
         <Link to="/pricing" data-testid="go-to-pricing"
           className="inline-flex items-center gap-2.5 px-10 py-4 bg-brand text-brand-cream hover:bg-brand-light rounded-full font-bold text-lg shadow-xl shadow-brand/20 btn-lift">
           Lihat Paket &amp; Harga <ArrowRight size={20} weight="bold" />
@@ -581,6 +604,193 @@ function SupportChat() {
   );
 }
 
+
+/* ============ PAIN AGITATION ============ */
+const PAIN_POINTS = [
+  "😩 Tiap hari bingung mau posting apa",
+  "📉 Feed berantakan, warna nggak konsisten",
+  "📸 Foto produk terlihat murahan & seadanya",
+  "💸 Mau sewa fotografer/agency, tapi mahal (Rp 500rb–1jt/bulan)",
+  "🤳 Nggak punya model buat promosi produk",
+  "⏰ Waktu habis buat edit, jualan malah keteteran",
+  "😔 Udah posting rutin tapi tetap sepi pembeli",
+  "🎨 Nggak ngerti desain, hasil selalu kelihatan amatir",
+];
+
+function PainAgitation() {
+  return (
+    <section
+      className="relative py-20 lg:py-28 overflow-hidden"
+      style={{ background: "linear-gradient(180deg, #FFFAF5 0%, #FFF5EC 100%)" }}
+      data-testid="pain-agitation"
+    >
+      {/* Subtle warm texture */}
+      <div className="absolute inset-0 opacity-[0.025]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #c28e6e 1px, transparent 0)", backgroundSize: "28px 28px" }} />
+
+      <div className="relative max-w-[1280px] mx-auto px-5 lg:px-10">
+
+        {/* Header */}
+        <div className="text-center mb-12 lg:mb-16">
+          <h2
+            className="font-heading font-bold text-brand tracking-[-0.03em] leading-[1.05]"
+            style={{ fontSize: "clamp(1.8rem, 4.5vw, 3.5rem)" }}
+          >
+            Kalau kamu ngalamin ini,<br />
+            kamu nggak sendirian 👇
+          </h2>
+        </div>
+
+        {/* Pain grid */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-14 lg:mb-16">
+          {PAIN_POINTS.map((pain) => (
+            <div
+              key={pain}
+              className="bg-white rounded-2xl px-5 py-4 border border-rose-100 shadow-sm flex items-start gap-3 group hover:border-rose-200 hover:shadow-md transition-all duration-200"
+            >
+              <div className="w-7 h-7 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center flex-shrink-0 mt-0.5 text-sm">
+                ✕
+              </div>
+              <p className="text-sm text-stone-700 leading-snug font-medium">{pain}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Transition text */}
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="rounded-3xl border border-amber-200 bg-amber-50/80 px-8 py-8 mb-8">
+            <p className="text-stone-700 leading-relaxed text-base lg:text-lg">
+              Masalahnya bukan produkmu jelek.{" "}
+              <br className="hidden sm:block" />
+              Masalahnya calon pembeli menilai dari tampilan dulu — dan tampilan yang
+              berantakan bikin mereka <strong>scroll pergi sebelum lihat produkmu.</strong>
+            </p>
+            <p className="mt-4 font-heading font-bold text-brand text-lg lg:text-xl">
+              Feedify hadir untuk mastiin itu nggak kejadian lagi.
+            </p>
+          </div>
+          <a
+            href="#pricing"
+            className="inline-flex items-center gap-2.5 px-8 py-4 bg-brand text-brand-cream hover:bg-brand-light rounded-full font-bold text-base shadow-lg shadow-brand/20 btn-lift"
+          >
+            Aku Mau Konten yang Rapi <ArrowRight size={18} weight="bold" />
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ============ COMPARISON TABLE ============ */
+const COMPARISON_ROWS = [
+  { label: "Biaya",        agency: "Rp 500rb–1jt/bln", diy: "Gratis tapi capek",     feedify: "Mulai Rp 1.300/konten" },
+  { label: "Waktu",        agency: "Nunggu revisi",    diy: "Berjam-jam",            feedify: "30 detik" },
+  { label: "Konsistensi",  agency: "Tergantung PIC",   diy: "Susah dijaga",          feedify: "Otomatis on-brand" },
+  { label: "Skill",        agency: "—",                diy: "Harus bisa desain",     feedify: "Nggak perlu" },
+  { label: "Kontrol",      agency: "Terbatas",         diy: "Penuh tapi ribet",      feedify: "Penuh & mudah" },
+];
+
+function ComparisonTable() {
+  return (
+    <section className="relative py-20 lg:py-28 bg-brand-cream border-y border-brand-sand" data-testid="comparison-table">
+      <div className="max-w-[1280px] mx-auto px-5 lg:px-10">
+
+        {/* Header */}
+        <div className="max-w-2xl mb-12 lg:mb-16">
+          <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Perbandingan</div>
+          <h2
+            className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95]"
+            style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}
+          >
+            Feedify vs{" "}
+            <span className="italic font-medium text-brand-light">Cara Lama</span>
+          </h2>
+        </div>
+
+        {/* Mobile: label + Feedify only, 2 columns, no scroll */}
+        <div className="lg:hidden">
+          {/* Header */}
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="rounded-2xl px-4 py-3 bg-white border border-brand-sand text-center">
+              <div className="font-heading font-bold text-sm text-brand">Cara Lama</div>
+              <div className="text-[10px] text-stone-400 mt-0.5">Agency / manual</div>
+            </div>
+            <div className="rounded-2xl px-4 py-3 bg-brand text-center shadow-lg shadow-brand/20">
+              <div className="font-heading font-bold text-sm text-brand-cream">Feedify</div>
+              <div className="text-[10px] text-brand-cream/60 mt-0.5">AI Brand Studio</div>
+              <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-gold/20 text-brand-gold text-[9px] font-bold uppercase tracking-wider">
+                ✦ Terbaik
+              </div>
+            </div>
+          </div>
+
+          {/* Rows */}
+          {COMPARISON_ROWS.map(({ label, agency, feedify }, i) => (
+            <div key={label} className="grid grid-cols-2 gap-3 mb-2 items-stretch">
+              <div className={`rounded-xl px-4 py-3 ${i % 2 === 0 ? "bg-white border border-brand-sand/60" : "bg-brand-sand/30"}`}>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-stone-400 mb-1">{label}</div>
+                <div className="text-sm text-stone-500">{agency}</div>
+              </div>
+              <div className={`rounded-xl px-4 py-3 ${i % 2 === 0 ? "bg-brand/5 border border-brand/10" : "bg-brand/8 border border-brand/15"}`}>
+                <div className="text-[9px] font-bold uppercase tracking-wider text-brand-gold mb-1">{label}</div>
+                <div className="text-sm font-semibold text-brand">
+                  <span className="text-brand-gold mr-1">✓</span>{feedify}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop: full 4-column table */}
+        <div className="hidden lg:block">
+          <div className="grid grid-cols-4 gap-3 mb-3">
+            <div />
+            {[
+              { label: "Sewa Agency", sub: "Freelancer / Studio", highlight: false },
+              { label: "Edit Sendiri", sub: "Canva / manual",       highlight: false },
+              { label: "Feedify",     sub: "AI Brand Studio",       highlight: true  },
+            ].map(({ label, sub, highlight }) => (
+              <div
+                key={label}
+                className={`rounded-2xl px-4 py-3 text-center ${
+                  highlight
+                    ? "bg-brand text-brand-cream shadow-lg shadow-brand/20"
+                    : "bg-white border border-brand-sand text-brand"
+                }`}
+              >
+                <div className={`font-heading font-bold text-sm ${highlight ? "text-brand-cream" : "text-brand"}`}>{label}</div>
+                <div className={`text-[10px] mt-0.5 ${highlight ? "text-brand-cream/60" : "text-stone-400"}`}>{sub}</div>
+                {highlight && (
+                  <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-gold/20 text-brand-gold text-[9px] font-bold uppercase tracking-wider">
+                    ✦ Terbaik
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          {COMPARISON_ROWS.map(({ label, agency, diy, feedify }, i) => (
+            <div key={label} className="grid grid-cols-4 gap-3 mb-2 items-center">
+              <div className="text-xs font-bold text-stone-500 uppercase tracking-[0.12em] pl-1">{label}</div>
+              <div className={`rounded-xl px-4 py-3 text-sm text-stone-500 ${i % 2 === 0 ? "bg-white border border-brand-sand/60" : "bg-brand-sand/30"}`}>{agency}</div>
+              <div className={`rounded-xl px-4 py-3 text-sm text-stone-500 ${i % 2 === 0 ? "bg-white border border-brand-sand/60" : "bg-brand-sand/30"}`}>{diy}</div>
+              <div className={`rounded-xl px-4 py-3 text-sm font-semibold text-brand ${i % 2 === 0 ? "bg-brand/5 border border-brand/10" : "bg-brand/8 border border-brand/15"} flex items-center gap-1.5`}>
+                <span className="text-brand-gold text-xs">✓</span> {feedify}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-10 text-center">
+          <a
+            href="#pricing"
+            className="inline-flex items-center gap-2 px-7 py-3.5 bg-brand text-brand-cream hover:bg-brand-light rounded-full font-bold text-sm shadow-lg shadow-brand/20 btn-lift"
+          >
+            Coba Feedify Sekarang <ArrowRight size={16} weight="bold" />
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /* ============ FOOTER ============ */
 function Footer() {
