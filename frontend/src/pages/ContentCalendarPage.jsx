@@ -7,9 +7,9 @@ import {
   CalendarBlank, Plus, X, CaretLeft, CaretRight,
   ImageSquare, Stack, PenNib, ForkKnife, Storefront,
   Trash, CircleNotch, LightbulbFilament,
-  ArrowRight, Bell, CheckCircle, Clock, TelegramLogo,
-  WhatsappLogo, Warning, CalendarPlus, Sparkle,
-  Image, TextT, ArrowSquareOut, CaretDown, CaretUp,
+  ArrowRight, Bell, CheckCircle, Clock,
+  Warning, CalendarPlus, Sparkle,
+  Image, TextT, CaretDown, CaretUp,
 } from "@phosphor-icons/react";
 
 function pad(n) { return String(n).padStart(2, "0"); }
@@ -36,14 +36,12 @@ const EMPTY_FORM = { title: "", scheduled_date: "", prompt_id: "", notes: "", st
 function NotifPanel() {
   const [notif, setNotif] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [tgCode, setTgCode] = useState(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     api.get("/notifications/settings")
       .then(({ data }) => setNotif(data))
-      .catch(() => setNotif({ telegram_chat_id: null, whatsapp_phone: null, default_reminder_hours: 24, notifications_enabled: true }));
+      .catch(() => setNotif({ default_reminder_hours: 24, notifications_enabled: true }));
   }, []);
 
   const save = async () => {
@@ -51,13 +49,6 @@ function NotifPanel() {
     try { await api.put("/notifications/settings", notif); toast.success("Pengaturan notifikasi disimpan"); }
     catch { toast.error("Gagal menyimpan"); }
     finally { setSaving(false); }
-  };
-
-  const startTg = async () => {
-    setConnecting(true);
-    try { const { data } = await api.post("/notifications/telegram-start"); setTgCode(data); }
-    catch { toast.error("Gagal generate kode Telegram"); }
-    finally { setConnecting(false); }
   };
 
   if (!notif) return null;
@@ -115,50 +106,6 @@ function NotifPanel() {
               <option value={48}>H-2 hari sebelum posting</option>
               <option value={72}>H-3 hari sebelum posting</option>
             </select>
-          </div>
-
-          {/* Telegram */}
-          <div className="rounded-xl border border-stone-100 p-4 space-y-2.5">
-            <div className="flex items-center gap-2">
-              <TelegramLogo size={16} weight="fill" className="text-[#2AABEE]" />
-              <span className="font-semibold text-brand text-sm">Telegram</span>
-              {notif.telegram_chat_id && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Terhubung ✓</span>}
-            </div>
-            {notif.telegram_chat_id ? (
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-stone-500">Chat ID: <code className="bg-stone-100 px-1 py-0.5 rounded">{notif.telegram_chat_id}</code></div>
-                <button onClick={() => setNotif(s => ({ ...s, telegram_chat_id: null }))} className="text-xs text-red-500 hover:text-red-700 font-medium" data-testid="telegram-disconnect">Putuskan</button>
-              </div>
-            ) : tgCode ? (
-              <div className="bg-stone-50 rounded-xl p-3 space-y-1.5 text-xs text-stone-600">
-                <div className="font-medium">Cara connect:</div>
-                <div>1. Cari <strong>@{tgCode.bot_username}</strong> di Telegram</div>
-                <div>2. Kirim: <code className="bg-white border border-stone-200 px-1 py-0.5 rounded font-mono">/connect {tgCode.code}</code></div>
-                <a href={tgCode.deep_link} target="_blank" rel="noreferrer"
-                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#2AABEE] text-white rounded-full text-xs font-semibold hover:bg-[#1a96d5] mt-1">
-                  <ArrowSquareOut size={11} /> Buka Telegram
-                </a>
-              </div>
-            ) : (
-              <button onClick={startTg} disabled={connecting} data-testid="telegram-connect-btn"
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#2AABEE] text-white rounded-full text-xs font-semibold hover:bg-[#1a96d5] disabled:opacity-60">
-                {connecting ? <CircleNotch size={12} className="animate-spin" /> : <TelegramLogo size={12} weight="fill" />}
-                Hubungkan Telegram
-              </button>
-            )}
-          </div>
-
-          {/* WhatsApp */}
-          <div className="rounded-xl border border-stone-100 p-4 space-y-2.5">
-            <div className="flex items-center gap-2">
-              <WhatsappLogo size={16} weight="fill" className="text-[#25D366]" />
-              <span className="font-semibold text-brand text-sm">WhatsApp</span>
-              {notif.whatsapp_phone && <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Tersimpan ✓</span>}
-            </div>
-            <input type="tel" className="input text-sm" placeholder="628123456789"
-              value={notif.whatsapp_phone || ""}
-              onChange={e => setNotif(s => ({ ...s, whatsapp_phone: e.target.value || null }))}
-              data-testid="wa-phone-input" />
           </div>
 
           <button onClick={save} disabled={saving} data-testid="save-notif-btn"

@@ -2,13 +2,9 @@
 
 Covers new endpoints:
 - POST /api/prompt/generate-food-menu (food menu builder)
-- POST /api/consistency/check (Gemini Vision; requires brand profile)
-- GET/POST /api/grid-planner (upsert single layout per user, max 9 slots)
 - GET/POST/PATCH/DELETE /api/calendar (+ month filter)
 - GET /api/stats now includes food_menu count
 """
-import uuid
-import pytest
 import requests
 
 
@@ -70,121 +66,6 @@ class TestStatsFoodMenu:
         assert "food_menu" in s
         assert isinstance(s["food_menu"], int)
         assert s["food_menu"] >= 1  # we created one above
-
-
-# ============= CONSISTENCY CHECKER =============
-class TestConsistencyChecker:
-    def test_consistency_check_without_brand_profile_returns_400(self, session, api_url, sample_jpeg_base64):
-        # Fresh user without brand profile
-        email = f"TEST_nobrand_{uuid.uuid4().hex[:8]}@feedifyqa.io"
-        rr = session.post(f"{api_url}/auth/register",
-                          json={"email": email, "password": "Demo1234!", "name": "NoBrand"})
-        assert rr.status_code == 200
-        tok = rr.json()["token"]
-        hdr = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
-        r = session.post(f"{api_url}/consistency/check",
-                         json={"image_base64": sample_jpeg_base64, "mime_type": "image/jpeg"},
-                         headers=hdr)
-        assert r.status_code == 400, r.text
-        detail = r.json().get("detail", "")
-        assert "brand profile" in detail.lower() or "belum dibuat" in detail.lower()
-
-    def test_consistency_check_with_brand_returns_scores(self, session, api_url, auth_headers, sample_jpeg_base64):
-        # Ensure brand profile exists for the primary registered_user
-        bp = {
-            "brand_name": "TEST Kopi Nusantara",
-            "category": "F&B",
-            "description": "Kopi arabika premium dari Aceh",
-            "color_primary": "#1A4F3A",
-            "color_secondary": "#FFF8E7",
-            "color_accent": "#D4A24E",
-            "visual_style": "minimal-clean",
-            "tone": "premium",
-        }
-        session.post(f"{api_url}/brand-profile", json=bp, headers=auth_headers)
-        payload = {
-            "image_base64": sample_jpeg_base64,
-            "mime_type": "image/jpeg",
-            "note": "Test image of coffee cup",
-        }
-        r = session.post(f"{api_url}/consistency/check", json=payload, headers=auth_headers, timeout=120)
-        assert r.status_code == 200, f"{r.status_code} {r.text[:500]}"
-        data = r.json()
-        if "error" in data:
-            pytest.fail(f"LLM parse failure: {data}")
-        # Required keys
-        for k in ("overall_score", "color_score", "mood_score", "composition_score",
-                  "typography_score", "summary", "strengths", "weaknesses",
-                  "actionable_tips", "detected_dominant_colors", "alignment_verdict"):
-            assert k in data, f"Missing key {k}; got {list(data.keys())[:15]}"
-        # Score ranges
-        for k in ("overall_score", "color_score", "mood_score", "composition_score", "typography_score"):
-            v = data[k]
-            assert isinstance(v, (int, float)) and 0 <= v <= 100, f"{k}={v}"
-        assert isinstance(data["strengths"], list)
-        assert isinstance(data["weaknesses"], list)
-        assert isinstance(data["actionable_tips"], list)
-        assert isinstance(data["detected_dominant_colors"], list)
-
-    def test_consistency_requires_auth(self, api_url, sample_jpeg_base64):
-        r = requests.post(f"{api_url}/consistency/check",
-                          json={"image_base64": sample_jpeg_base64, "mime_type": "image/jpeg"})
-        assert r.status_code in (401, 403)
-
-
-# ============= GRID PLANNER =============
-class TestGridPlanner:
-    def test_grid_planner_initially_null(self, session, api_url):
-        # Fresh user => no layout yet
-        email = f"TEST_grid_{uuid.uuid4().hex[:8]}@feedifyqa.io"
-        rr = session.post(f"{api_url}/auth/register",
-                          json={"email": email, "password": "Demo1234!", "name": "GridUser"})
-        tok = rr.json()["token"]
-        hdr = {"Authorization": f"Bearer {tok}", "Content-Type": "application/json"}
-        # Stash on class for next tests
-        TestGridPlanner._hdr = hdr
-        r = session.get(f"{api_url}/grid-planner", headers=hdr)
-        assert r.status_code == 200
-        assert r.json() is None
-
-    def test_grid_planner_save_9_slots(self, session, api_url):
-        hdr = TestGridPlanner._hdr
-        slots = [{"slot_index": i, "label": f"Post {i}", "note": f"note {i}",
-                  "color_tag": "#FF0000" if i == 0 else "#00FF00"} for i in range(9)]
-        r = session.post(f"{api_url}/grid-planner",
-                         json={"name": "My Grid", "slots": slots}, headers=hdr)
-        assert r.status_code == 200, r.text
-        body = r.json()
-        assert body["name"] == "My Grid"
-        assert len(body["slots"]) == 9
-        assert body["slots"][0]["label"] == "Post 0"
-
-    def test_grid_planner_upsert_no_duplicates(self, session, api_url):
-        hdr = TestGridPlanner._hdr
-        # Second POST should update, not duplicate
-        new_slots = [{"slot_index": i, "label": f"Updated {i}"} for i in range(9)]
-        r = session.post(f"{api_url}/grid-planner",
-                         json={"name": "My Grid V2", "slots": new_slots}, headers=hdr)
-        assert r.status_code == 200
-        # GET reflects update
-        g = session.get(f"{api_url}/grid-planner", headers=hdr)
-        body = g.json()
-        assert body is not None
-        assert body["name"] == "My Grid V2"
-        assert body["slots"][0]["label"] == "Updated 0"
-
-    def test_grid_planner_max_9_slots(self, session, api_url):
-        hdr = TestGridPlanner._hdr
-        slots = [{"slot_index": i, "label": f"x"} for i in range(10)]
-        r = session.post(f"{api_url}/grid-planner",
-                         json={"name": "X", "slots": slots}, headers=hdr)
-        assert r.status_code == 400, r.text
-
-    def test_grid_planner_requires_auth(self, api_url):
-        r = requests.get(f"{api_url}/grid-planner")
-        assert r.status_code in (401, 403)
-        r2 = requests.post(f"{api_url}/grid-planner", json={"name": "x", "slots": []})
-        assert r2.status_code in (401, 403)
 
 
 # ============= CONTENT CALENDAR =============

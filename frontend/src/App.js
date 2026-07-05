@@ -34,7 +34,6 @@ const HistoryPage           = lazy(() => import("@/pages/HistoryPage"));
 const SettingsPage          = lazy(() => import("@/pages/SettingsPage"));
 const BrandKitPage          = lazy(() => import("@/pages/BrandKitPage"));
 const MorePage              = lazy(() => import("@/pages/MorePage"));
-const CommunityPage         = lazy(() => import("@/pages/CommunityPage"));
 const BuyCreditsPage        = lazy(() => import("@/pages/BuyCreditsPage"));
 const AdminPage             = lazy(() => import("@/pages/AdminPage"));
 
@@ -136,7 +135,6 @@ function App() {
               <Route path="/brand-kit"             element={<BrandKitPage />} />
               <Route path="/more"                  element={<MorePage />} />
               <Route path="/admin"                 element={<AdminRoute><AdminPinGate><AdminPage /></AdminPinGate></AdminRoute>} />
-              <Route path="/community"             element={<CommunityPage />} />
               <Route path="/credits"               element={<BuyCreditsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

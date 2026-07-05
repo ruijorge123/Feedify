@@ -40,8 +40,8 @@ import {
   Package,
   Wrench,
   FilmSlate,
-  GridFour,
-  ShieldCheck,
+  Camera,
+  Microphone,
   EyeSlash,
 } from "@phosphor-icons/react";
 import { Switch } from "@/components/ui/switch";
@@ -679,13 +679,13 @@ function MaintenancePanel() {
 
 const MENU_LOCK_ICONS = {
   banner: ImageSquare,
+  studio: Camera,
   carousel: Stack,
   copywriting: PenNib,
   reels: FilmSlate,
+  "talking-avatar": Microphone,
   food: ForkKnife,
   marketplace: Storefront,
-  "grid-planner": GridFour,
-  consistency: ShieldCheck,
   calendar: CalendarBlank,
 };
 

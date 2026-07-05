@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useMenuLockStatus, menuMode } from "@/lib/menuLock";
 import {
-  GridFour,
   ForkKnife,
   CalendarBlank,
   ClockCounterClockwise,
@@ -12,8 +11,6 @@ import {
   Stack,
   ImageSquare,
   ShieldStar,
-  WhatsappLogo,
-  Tag,
   FilmSlate,
   Wrench,
   Camera,
@@ -36,7 +33,6 @@ const sections = [
   {
     title: "Planning & QA",
     items: [
-      { to: "/grid-planner", label: "Feed Grid Planner", desc: "Plan 3×3 Instagram feed", icon: GridFour, color: "bg-emerald-700 text-emerald-50", lockKey: "grid-planner" },
       { to: "/calendar", label: "Calendar Planner", desc: "Jadwalkan konten & notif pengingat", icon: CalendarBlank, color: "bg-indigo-700 text-indigo-50", lockKey: "calendar" },
     ],
   },
@@ -45,12 +41,6 @@ const sections = [
     items: [
       { to: "/history", label: "Prompt History", desc: "Semua prompt yang pernah dibuat", icon: ClockCounterClockwise, color: "bg-stone-700 text-stone-50" },
       { to: "/settings", label: "Settings", desc: "Edit brand profile, akun", icon: Gear, color: "bg-stone-500 text-stone-50" },
-    ],
-  },
-  {
-    title: "Eksklusif",
-    items: [
-      { to: "/community", label: "Komunitas Feedify", desc: "Gabung komunitas & klaim voucher 5%", icon: WhatsappLogo, color: "bg-[#25D366] text-white" },
     ],
   },
 ];

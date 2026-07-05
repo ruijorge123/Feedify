@@ -6,7 +6,7 @@ import {
   TrendUp, Storefront, InstagramLogo, FilmSlate, PenNib,
   RocketLaunch, ChartBar, Lightbulb, ArrowLeft, ArrowRight,
   Sparkle, CircleNotch, CheckCircle, ImageSquare, Stack,
-  Brain, CalendarBlank, Check, ShieldCheck,
+  Brain, CalendarBlank, Check,
 } from "@phosphor-icons/react";
 
 // ─── Tool icon map ─────────────────────────────────────────────────────────────
@@ -19,7 +19,6 @@ const TOOL_ICON_MAP = {
   "Marketplace":         Storefront,
   "Calendar":            CalendarBlank,
   "Studio":              Brain,
-  "Consistency Checker": ShieldCheck,
 };
 
 // ─── Category definitions ─────────────────────────────────────────────────────

@@ -68,7 +68,6 @@ GROQ_API_KEYS = [k for k in [
     os.environ.get('GROQ_API_KEY_4', ''),
     os.environ.get('GROQ_API_KEY_5', ''),
 ] if k]
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USER = os.environ.get('SMTP_USER', '')
@@ -324,25 +323,6 @@ class CalendarIdeasIn(BaseModel):
     year: int
 
 
-class ConsistencyCheckIn(BaseModel):
-    image_base64: str
-    mime_type: str = "image/jpeg"
-    note: str = ""  # optional note about the image
-
-
-class GridSlotIn(BaseModel):
-    slot_index: int  # 0-8
-    label: str = ""
-    note: str = ""
-    color_tag: str = ""  # hex
-    prompt_id: Optional[str] = None  # link to existing generated prompt
-
-
-class GridLayoutIn(BaseModel):
-    name: str = "My Feed Grid"
-    slots: List[GridSlotIn] = []  # exactly 9 slots
-
-
 class CalendarEventIn(BaseModel):
     title: str
     scheduled_date: str  # ISO date string (YYYY-MM-DD)
@@ -366,8 +346,6 @@ class SchedulePostIn(BaseModel):
 
 
 class NotificationSettingsIn(BaseModel):
-    telegram_chat_id: Optional[str] = None
-    whatsapp_phone: Optional[str] = None
     default_reminder_hours: int = 24
     notifications_enabled: bool = True
 
@@ -5685,208 +5663,10 @@ async def studio_campaign_pack(payload: StudioIn, current_user: dict = Depends(g
     }
 
 
-# ============= BRAND CONSISTENCY CHECKER (Gemini Vision) =============
-@api_router.post("/consistency/check")
-async def consistency_check(payload: ConsistencyCheckIn, current_user: dict = Depends(get_current_user)):
-    await _block_if_menu_locked("consistency")
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
-    has_brand_dna = brand is not None
-
-    if has_brand_dna:
-        brand_context = (
-            "Brand DNA tersedia:\n"
-            f"- Nama Brand: {brand.get('brand_name', '')}\n"
-            f"- Kategori: {brand.get('category', '')}\n"
-            f"- Warna primer: {brand.get('color_primary', '')}\n"
-            f"- Warna sekunder: {brand.get('color_secondary', '')}\n"
-            f"- Gaya visual: {brand.get('visual_style', '')}\n"
-            + (f"- Brand positioning: {brand.get('brand_positioning', '')}\n" if brand.get('brand_positioning') else "")
-            + (f"- Brand personality: {', '.join(brand.get('brand_personality', []))}\n" if brand.get('brand_personality') else "")
-        )
-    else:
-        brand_context = "Brand DNA: Tidak tersedia. Analisis berdasarkan standar fotografi komersial profesional saja. Untuk brand_identity scores, nilai berdasarkan prinsip desain universal."
-
-    system = (
-        "Anda adalah AI Creative Director dan Brand Auditor profesional kelas enterprise. "
-        "Tugas Anda: menganalisis gambar secara mendalam dari perspektif fotografi komersial, brand identity, marketplace readiness, dan psikologi konsumen. "
-        "Output HARUS JSON valid (tanpa markdown fence). Gunakan Bahasa Indonesia untuk semua teks penjelasan."
-    )
-
-    instruction = f"""Konteks Brand:
-{brand_context}
-
-Catatan user: {payload.note or 'Tidak ada'}
-
-Analisis gambar ini secara komprehensif. Kembalikan HANYA JSON valid dengan struktur berikut (semua field wajib diisi):
-
-{{
-  "overall_score": <angka 0-100 mencerminkan kualitas komersial keseluruhan>,
-  "status": "<Excellent jika >=85, Good jika >=70, Fair jika >=55, Poor jika <55>",
-  "summary": "<ringkasan kualitas 1-2 kalimat dalam bahasa Indonesia yang jelas dan spesifik>",
-  "star_ratings": {{
-    "commercial_readiness": <1-5>,
-    "photography_quality": <1-5>,
-    "marketplace_ready": <1-5>,
-    "luxury_impression": <1-5>,
-    "brand_consistency": <1-5>,
-    "visual_hierarchy": <1-5>,
-    "trust_score": <1-5>,
-    "conversion_potential": <1-5>
-  }},
-  "categories": {{
-    "brand_identity": [
-      {{"key": "color_palette", "label": "Color Palette", "score": <0-100>, "explanation": "<penjelasan singkat dalam bahasa Indonesia>"}},
-      {{"key": "typography", "label": "Typography", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "visual_tone", "label": "Visual Tone", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "brand_dna", "label": "Brand DNA Match", "score": <0-100>, "explanation": "<penjelasan>"}}
-    ],
-    "photography": [
-      {{"key": "lighting", "label": "Lighting", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "composition", "label": "Composition", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "camera_angle", "label": "Camera Angle", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "background_quality", "label": "Background Quality", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "negative_space", "label": "Negative Space", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "commercial_styling", "label": "Commercial Styling", "score": <0-100>, "explanation": "<penjelasan>"}}
-    ],
-    "marketplace": [
-      {{"key": "product_visibility", "label": "Product Visibility", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "thumbnail_readability", "label": "Thumbnail Readability", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "mobile_visibility", "label": "Mobile Visibility", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "conversion_potential", "label": "Conversion Potential", "score": <0-100>, "explanation": "<penjelasan>"}}
-    ],
-    "psychology": [
-      {{"key": "premium_impression", "label": "Premium Impression", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "trust", "label": "Trust", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "emotional_impact", "label": "Emotional Impact", "score": <0-100>, "explanation": "<penjelasan>"}},
-      {{"key": "purchase_intent", "label": "Purchase Intent", "score": <0-100>, "explanation": "<penjelasan>"}}
-    ]
-  }},
-  "recommendations": [
-    {{"text": "<saran konkret dan actionable>", "why": "<alasan mengapa ini penting>", "expected_improvement": "<dampak yang diharapkan, mis. meningkatkan konversi 15-20%>"}},
-    {{"text": "<saran 2>", "why": "<alasan>", "expected_improvement": "<dampak>"}}
-  ],
-  "advanced_insights": {{
-    "predicted_ctr": <estimasi persentase peningkatan CTR sebagai angka bulat, mis. 18>,
-    "luxury_feeling": <0-100>,
-    "marketplace_score": <0-100>,
-    "visual_balance": <0-100>,
-    "premium_impression": <0-100>,
-    "text_readability": <0-100>,
-    "hero_product_visibility": <0-100>
-  }},
-  "detected_dominant_colors": ["<#hexcode1>", "<#hexcode2>", "<#hexcode3>"]
-}}
-
-Berikan maksimal 5 rekomendasi yang paling impactful. Skor harus realistis dan berdasarkan analisis mendalam gambar."""
-
-    try:
-        raw = await _openai_vision(system, instruction, image_base64=payload.image_base64)
-    except Exception as e:
-        logger.error(f"Brand audit failed: {e}")
-        raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Brand audit gagal. Coba lagi."))
-
-    raw = raw.strip()
-    if raw.startswith("```"):
-        lines = raw.split("\n")
-        raw = "\n".join(lines[1:-1]) if lines[-1].startswith("```") else "\n".join(lines[1:])
-        raw = raw.strip()
-    if raw.startswith("json"):
-        raw = raw[4:].strip()
-
-    try:
-        parsed = json.loads(raw)
-    except Exception:
-        start = raw.find("{")
-        end = raw.rfind("}")
-        if start >= 0 and end > start:
-            try:
-                parsed = json.loads(raw[start:end + 1])
-            except Exception:
-                parsed = {"error": "parse_failed", "_raw": raw[:1500]}
-        else:
-            parsed = {"error": "no_json", "_raw": raw[:1500]}
-
-    parsed["has_brand_dna"] = has_brand_dna
-
-    if "error" not in parsed:
-        await db.consistency_checks.insert_one({
-            "id": str(uuid.uuid4()),
-            "user_id": current_user["id"],
-            "result": parsed,
-            "note": payload.note,
-            "created_at": now_iso(),
-        })
-
-    return parsed
-
-
-# ============= GRID PLANNER =============
-@api_router.get("/grid-planner")
-async def get_grid_layout(current_user: dict = Depends(get_current_user)):
-    layout = await db.grid_layouts.find_one({"user_id": current_user["id"]}, {"_id": 0})
-    return layout  # may be None
-
-
-@api_router.post("/grid-planner")
-async def save_grid_layout(payload: GridLayoutIn, current_user: dict = Depends(get_current_user)):
-    await _block_if_menu_locked("grid-planner")
-    if len(payload.slots) > 9:
-        raise HTTPException(status_code=400, detail="Maksimal 9 slot")
-    doc = {
-        "user_id": current_user["id"],
-        "name": payload.name,
-        "slots": [s.model_dump() for s in payload.slots],
-        "updated_at": now_iso(),
-    }
-    existing = await db.grid_layouts.find_one({"user_id": current_user["id"]})
-    if existing:
-        await db.grid_layouts.update_one({"user_id": current_user["id"]}, {"$set": doc})
-    else:
-        doc["id"] = str(uuid.uuid4())
-        doc["created_at"] = now_iso()
-        await db.grid_layouts.insert_one(doc)
-    return await db.grid_layouts.find_one({"user_id": current_user["id"]}, {"_id": 0})
-
-
 # ============= NOTIFICATION HELPERS =============
 
-async def _send_telegram(chat_id: str, text: str) -> bool:
-    """Send a Telegram message to a chat_id via Bot API."""
-    if not TELEGRAM_BOT_TOKEN or not _HTTPX_AVAILABLE:
-        return False
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.post(
-                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-            )
-            return r.status_code == 200
-    except Exception as e:
-        logger.warning(f"Telegram send failed: {e}")
-        return False
-
-
-
-def _make_reminder_message(post: dict, brand_name: str = "") -> str:
-    post_date = post.get("post_date", "")
-    title = post.get("title", "Konten kamu")
-    platform = post.get("platform", "Instagram")
-    caption_preview = post.get("caption", "")[:120]
-    hours_before = post.get("reminder_hours_before", 24)
-    label = "besok" if hours_before <= 24 else f"{hours_before // 24} hari lagi"
-
-    return (
-        f"🔔 <b>Feedify — Reminder Posting!</b>\n\n"
-        f"📅 Konten dijadwalkan tayang: <b>{post_date}</b> ({label})\n"
-        f"📌 Judul: {title}\n"
-        f"📱 Platform: {platform.capitalize()}\n\n"
-        f"📝 Caption preview:\n<i>{caption_preview}{'...' if len(post.get('caption','')) > 120 else ''}</i>\n\n"
-        f"Buka Feedify sekarang untuk lihat konten lengkap dan siapkan posting kamu 🚀"
-    )
-
-
 async def _reminder_loop():
-    """Background task: check every 60s for due reminders and send notifications."""
+    """Background task: check every 60s for due reminders and mark them sent."""
     await asyncio.sleep(10)  # wait for server to fully start
     while True:
         try:
@@ -5898,18 +5678,11 @@ async def _reminder_loop():
             }, {"_id": 0}).to_list(50)
 
             for post in due:
-                user_id = post["user_id"]
-                notif = await db.notification_settings.find_one({"user_id": user_id}, {"_id": 0})
-                if notif and notif.get("notifications_enabled", True):
-                    msg = _make_reminder_message(post)
-                    if notif.get("telegram_chat_id"):
-                        await _send_telegram(notif["telegram_chat_id"], msg)
-
                 await db.scheduled_posts.update_one(
                     {"id": post["id"]},
                     {"$set": {"reminder_sent": True}},
                 )
-                logger.info(f"Reminder sent for scheduled post {post['id']}")
+                logger.info(f"Reminder marked sent for scheduled post {post['id']}")
         except Exception as e:
             logger.error(f"Reminder loop error: {e}")
         await asyncio.sleep(60)
@@ -6040,7 +5813,7 @@ async def delete_schedule(post_id: str, current_user: dict = Depends(get_current
 async def get_notification_settings(current_user: dict = Depends(get_current_user)):
     doc = await db.notification_settings.find_one({"user_id": current_user["id"]}, {"_id": 0})
     if not doc:
-        return {"telegram_chat_id": None, "whatsapp_phone": None, "default_reminder_hours": 24, "notifications_enabled": True}
+        return {"default_reminder_hours": 24, "notifications_enabled": True}
     return doc
 
 
@@ -6052,77 +5825,6 @@ async def save_notification_settings(payload: NotificationSettingsIn, current_us
         upsert=True,
     )
     return {"saved": True}
-
-
-@api_router.post("/notifications/telegram-start")
-async def telegram_start(current_user: dict = Depends(get_current_user)):
-    """Generate a unique connection code for Telegram bot linking."""
-    code = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
-    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
-    await db.telegram_pending.delete_many({"user_id": current_user["id"]})
-    await db.telegram_pending.insert_one({
-        "user_id": current_user["id"],
-        "code": code,
-        "expires_at": expires_at,
-        "created_at": now_iso(),
-    })
-    bot_username = os.environ.get("TELEGRAM_BOT_USERNAME", "feedify_notif_bot")
-    return {
-        "code": code,
-        "bot_username": bot_username,
-        "deep_link": f"https://t.me/{bot_username}?start={code}",
-        "instruction": f"Buka Telegram, cari @{bot_username}, lalu kirim: /connect {code}",
-        "expires_minutes": 15,
-    }
-
-
-@api_router.post("/telegram/webhook")
-async def telegram_webhook(request: Request):
-    """Webhook endpoint for Telegram bot updates. Register this URL in BotFather."""
-    try:
-        update = await request.json()
-    except Exception:
-        return {"ok": True}
-
-    msg = update.get("message") or update.get("edited_message")
-    if not msg:
-        return {"ok": True}
-
-    chat_id = str(msg.get("chat", {}).get("id", ""))
-    text = (msg.get("text") or "").strip()
-
-    # Handle /start CODE or /connect CODE
-    for prefix in ("/start ", "/connect "):
-        if text.startswith(prefix):
-            code = text[len(prefix):].strip().upper()
-            pending = await db.telegram_pending.find_one({"code": code})
-            if not pending:
-                await _send_telegram(chat_id, "❌ Kode tidak valid atau sudah kadaluarsa. Coba generate kode baru di Feedify.")
-                return {"ok": True}
-            if pending.get("expires_at", "") < datetime.now(timezone.utc).isoformat():
-                await _send_telegram(chat_id, "⏰ Kode sudah kadaluarsa. Generate kode baru di Settings Feedify.")
-                return {"ok": True}
-            # Save chat_id
-            await db.notification_settings.update_one(
-                {"user_id": pending["user_id"]},
-                {"$set": {
-                    "user_id": pending["user_id"],
-                    "telegram_chat_id": chat_id,
-                    "notifications_enabled": True,
-                    "default_reminder_hours": 24,
-                    "updated_at": now_iso(),
-                }},
-                upsert=True,
-            )
-            await db.telegram_pending.delete_one({"code": code})
-            await _send_telegram(chat_id,
-                "✅ <b>Berhasil terhubung ke Feedify!</b>\n\n"
-                "Mulai sekarang kamu akan dapat notifikasi pengingat posting langsung di Telegram ini 🎉\n\n"
-                "Jadwalkan konten di <b>feedify.app → Calendar Planner</b>"
-            )
-            return {"ok": True}
-
-    return {"ok": True}
 
 
 # ============= CONTENT CALENDAR =============
@@ -6492,9 +6194,7 @@ FITUR-FITUR FEEDIFY:
 2. Carousel Storytelling — generate 3–7 slide sekaligus (tiap slide = 1 kredit), cocok buat edu-content dan product storytelling
 3. Copywriting AI — generate caption, hashtag, headline dalam Bahasa Indonesia sesuai tone brand. GRATIS, tidak pakai kredit
 4. F&B Menu Visual — khusus bisnis kuliner, generate foto menu dengan mood dan layout yang bisa dipilih
-5. Feed Grid Planner — preview tampilan feed 3×3 sebelum posting, supaya feed selalu rapi dan konsisten. GRATIS
-6. Content Calendar — rencanakan jadwal konten bulanan. GRATIS
-7. Consistency Checker — AI audit visual konten vs Brand DNA, kasih skor dan saran. Tersedia setelah generate
+5. Content Calendar — rencanakan jadwal konten bulanan. GRATIS
 
 BRAND DNA — FITUR INTI FEEDIFY:
 Setup sekali: nama brand, palet warna, gaya visual, tone of voice, target audiens, kata-kata khas brand.
@@ -6731,7 +6431,7 @@ def _gc_action_plan_stub(category: str, answers: dict, followup_answers: dict) -
             {"text": "Posting 3 hari berturut-turut di jam prime time (7-9 pagi atau 7-9 malam WIB)", "duration": "15 menit/hari", "tool": None, "tool_path": None},
             {"text": "Buat Carousel 'Behind the Scenes' proses pembuatan produk — membangun kepercayaan dan koneksi", "duration": "1 jam", "tool": "Carousel", "tool_path": "/generate/carousel"},
             {"text": "Tulis ulang bio IG: siapa kamu, untuk siapa, manfaat produk, dan CTA yang jelas", "duration": "20 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
-            {"text": "Cek konsistensi feed kamu — pastikan semua visual on-brand sebelum posting berikutnya", "duration": "15 menit", "tool": "Consistency Checker", "tool_path": "/consistency"},
+            {"text": "Cek konsistensi feed kamu — pastikan semua visual on-brand sebelum posting berikutnya", "duration": "15 menit", "tool": None, "tool_path": None},
         ],
         "reels": [
             {"text": "Tulis script Reels dengan formula: Hook 3 detik → Problem → Solusi → CTA", "duration": "30 menit", "tool": "Copywriting", "tool_path": "/generate/copywriting"},
@@ -6759,7 +6459,7 @@ def _gc_action_plan_stub(category: str, answers: dict, followup_answers: dict) -
             {"text": "Buat Feed Post yang menonjolkan 1 keunggulan unik kamu vs kompetitor (tanpa sebut nama)", "duration": "30 menit", "tool": "Feed Post", "tool_path": "/generate/banner"},
             {"text": "Tentukan 1 posisi yang tidak dimiliki kompetitor kamu dan jadikan itu identitas brand", "duration": "1 jam", "tool": None, "tool_path": None},
             {"text": "Buat Carousel edukasi yang memposisikan kamu sebagai authority di kategori ini", "duration": "1 jam", "tool": "Carousel", "tool_path": "/generate/carousel"},
-            {"text": "Cek konsistensi visual kamu vs kompetitor — brand yang lebih konsisten menang jangka panjang", "duration": "15 menit", "tool": "Consistency Checker", "tool_path": "/consistency"},
+            {"text": "Cek konsistensi visual kamu vs kompetitor — brand yang lebih konsisten menang jangka panjang", "duration": "15 menit", "tool": None, "tool_path": None},
         ],
         "content_ideas": [
             {"text": "Buat Carousel 'Tips [Kategori Produk]' — konten edukatif build authority di niche kamu", "duration": "1 jam", "tool": "Carousel", "tool_path": "/generate/carousel"},
@@ -7054,7 +6754,7 @@ async def _get_or_create_daily_voucher() -> dict:
 
 
 async def _resolve_voucher(code: str, user_id: str):
-    """Resolve voucher — supports: daily story (FDY-), community (COM5-), static catalog."""
+    """Resolve voucher — supports: daily story (FDY-), static catalog."""
     code = code.strip().upper()
 
     # ── Daily IG Story voucher ────────────────────────────────────────────────
@@ -7075,19 +6775,6 @@ async def _resolve_voucher(code: str, user_id: str):
             "ref": f"voucher-daily-{code}",
             "_daily_code": code,
         }, None
-
-    # ── Community voucher: COM5-{user_id[:6]} ────────────────────────────────
-    if code.startswith("COM5-"):
-        user = await db.users.find_one({"id": user_id})
-        if not user or not user.get("community_verified"):
-            return None, "Kamu belum terverifikasi di komunitas Feedify"
-        expected = f"COM5-{user_id[:6].upper()}"
-        if code != expected:
-            return None, "Kode komunitas tidak cocok dengan akun kamu"
-        already = await db.credit_transactions.find_one({"user_id": user_id, "reference_id": "voucher-community"})
-        if already:
-            return None, "Voucher komunitas hanya bisa dipakai sekali"
-        return {"type": "percent", "value": 5, "label": "Diskon 5% Komunitas", "ref": "voucher-community"}, None
 
     # ── Static catalog ────────────────────────────────────────────────────────
     v = VOUCHER_CATALOG.get(code)
@@ -7283,13 +6970,14 @@ async def maintenance_status():
 # bedanya cuma di frontend: "hidden" gak pernah ditampilkan sebagai opsi nav sama sekali.
 LOCKABLE_MENUS = {
     "banner":        "Feed Post / Banner",
+    "studio":        "Feedify Studio",
     "carousel":      "Carousel",
     "copywriting":   "Copywriting",
     "reels":         "Reels",
+    "talking-avatar": "Talking Avatar",
     "food":          "F&B Menu",
     "marketplace":   "Marketplace",
     "growth-consultant": "Growth Consultant",
-    "consistency":   "Consistency Checker",
     "calendar":      "Calendar Planner",
 }
 MENU_LOCK_MODES = ("active", "maintenance", "hidden")
@@ -7579,29 +7267,6 @@ async def admin_user_detail(user_id: str, admin_user: dict = Depends(require_adm
 
 
 # ============= HEALTH =============
-# ============= COMMUNITY =============
-
-
-@api_router.get("/community/status")
-async def community_status(current_user: dict = Depends(get_current_user)):
-    verified = current_user.get("community_verified", False)
-    notif = await db.notification_settings.find_one({"user_id": current_user["id"]})
-    has_wa = bool(notif and notif.get("whatsapp_phone"))
-
-    voucher_code = None
-    if verified:
-        # Unique per-user voucher: COM5-{first 6 chars of user id uppercase}
-        voucher_code = f"COM5-{current_user['id'][:6].upper()}"
-
-    return {
-        "community_verified": verified,
-        "has_wa_number": has_wa,
-        "whatsapp_phone": (notif.get("whatsapp_phone") if notif else None),
-        "voucher_code": voucher_code,
-
-        "discount_pct": 5,
-    }
-
 
 # ─── Reels Generator ─────────────────────────────────────────────────────────
 
@@ -7726,6 +7391,7 @@ async def talking_avatar_generate(
     payload: dict,
     current_user: dict = Depends(get_current_user),
 ):
+    await _block_if_menu_locked("talking-avatar")
     if not HEYGEN_API_KEY:
         raise HTTPException(status_code=503, detail="Fitur ini segera hadir — HeyGen belum dikonfigurasi")
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, CalendarBlank, Clock, Bell, CheckCircle, CircleNotch, TelegramLogo, WhatsappLogo } from "@phosphor-icons/react";
+import { X, CalendarBlank, Clock, Bell, CheckCircle, CircleNotch } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import { toast } from 'react-toastify';
 
@@ -97,18 +97,8 @@ export default function ScheduleModal({ open, onClose, promptId, imageBase64, da
               Konten dijadwalkan pada <strong>{form.post_date}</strong> pukul <strong>{form.post_time}</strong>
             </p>
             <p className="text-stone-500 text-xs mb-6">
-              Kamu akan dapat notifikasi {REMINDER_OPTIONS.find(r => r.value === form.reminder_hours_before)?.label || "sebelum posting"}
+              Kamu akan dapat notifikasi {REMINDER_OPTIONS.find(r => r.value === form.reminder_hours_before)?.label || "sebelum posting"} langsung di Feedify
             </p>
-            <div className="flex flex-col gap-2 text-xs text-stone-400 mb-6 bg-stone-50 rounded-xl p-3">
-              <div className="flex items-center gap-2">
-                <TelegramLogo size={14} className="text-[#2AABEE]" weight="fill" />
-                Notif via Telegram — aktifkan di Settings
-              </div>
-              <div className="flex items-center gap-2">
-                <WhatsappLogo size={14} className="text-[#25D366]" weight="fill" />
-                Notif via WhatsApp — aktifkan di Settings
-              </div>
-            </div>
             <button onClick={reset} className="w-full py-3 bg-brand text-white rounded-full font-semibold">Selesai</button>
           </div>
         ) : (

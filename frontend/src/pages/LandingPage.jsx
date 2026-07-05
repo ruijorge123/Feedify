@@ -404,9 +404,7 @@ function Bento() {
           <BentoTile testid="bento-studio" tag="Commercial AI" title="Studio Commercial" desc="Sesi foto produk virtual bergaya brand besar — tanpa fotografer, tanpa studio fisik." span="col-span-3 lg:col-span-2" />
           <BentoTile testid="bento-reels" tag="Video AI" title="Reels Video Generator" desc="Ubah foto produk jadi video iklan sinematik. Powered by Kling AI." span="col-span-3 lg:col-span-2" />
           <BentoTile testid="bento-growth" tag="AI Consultant" title="Growth Consultant AI" desc="Analisis bisnis, strategi konten, dan rekomendasi tindakan dari AI business coach." span="col-span-6 lg:col-span-2" />
-          <BentoTile testid="bento-consistency" tag="QA · Feedify Vision" title="Consistency Checker" desc="Upload hasil Feedify, dapat skor konsistensi vs Brand DNA + saran perbaikan." span="col-span-3 lg:col-span-2" />
-          <BentoTile testid="bento-calendar" tag="Planning" title="Calendar Planner" desc="Jadwalkan konten ke kalender, notifikasi pengingat via WA atau Telegram." span="col-span-3 lg:col-span-2" />
-          <BentoTile testid="bento-grid" tag="Planning" title="Feed Grid Planner" desc="3×3 layout dengan drag-drop + color tagging. Visualisasi feed sebelum posting." span="col-span-6 lg:col-span-2" />
+          <BentoTile testid="bento-calendar" tag="Planning" title="Calendar Planner" desc="Jadwalkan konten ke kalender & dapat notifikasi pengingat langsung dari Feedify." span="col-span-3 lg:col-span-2" />
         </div>
       </div>
     </section>

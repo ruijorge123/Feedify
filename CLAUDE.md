@@ -37,10 +37,6 @@ Optional environment variables:
 ```
 GOOGLE_CLIENT_ID=...          # enables Google OAuth login
 GROQ_API_KEY=...              # enables /chat/support endpoint (Groq LLM)
-TELEGRAM_BOT_TOKEN=...        # enables Telegram schedule reminders
-FONNTE_TOKEN=...              # enables WhatsApp notifications via Fonnte
-FONNTE_COMMUNITY_ID=...
-FONNTE_COMMUNITY_LINK=...
 FAL_KEY=...                   # enables Reels video generation (fal.ai Kling)
 OPENAI_API_KEY=...            # GPT-4o Video Director for Reels (falls back to EMERGENT_LLM_KEY)
 SMTP_USER=...                 # enables OTP email verification on signup
@@ -110,10 +106,10 @@ Content generation uses a two-step pipeline:
 Backend `require_admin` dependency checks `user.role == "admin"`. Admin routes (`/admin/*`) expose user management, credit adjustments, analytics, and daily voucher management. The `/admin` route in React is protected by **both** `AdminRoute` (role check) and `AdminPinGate` (a PIN challenge rendered inside the route), so admin users must enter a PIN on each session before seeing `AdminPage`.
 
 ### Menu Lockdown (Per-Menu Feature Flags)
-Admins can lock individual menus via `POST /api/admin/menu-lockdown` (payload: `{ menuKey, mode }` where mode is `"active"` | `"maintenance"` | `"coming_soon"`). The status is stored in the `app_settings` collection under key `"menu_lockdown"`. `GET /api/menu-lockdown-status` is public and returns a dict keyed by `menuKey`. On the frontend, every generator route is wrapped in `<MenuLockGate menuKey="...">` (see `App.js` and `MenuLockGate.jsx`) which reads from `menuLock.js` and renders a blocking overlay when not `"active"`. Admins always bypass the gate. `MaintenancePage` (`/maintenance`) polls `GET /api/maintenance-status` until the site-wide maintenance flag is cleared.
+Admins can lock individual menus via `POST /api/admin/menu-lockdown` (payload: `{ menu_key, mode }` where mode is `"active"` | `"maintenance"` | `"hidden"`). `"maintenance"` keeps the menu visible in nav but blocks access; `"hidden"` removes it from user nav entirely (admins still see and can toggle it in the Admin Panel's menu list). The status is stored in the `app_settings` collection under key `"menu_lockdown"`. `GET /api/menu-lockdown-status` is public and returns a dict keyed by menu key. On the frontend, every generator route is wrapped in `<MenuLockGate menuKey="...">` (see `App.js` and `MenuLockGate.jsx`) which reads from `menuLock.js`. Admins always bypass the gate. `MaintenancePage` (`/maintenance`) polls `GET /api/maintenance-status` until the site-wide maintenance flag is cleared.
 
 ### Scheduling & Notifications
-`POST /api/schedule` creates a scheduled post. A background `_reminder_loop()` task fires on startup and sends reminders via Telegram (`TELEGRAM_BOT_TOKEN`) or WhatsApp (`FONNTE_TOKEN`). Notification preferences are saved per-user at `PUT /api/notifications/settings`.
+`POST /api/schedule` creates a scheduled post with a `reminder_at` timestamp. A background `_reminder_loop()` task fires on startup and marks due reminders as sent (`reminder_sent`); reminders surface directly in the Feedify web app — there is no external Telegram/WhatsApp delivery channel. Notification preferences are saved per-user at `PUT /api/notifications/settings`.
 
 ### Voucher & Referral
 Daily voucher codes are auto-generated (`_get_or_create_daily_voucher`). Validated via `POST /api/vouchers/validate`. Referral links generated at `GET /api/referral/my-link` and applied via `POST /api/referral/apply`.
@@ -132,16 +128,18 @@ Source of truth: `design_guidelines.json`. Never deviate from these:
 
 ## Content Dashboards
 
-The app has seven generation dashboards:
+The app has nine generation dashboards:
 - **Banner** (`/generate/banner`) — single static promotional image
+- **Studio** (`/studio`) — commercial product photography (`StudioPage.jsx`)
 - **Carousel** (`/generate/carousel`) — multi-slide Instagram carousel (3–7 slides, each costs 1 credit)
 - **Copywriting** (`/generate/copywriting`) — text only via Gemini, no image credit consumed
+- **Reels** (`/generate/reels`) — image-to-video ad (fal.ai Kling), see Video generation above
+- **Talking Avatar** (`/generate/talking-avatar`) — image-to-talking-video via HeyGen (`TalkingAvatarPage.jsx`)
 - **Food Menu** (`/generate/food`) — F&B specific image with mood/layout presets; **admin-only** (wrapped in `AdminRoute`)
 - **Marketplace** (`/generate/marketplace`) — marketplace product listing image
-- **Reels** (`/generate/reels`) — image-to-video ad (fal.ai Kling), see Video generation above
 - **Growth Consultant** (`/growth-consultant`) — AI-powered business growth advice (`GrowthConsultantPage.jsx`)
 
-Plus planning tools: **Grid Planner** (`GridPlannerPage.jsx`), **Content Calendar** (`/calendar`), **Consistency Checker** (`/consistency`), and **History** (`/history`).
+Plus planning tools: **Content Calendar** (`/calendar`) and **History** (`/history`).
 
 All generator routes (and most planning tools) are wrapped in `<MenuLockGate>` — see Menu Lockdown above.
 
