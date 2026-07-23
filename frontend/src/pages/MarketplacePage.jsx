@@ -86,6 +86,7 @@ export default function MarketplacePage() {
       ...(usp ? [`• ${usp}`] : []),
     ].join("\n");
     if (autoFill) setBenefitUtama(autoFill);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProductId]);
 
   // Discount preview
