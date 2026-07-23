@@ -33,9 +33,12 @@ const ContentCalendarPage   = lazy(() => import("@/pages/ContentCalendarPage"));
 const HistoryPage           = lazy(() => import("@/pages/HistoryPage"));
 const SettingsPage          = lazy(() => import("@/pages/SettingsPage"));
 const BrandKitPage          = lazy(() => import("@/pages/BrandKitPage"));
+const FeedbackPage          = lazy(() => import("@/pages/FeedbackPage"));
 const MorePage              = lazy(() => import("@/pages/MorePage"));
 const BuyCreditsPage        = lazy(() => import("@/pages/BuyCreditsPage"));
+const ProductLibraryPage    = lazy(() => import("@/pages/ProductLibraryPage"));
 const AdminPage             = lazy(() => import("@/pages/AdminPage"));
+const FeedGeneratorPage     = lazy(() => import("@/pages/FeedGeneratorPage"));
 
 function PageLoader() {
   return (
@@ -61,6 +64,9 @@ function ProtectedRoute({ children, requireBrand = true }) {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
+  // Non-admin users must have paid (lifetime access) before entering the app
+  const hasAccess = user.role === "admin" || user.is_lifetime;
+  if (!hasAccess) return <Navigate to="/pricing" replace />;
   if (requireBrand && !user.has_brand_profile) return <Navigate to="/onboarding" replace />;
   return children;
 }
@@ -83,8 +89,24 @@ function PublicOnly({ children }) {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (user) {
+    const hasAccess = user.role === "admin" || user.is_lifetime;
+    if (!hasAccess) return children; // Not paid yet — let them see login/register
     return <Navigate to={user.has_brand_profile ? "/dashboard" : "/onboarding"} replace />;
   }
+  return children;
+}
+
+function LogoutPage() {
+  const { logout } = useAuth();
+  useEffect(() => { logout(); }, []); // eslint-disable-line
+  return null;
+}
+
+// Checkout only requires login, not payment (user comes here TO pay)
+function LoginRequired({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/login?redirect=/checkout?plan=lifetime" replace />;
   return children;
 }
 
@@ -108,8 +130,9 @@ function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/"                element={<LandingPage />} />
-            <Route path="/pricing"         element={<PricingPage />} />
-            <Route path="/checkout"        element={<CheckoutPage />} />
+            <Route path="/logout"          element={<LogoutPage />} />
+            <Route path="/pricing"         element={<BuyCreditsPage />} />
+            <Route path="/checkout"        element={<LoginRequired><CheckoutPage /></LoginRequired>} />
             <Route path="/login"           element={<LoginPage />} />
             <Route path="/register"        element={<PublicOnly><RegisterPage /></PublicOnly>} />
             <Route path="/verify-email"    element={<VerifyEmailPage />} />
@@ -128,11 +151,14 @@ function App() {
               <Route path="/generate/talking-avatar"  element={<MenuLockGate menuKey="talking-avatar"><TalkingAvatarPage /></MenuLockGate>} />
               <Route path="/generate/food"             element={<AdminRoute><MenuLockGate menuKey="food"><FoodMenuPage /></MenuLockGate></AdminRoute>} />
               <Route path="/generate/marketplace"     element={<MenuLockGate menuKey="marketplace"><MarketplacePage /></MenuLockGate>} />
+              <Route path="/generate/feed-generator"  element={<MenuLockGate menuKey="feed-generator"><FeedGeneratorPage /></MenuLockGate>} />
               <Route path="/growth-consultant"         element={<MenuLockGate menuKey="growth-consultant"><GrowthConsultantPage /></MenuLockGate>} />
               <Route path="/calendar"              element={<MenuLockGate menuKey="calendar"><ContentCalendarPage /></MenuLockGate>} />
               <Route path="/history"               element={<HistoryPage />} />
+              <Route path="/products"              element={<ProductLibraryPage />} />
               <Route path="/settings"             element={<SettingsPage />} />
               <Route path="/brand-kit"             element={<BrandKitPage />} />
+              <Route path="/feedback"              element={<FeedbackPage />} />
               <Route path="/more"                  element={<MorePage />} />
               <Route path="/admin"                 element={<AdminRoute><AdminPinGate><AdminPage /></AdminPinGate></AdminRoute>} />
               <Route path="/credits"               element={<BuyCreditsPage />} />

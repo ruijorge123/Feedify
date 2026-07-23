@@ -241,7 +241,7 @@ button, [role="button"], input, select, textarea {
     to   { transform: translateX(-50%); }
 }
 .strip-scroll {
-    animation: strip-scroll 28s linear infinite;
+    animation: strip-scroll 110s linear infinite;
     will-change: transform;
 }
 .strip-scroll:hover {
@@ -251,7 +251,7 @@ button, [role="button"], input, select, textarea {
 @media (max-width: 639px) {
     .strip-scroll {
         will-change: auto;
-        animation-duration: 35s;
+        animation-duration: 75s;
     }
 }
 

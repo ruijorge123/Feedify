@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import api from "@/lib/api";
 import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext";
-import { notifyCreditsUpdate } from "@/lib/credits";
-import NoCreditsModal from "@/components/NoCreditsModal";
+import PromptSuccessCard from "@/components/PromptSuccessCard";
 import {
   FilmSlate, UploadSimple, Image as ImageIcon, CircleNotch,
   CheckCircle, DownloadSimple, ArrowsClockwise, Sparkle, Lightning,
@@ -75,9 +74,8 @@ export default function ReelsGeneratorPage() {
     aspect_ratio: "9:16",
   });
   const [generating, setGenerating] = useState(false);
-  const [noCredits,  setNoCredits]  = useState(false);
+  const [promptResult, setPromptResult] = useState(null);
   const [genPhase, setGenPhase]     = useState("");
-  const [result, setResult]         = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -126,40 +124,26 @@ export default function ReelsGeneratorPage() {
   }, [generating]);
 
   const generate = async () => {
-    if (!image) { toast.error("Upload foto produk dulu"); return; }
     setGenerating(true);
-    setResult(null);
-
-    const formData = new FormData();
-    formData.append("image",          image);
-    formData.append("video_goal",     form.video_goal);
-    formData.append("duration",       form.duration.toString());
-    formData.append("aspect_ratio",   form.aspect_ratio);
-    formData.append("director_notes", directorNotes.trim());
-
+    setPromptResult(null);
     try {
-      const { data } = await api.post("/reels/generate", formData, {
+      const formData = new FormData();
+      if (image) formData.append("image", image);
+      formData.append("video_goal",     form.video_goal);
+      formData.append("duration",       form.duration.toString());
+      formData.append("aspect_ratio",   form.aspect_ratio);
+      formData.append("director_notes", directorNotes.trim());
+
+      const { data } = await api.post("/reels/preview", formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        timeout: 360000,
       });
-      setResult(data.video);
-      notifyCreditsUpdate();
-      toast.success("Video Reels berhasil dibuat!");
-      setTimeout(() => document.getElementById("reels-result")?.scrollIntoView({ behavior: "smooth" }), 100);
-    } catch (err) {
-      if (err?.response?.status === 402) {
-        setNoCredits(true);
-      } else {
-        const msg = err?.response?.data?.detail || "Gagal generate video, coba lagi";
-        toast.error(msg);
-      }
-      notifyCreditsUpdate();
+      setPromptResult(data);
+    } catch {
+      toast.error("Gagal membuat prompt. Coba lagi.");
     } finally {
       setGenerating(false);
     }
   };
-
-  const reset = () => { setResult(null); };
 
   const selectedGoal  = VIDEO_GOALS.find(g => g.id === form.video_goal);
   const selectedRatio = ASPECT_RATIOS.find(r => r.value === form.aspect_ratio);
@@ -423,7 +407,7 @@ export default function ReelsGeneratorPage() {
               {generating ? (
                 <><CircleNotch size={18} className="animate-spin" /> Sedang render video...</>
               ) : (
-                <><FilmSlate size={18} weight="fill" /> Generate Video · {CREDITS_PER_VIDEO} Kredit</>
+                <><FilmSlate size={18} weight="fill" /> Buat Prompt & Buka ChatGPT</>
               )}
             </button>
           </div>
@@ -459,7 +443,7 @@ export default function ReelsGeneratorPage() {
             {generating ? (
               <><CircleNotch size={20} className="animate-spin" /> Generating...</>
             ) : (
-              <><FilmSlate size={20} weight="fill" /> Generate Video · {CREDITS_PER_VIDEO} Kredit</>
+              <><FilmSlate size={20} weight="fill" /> Buat Prompt & Buka ChatGPT</>
             )}
           </button>
 
@@ -485,90 +469,20 @@ export default function ReelsGeneratorPage() {
       <div className="lg:hidden fixed bottom-16 left-0 right-0 z-50 backdrop-blur-md border-t border-stone-200"
         style={{ background: "rgba(242,246,244,0.94)" }}>
         <div className="max-w-4xl mx-auto px-4 py-2.5">
-          <button onClick={generate} disabled={generating || !image} data-testid="reels-generate-btn-mobile"
-            className="w-full h-11 bg-brand text-brand-cream rounded-full font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 shadow-md shadow-brand/20 btn-lift transition-colors">
+          <button onClick={generate} disabled={generating} data-testid="reels-generate-btn-mobile"
+            className="w-full h-11 bg-[#10a37f] hover:bg-[#0d8a6c] text-white rounded-full font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-60 shadow-md btn-lift transition-colors">
             {generating
-              ? <><CircleNotch size={15} className="animate-spin" /> Sedang render video...</>
-              : <><FilmSlate size={15} weight="fill" /> Generate Video · {CREDITS_PER_VIDEO} Kredit</>
+              ? <><CircleNotch size={15} className="animate-spin" /> Membangun prompt...</>
+              : <><Sparkle size={15} weight="fill" /> Buat Prompt & Buka ChatGPT</>
             }
           </button>
         </div>
       </div>
 
-      {/* ── Result ── */}
-      {result && (
-        <div id="reels-result" className="space-y-4 animate-fade-up">
-          <div className="flex items-center gap-3">
-            <CheckCircle size={22} weight="fill" className="text-green-600" />
-            <div>
-              <h2 className="font-heading text-xl font-bold text-brand">Video Siap!</h2>
-              <p className="text-xs text-stone-400 mt-0.5">{selectedGoal?.label} · {result.duration}s · {result.aspect_ratio}</p>
-            </div>
-          </div>
-
-          <div className="grid lg:grid-cols-3 gap-6">
-            {/* Video Player */}
-            <div className="lg:col-span-2">
-              <div className="feedify-card p-4">
-                <div className={`${ratioContainerClass} mx-auto rounded-2xl overflow-hidden bg-stone-900`}>
-                  <video src={result.video_url} controls autoPlay loop playsInline
-                    className="w-full h-full object-contain" data-testid="reels-video-player" />
-                </div>
-
-                <div className="flex gap-2 mt-4 justify-center">
-                  <a href={result.video_url}
-                    download={`feedify-reels-${result.id?.slice(0, 8)}.mp4`}
-                    target="_blank" rel="noreferrer"
-                    data-testid="reels-download-btn"
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-brand text-brand-cream rounded-full font-bold text-sm hover:bg-brand-light transition-all btn-lift">
-                    <DownloadSimple size={15} weight="bold" /> Download Video
-                  </a>
-                  <button onClick={reset} data-testid="reels-new-btn"
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-white border border-stone-200 text-stone-700 rounded-full font-semibold text-sm hover:border-stone-300 transition-all">
-                    <ArrowsClockwise size={14} weight="bold" /> Buat Baru
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Video Info Sidebar */}
-            <div className="space-y-4">
-              <div className="feedify-card p-4 space-y-3">
-                <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold">Detail Video</div>
-                <BriefRow label="Tujuan"   value={result.video_goal_label} />
-                <BriefRow label="Durasi"   value={`${result.duration} detik`} />
-                <BriefRow label="Format"   value={result.aspect_ratio} />
-                <BriefRow label="Provider" value="Kling v2.5" />
-              </div>
-
-              {isAdmin && result.prompt_used && (
-                <div className="feedify-card p-4 space-y-2">
-                  <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold">Prompt Sinematik</div>
-                  <p className="text-[11px] text-stone-600 leading-relaxed">{result.prompt_used}</p>
-                </div>
-              )}
-
-              <div className="feedify-card p-4 space-y-2">
-                <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold">Platform yang Cocok</div>
-                {[
-                  result.aspect_ratio === "9:16" ? "Instagram Reels" : null,
-                  result.aspect_ratio === "9:16" ? "TikTok" : null,
-                  "WhatsApp Status",
-                  result.aspect_ratio === "1:1" ? "Instagram Feed" : null,
-                  result.aspect_ratio === "4:5" ? "Instagram Feed" : null,
-                  "Facebook Reels",
-                ].filter(Boolean).map(p => (
-                  <div key={p} className="flex items-center gap-1.5 text-xs text-stone-600">
-                    <span className="text-green-500">✓</span> {p}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+      {promptResult && (
+        <PromptSuccessCard promptData={promptResult} onReset={() => setPromptResult(null)} />
       )}
     </div>
-    <NoCreditsModal open={noCredits} onClose={() => setNoCredits(false)} />
     </>
   );
 }

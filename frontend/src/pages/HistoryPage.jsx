@@ -1,15 +1,28 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { toast } from 'react-toastify';
-import { ImageSquare, Stack, PenNib, ForkKnife, Trash, ClockCounterClockwise, Copy, Check, CalendarPlus } from "@phosphor-icons/react";
+import { ImageSquare, Stack, PenNib, ForkKnife, Trash, ClockCounterClockwise, Copy, Check, CalendarPlus, Storefront, Camera, SquaresFour, Package } from "@phosphor-icons/react";
 import JsonOutput from "@/components/JsonOutput";
 import ScheduleModal from "@/components/ScheduleModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
+const TYPE_META = {
+  banner:         { name: "Feed & Banner", icon: ImageSquare },
+  feed_generator: { name: "Feed Generator", icon: SquaresFour },
+  carousel:       { name: "Carousel", icon: Stack },
+  studio:         { name: "Studio", icon: Camera },
+  marketplace:    { name: "Marketplace", icon: Storefront },
+  copywriting:    { name: "Copywriting", icon: PenNib },
+  "food-menu":    { name: "F&B Menu", icon: ForkKnife },
+};
+
 const TYPE_FILTERS = [
   { id: "", name: "Semua" },
-  { id: "banner", name: "Feed Post", icon: ImageSquare },
+  { id: "banner", name: "Feed & Banner", icon: ImageSquare },
+  { id: "feed_generator", name: "Feed Generator", icon: SquaresFour },
   { id: "carousel", name: "Carousel", icon: Stack },
+  { id: "studio", name: "Studio", icon: Camera },
+  { id: "marketplace", name: "Marketplace", icon: Storefront },
   { id: "copywriting", name: "Copywriting", icon: PenNib },
   { id: "food-menu", name: "F&B Menu", icon: ForkKnife },
 ];
@@ -92,8 +105,11 @@ export default function HistoryPage() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((p) => {
-            const thumb = p.image_base64 || (p.slide_images && p.slide_images[0]);
-            const typeLabel = { banner: "Feed Post", carousel: "Carousel", copywriting: "Copywriting", "food-menu": "F&B Menu", marketplace: "Marketplace" }[p.dashboard_type] || p.dashboard_type;
+            const thumb = p.image_base64 || (p.slide_images && p.slide_images[0]) || p.product_photo_base64 || p.reference_image_base64;
+            const meta = TYPE_META[p.dashboard_type] || { name: p.dashboard_type, icon: ImageSquare };
+            const TypeIcon = meta.icon;
+            const hasProduct = !!(p.product_photo_base64 || p.product?.name);
+            const hasInspiration = !!p.reference_image_base64;
             return (
               <div key={p.id} className="feedify-card overflow-hidden group flex flex-col" data-testid={`prompt-card-${p.id}`}>
                 {/* Thumbnail */}
@@ -102,13 +118,15 @@ export default function HistoryPage() {
                     <img src={thumb.startsWith("data:") ? thumb : `data:image/png;base64,${thumb}`} alt={p.title} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <div className="h-full w-full flex items-center justify-center text-brand-light/40">
-                      {p.dashboard_type === "banner" && <ImageSquare size={32} weight="duotone" />}
-                      {p.dashboard_type === "carousel" && <Stack size={32} weight="duotone" />}
-                      {p.dashboard_type === "copywriting" && <PenNib size={32} weight="duotone" />}
-                      {p.dashboard_type === "food-menu" && <ForkKnife size={32} weight="duotone" />}
+                      <TypeIcon size={32} weight="duotone" />
                     </div>
                   )}
-                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-brand text-brand-cream text-[10px] font-bold uppercase tracking-wide">{typeLabel}</div>
+                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-brand text-brand-cream text-[10px] font-bold uppercase tracking-wide">{meta.name}</div>
+                  {/* Data completeness chips */}
+                  <div className="absolute bottom-2 left-2 flex gap-1">
+                    {hasProduct && <span className="px-1.5 py-0.5 rounded-full bg-white/90 text-brand text-[9px] font-bold flex items-center gap-0.5"><Package size={9} weight="fill" /> Produk</span>}
+                    {hasInspiration && <span className="px-1.5 py-0.5 rounded-full bg-white/90 text-brand text-[9px] font-bold flex items-center gap-0.5"><Camera size={9} weight="fill" /> Inspirasi</span>}
+                  </div>
                 </button>
 
                 {/* Info */}
@@ -182,10 +200,15 @@ export default function HistoryPage() {
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {/* Data lengkap: produk + inspirasi */}
+              <PromptAssets item={selected} />
+
               {selected.dashboard_type === "copywriting" ? (
                 <CopyViewer data={selected.prompt_json} />
               ) : selected.dashboard_type === "carousel" ? (
                 <CarouselViewer data={selected.prompt_json} />
+              ) : selected.dashboard_type === "feed_generator" ? (
+                <FeedGenViewer data={selected.prompt_json} />
               ) : (
                 <JsonOutput json={selected.prompt_json} title={`${selected.title}.json`} testid="modal-json-output" />
               )}
@@ -204,6 +227,84 @@ export default function HistoryPage() {
         loading={deleteConfirm.deleting}
         onConfirm={confirmDelete}
       />
+    </div>
+  );
+}
+
+// Product photo + inspiration photo + product knowledge shown at top of detail modal
+function PromptAssets({ item }) {
+  const product = item.product || null;
+  const productPhoto = item.product_photo_base64;
+  const inspiration = item.reference_image_base64;
+  const benefits = product?.benefits || product?.features || [];
+  if (!productPhoto && !inspiration && !product) return null;
+
+  const src = (v) => (v?.startsWith("data:") ? v : `data:image/png;base64,${v}`);
+
+  return (
+    <div className="rounded-2xl border border-brand-sand bg-brand-sand/20 p-4 space-y-3">
+      <div className="text-[10px] uppercase tracking-[0.18em] text-brand-light font-bold">Data yang dipakai</div>
+      <div className="grid grid-cols-2 gap-3">
+        {(productPhoto || product?.name) && (
+          <div className="flex items-center gap-2.5">
+            {productPhoto ? (
+              <img src={src(productPhoto)} alt="produk" className="w-14 h-14 rounded-xl object-cover border border-stone-200 flex-shrink-0" />
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0"><Package size={22} weight="duotone" className="text-brand" /></div>
+            )}
+            <div className="min-w-0">
+              <div className="text-[10px] text-stone-400 font-semibold">Produk</div>
+              <div className="text-sm font-bold text-brand truncate">{product?.name || "Foto produk"}</div>
+              {product?.category && <div className="text-[11px] text-stone-500 truncate">{product.category}</div>}
+            </div>
+          </div>
+        )}
+        {inspiration && (
+          <div className="flex items-center gap-2.5">
+            <img src={src(inspiration)} alt="inspirasi" className="w-14 h-14 rounded-xl object-cover border border-stone-200 flex-shrink-0" />
+            <div className="min-w-0">
+              <div className="text-[10px] text-stone-400 font-semibold">Foto inspirasi</div>
+              <div className="text-sm font-bold text-brand">Referensi gaya</div>
+              <a href={src(inspiration)} download="foto-inspirasi.jpg" className="text-[11px] text-brand hover:underline">Download</a>
+            </div>
+          </div>
+        )}
+      </div>
+      {benefits.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {benefits.slice(0, 6).map((b, i) => (
+            <span key={i} className="text-[10px] px-2 py-0.5 bg-white text-brand rounded-full border border-brand-sand font-medium">{b}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Feed Generator saves { prompts:[{content_type,purpose,caption_angle,chatgpt_prompt,tip}], count, product_name }
+function FeedGenViewer({ data }) {
+  const prompts = data?.prompts || [];
+  const [idx, setIdx] = useState(0);
+  if (prompts.length === 0) return <JsonOutput json={data} title="feed-generator.json" testid="modal-json-output" />;
+  const p = prompts[idx];
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+        {prompts.map((_, i) => (
+          <button key={i} onClick={() => setIdx(i)}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border ${idx === i ? "bg-brand text-brand-cream border-brand" : "bg-white border-brand-sand text-stone-700"}`}>
+            {i + 1}
+          </button>
+        ))}
+      </div>
+      {p?.purpose && <div className="text-sm font-semibold text-brand">{p.purpose}</div>}
+      {p?.caption_angle && (
+        <div className="bg-brand-sand/40 rounded-xl px-3 py-2">
+          <div className="text-[10px] uppercase tracking-widest text-stone-400 font-bold mb-0.5">Angle Caption</div>
+          <p className="text-sm text-stone-700 italic">"{p.caption_angle}"</p>
+        </div>
+      )}
+      <Line text={p?.chatgpt_prompt || ""} />
     </div>
   );
 }

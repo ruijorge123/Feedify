@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { toast } from 'react-toastify';
 import { handleGenerateError } from "@/lib/moderation";
@@ -7,110 +8,70 @@ import {
   Sparkle, CircleNotch, CheckCircle, Copy, Check,
   Target, Article, MegaphoneSimple, Hash,
   ImageSquare, Stack, Storefront, HouseSimple, ArrowRight,
-  Lightning, CaretDown, CaretUp,
+  Lightning, Package, X, CaretDown,
 } from "@phosphor-icons/react";
 import BrandDnaCard from "@/components/BrandDnaCard";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
 const BRAND_CACHE_KEY = "feedify_brand_cache";
 
-const QUICK_PROMPTS = [
-  {
-    label: "Promo Diskon",
-    desc:  "Skincare andalan kami kini diskon 30% — dari Rp 120.000 jadi Rp 84.000. Berlaku 3 hari, stok tersisa 50 pcs. Manfaat: melembapkan, mencerahkan, aman untuk kulit sensitif.",
-    goal:  "hard_selling",
-    cta:   "strong",
-  },
-  {
-    label: "Launch Produk Baru",
-    desc:  "Introducing formula terbaru kami untuk kulit kusam dan lelah — mengandung Vitamin C 20% + Niacinamide, lebih ringan dan cepat meresap. Harga perkenalan Rp 99.000 (normal Rp 150.000), berlaku 7 hari pertama.",
-    goal:  "product_launch",
-    cta:   "medium",
-  },
-  {
-    label: "Edukasi",
-    desc:  "80% masalah kulit berminyak ternyata disebabkan kurangnya hidrasi. Produk kami mengandung Hyaluronic Acid yang mengunci kelembapan 24 jam tanpa menyumbat pori — cocok untuk kulit berminyak, kombinasi, dan sensitif.",
-    goal:  "education",
-    cta:   "soft",
-  },
-  {
-    label: "Soft Selling",
-    desc:  "Rutinitas pagi jadi lebih simpel: moisturizer, sunscreen, dan primer dalam satu langkah. Tekstur ringan, bebas whitecast, nyaman dipakai seharian baik ke kantor maupun WFH.",
-    goal:  "soft_selling",
-    cta:   "soft",
-  },
-  {
-    label: "Hard Selling",
-    desc:  "Produk bestseller kami dengan 10.000+ ulasan bintang 5. Harga Rp 85.000 sudah termasuk gratis ongkir ke seluruh Indonesia. Order sekarang, proses hari ini, tiba 2–3 hari. Stok hampir habis!",
-    goal:  "hard_selling",
-    cta:   "strong",
-  },
-  {
-    label: "Testimoni",
-    desc:  "Lebih dari 5.000 pelanggan sudah membuktikan hasilnya — kulit lebih cerah dalam 2 minggu pemakaian. Rating 4.9/5 di semua platform. Bahan alami, bebas paraben, aman untuk ibu hamil dan menyusui.",
-    goal:  "brand_awareness",
-    cta:   "medium",
-  },
-  {
-    label: "Flash Sale",
-    desc:  "FLASH SALE 12 jam — produk skincare premium turun 50%! Harga normal Rp 200.000, sekarang hanya Rp 100.000. Stok hanya 30 pcs, first come first served. Jangan sampai kehabisan.",
-    goal:  "flash_sale",
-    cta:   "strong",
-  },
-  {
-    label: "Limited Edition",
-    desc:  "Hadir untuk pertama dan terakhir kalinya — edisi koleksi eksklusif dengan kemasan premium spesial. Formula yang sama, packaging berbeda. Hanya 200 pcs diproduksi, tidak akan ada restock. Harga Rp 150.000.",
-    goal:  "product_launch",
-    cta:   "strong",
-  },
+/* ─── Content types ──────────────────────────────────────── */
+const CONTENT_TYPES = [
+  { id: "soft_selling",   label: "Soft Selling",   goal: "soft_selling",    cta: "soft"   },
+  { id: "hard_selling",   label: "Hard Selling",   goal: "hard_selling",    cta: "strong" },
+  { id: "product_launch", label: "Launch",         goal: "product_launch",  cta: "medium" },
+  { id: "promo",          label: "Promo / Diskon", goal: "hard_selling",    cta: "strong" },
+  { id: "education",      label: "Edukasi",        goal: "education",       cta: "soft"   },
+  { id: "testimonial",    label: "Testimoni",      goal: "brand_awareness", cta: "medium" },
+  { id: "flash_sale",     label: "Flash Sale",     goal: "flash_sale",      cta: "strong" },
+  { id: "awareness",      label: "Awareness",      goal: "awareness",       cta: "soft"   },
 ];
 
+/* Build description from product data + type */
+function buildDescription(product, typeId) {
+  if (!product) return "";
+  const lines = [];
+  if (product.name)        lines.push(`Produk: ${product.name}`);
+  if (product.category)    lines.push(`Kategori: ${product.category}`);
+  if (product.description) lines.push(`Info: ${product.description}`);
+  if (product.usp)         lines.push(`Keunggulan: ${product.usp}`);
+  if ((product.benefits || []).length)    lines.push(`Manfaat: ${product.benefits.join(", ")}`);
+  if ((product.ingredients || []).length) lines.push(`Bahan: ${product.ingredients.join(", ")}`);
+
+  const base = lines.join("\n");
+
+  const toneMap = {
+    soft_selling:   "Tone: Soft & value-driven. Ceritakan manfaat secara natural, tanpa hard sell.",
+    hard_selling:   "Tone: Direct & urgent. Tekankan harga, stok terbatas, dan alasan beli sekarang.",
+    product_launch: "Tone: Exciting & eksklusif. Peluncuran produk baru — tekankan formula/kemasan baru, harga perkenalan, batas waktu.",
+    promo:          "Tone: Promosi diskon. Cantumkan persentase/nominal diskon, harga sebelum & sesudah, batas waktu promo.",
+    education:      "Tone: Informatif & edukatif. Jelaskan bahan aktif, cara kerja, atau fakta menarik tentang produk ini.",
+    testimonial:    "Tone: Social proof. Gunakan bukti nyata — rating, jumlah pelanggan, atau testimoni untuk membangun kepercayaan.",
+    flash_sale:     "Tone: FOMO & urgensi tinggi. Flash sale terbatas waktu, stok terbatas, harga jauh di bawah normal.",
+    awareness:      "Tone: Perkenalan brand/produk. Ringan, intriguing, buat orang penasaran tanpa langsung hard sell.",
+  };
+
+  return base + (toneMap[typeId] ? `\n\n${toneMap[typeId]}` : "");
+}
+
+/* ─── Options ────────────────────────────────────────────── */
 const AUDIENCE_OPTIONS = [
-  { id: "auto",           name: "Auto",          sub: "Rekomen" },
-  { id: "women",          name: "Wanita",         sub: null },
-  { id: "men",            name: "Pria",           sub: null },
-  { id: "parents",        name: "Parents",        sub: null },
-  { id: "students",       name: "Mahasiswa",      sub: null },
-  { id: "office_workers", name: "Pekerja Kantor", sub: null },
-  { id: "business",       name: "Pebisnis",       sub: null },
-  { id: "gen_z",          name: "Gen Z",          sub: null },
-  { id: "millennials",    name: "Millennials",    sub: null },
-  { id: "custom",         name: "Custom",         sub: null },
+  { id: "auto",           name: "Auto"          },
+  { id: "women",          name: "Wanita"         },
+  { id: "men",            name: "Pria"           },
+  { id: "parents",        name: "Parents"        },
+  { id: "students",       name: "Mahasiswa"      },
+  { id: "office_workers", name: "Pekerja Kantor" },
+  { id: "business",       name: "Pebisnis"       },
+  { id: "gen_z",          name: "Gen Z"          },
+  { id: "millennials",    name: "Millennials"    },
+  { id: "custom",         name: "Custom"         },
 ];
 
 const AUDIENCE_LABEL_MAP = {
-  auto:           "",
-  women:          "Wanita",
-  men:            "Pria",
-  parents:        "Orang tua",
-  students:       "Mahasiswa",
-  office_workers: "Pekerja kantoran",
-  business:       "Pemilik bisnis",
-  gen_z:          "Gen Z",
-  millennials:    "Millennials",
+  auto: "", women: "Wanita", men: "Pria", parents: "Orang tua",
+  students: "Mahasiswa", office_workers: "Pekerja kantoran",
+  business: "Pemilik bisnis", gen_z: "Gen Z", millennials: "Millennials",
 };
-
-const BRAND_VOICES = [
-  { id: "auto",         name: "Auto",         badge: "⭐" },
-  { id: "friendly",     name: "Friendly",     badge: null },
-  { id: "professional", name: "Professional", badge: null },
-  { id: "luxury",       name: "Luxury",       badge: null },
-  { id: "playful",      name: "Playful",      badge: null },
-  { id: "educational",  name: "Educational",  badge: null },
-  { id: "persuasive",   name: "Persuasive",   badge: null },
-  { id: "minimal",      name: "Minimal",      badge: null },
-];
-
-const PRIMARY_GOALS = [
-  { id: "auto",           name: "Auto",           badge: "⭐" },
-  { id: "brand_awareness",name: "Brand Awareness",badge: null },
-  { id: "education",      name: "Education",      badge: null },
-  { id: "soft_selling",   name: "Soft Selling",   badge: null },
-  { id: "hard_selling",   name: "Hard Selling",   badge: null },
-  { id: "product_launch", name: "Product Launch", badge: null },
-  { id: "flash_sale",     name: "Flash Sale",     badge: null },
-];
 
 const CTA_STRENGTHS = [
   { id: "soft",   name: "Soft",   example: "\"Coba lihat produknya 😊\"" },
@@ -125,448 +86,42 @@ const CAPTION_LENGTHS = [
 ];
 
 const OUTPUT_TYPES = [
-  { id: "instagram",  name: "Instagram Caption",         recommended: true  },
-  { id: "tiktok",     name: "TikTok Caption",            recommended: false },
-  { id: "facebook",   name: "Facebook Post",             recommended: false },
-  { id: "whatsapp",   name: "WhatsApp Promo",            recommended: false },
-  { id: "google_ads", name: "Google Ads",                recommended: false },
-  { id: "email",      name: "Email Marketing",           recommended: false },
-  { id: "marketplace",name: "Marketplace (Shopee/Tokped)",recommended: false },
-  { id: "blog",       name: "Blog Intro",                recommended: false },
+  { id: "instagram",   name: "Instagram",   recommended: true  },
+  { id: "tiktok",      name: "TikTok",      recommended: false },
+  { id: "whatsapp",    name: "WhatsApp",    recommended: false },
+  { id: "marketplace", name: "Marketplace", recommended: false },
+  { id: "email",       name: "Email",       recommended: false },
 ];
 
 const NEXT_ACTIONS = [
-  { id: "banner",      label: "Create Feed Post",           href: "/generate/banner",      Icon: ImageSquare },
-  { id: "carousel",    label: "Create Carousel",            href: "/generate/carousel",    Icon: Stack },
-  { id: "marketplace", label: "Create Marketplace Listing", href: "/generate/marketplace", Icon: Storefront },
-  { id: "home",        label: "Back to Dashboard",          href: "/dashboard",            Icon: HouseSimple },
+  { id: "banner",      label: "Create Feed & Banner",  href: "/generate/banner",      Icon: ImageSquare },
+  { id: "carousel",    label: "Create Carousel",       href: "/generate/carousel",    Icon: Stack },
+  { id: "marketplace", label: "Marketplace Listing",   href: "/generate/marketplace", Icon: Storefront },
+  { id: "home",        label: "Back to Dashboard",     href: "/dashboard",            Icon: HouseSimple },
 ];
 
 const DEFAULT_FORM = {
-  product_name:       "",
-  product_description:"",
-  usp:                "",
-  audience:           "auto",
-  audience_custom:    "",
-  brand_voice:        "auto",
-  primary_goal:       "auto",
-  cta_strength:       "medium",
-  caption_length:     "medium",
-  output_type:        "instagram",
-  save:               true,
+  content_type:        "soft_selling",
+  product_description: "",
+  audience:            "auto",
+  audience_custom:     "",
+  cta_strength:        "medium",
+  caption_length:      "medium",
+  output_type:         "instagram",
+  save:                true,
 };
 
-// ── Main Component ─────────────────────────────────────────────────────────────
-
-export default function CopywritingPage() {
-  const [searchParams] = useSearchParams();
-  const nav            = useNavigate();
-  const from           = searchParams.get("from");
-
-  const [form, setForm]         = useState(DEFAULT_FORM);
-  const [generating, setGenerating] = useState(false);
-  const [result, setResult]     = useState(null);
-  const [showUsp, setShowUsp]   = useState(false);
-
-  const upd = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  useEffect(() => {
-    // Seed brand cache for BrandDnaCard
-    api.get("/brand-profile").then(({ data }) => {
-      localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(data));
-    }).catch(() => {});
-  }, []);
-
-  const applyQuickPrompt = ({ desc, goal, cta }) => {
-    upd("product_description", desc);
-    upd("primary_goal", goal);
-    upd("cta_strength", cta);
-  };
-
-  const effectiveAudience = form.audience === "custom"
-    ? form.audience_custom
-    : (AUDIENCE_LABEL_MAP[form.audience] || "");
-
-  const generate = async () => {
-    if (!form.product_name.trim())        { toast.error("Nama produk wajib diisi"); return; }
-    if (!form.product_description.trim()) { toast.error("Deskripsi produk wajib diisi"); return; }
-
-    setGenerating(true);
-    setResult(null);
-    try {
-      const voiceToSend = form.brand_voice === "auto" ? "" : form.brand_voice;
-      const goalToSend  = form.primary_goal  === "auto" ? "soft_selling" : form.primary_goal;
-      const payload = {
-        product_name:        form.product_name,
-        product_description: form.product_description,
-        main_problem:        form.usp,
-        usp:                 form.usp,
-        target_audience:     effectiveAudience,
-        brand_voice:         voiceToSend,
-        content_purpose:     goalToSend,
-        primary_goal:        goalToSend,
-        cta_strength:        form.cta_strength,
-        caption_length:      form.caption_length,
-        platform:            form.output_type,
-        save:                form.save,
-      };
-      const { data } = await api.post("/prompt/generate-copywriting", payload);
-      if (data.result?.error) { toast.error("Feedify gagal menghasilkan. Coba lagi."); return; }
-      setResult(data);
-      toast.success("Marketing copy siap!");
-      setTimeout(() => document.getElementById("copy-result")?.scrollIntoView({ behavior: "smooth" }), 100);
-    } catch (err) {
-      const handled = handleGenerateError(err);
-      if (!handled) toast.error("Gagal generate. Coba lagi.");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
+/* ─── sub-components ─────────────────────────────────────── */
+function NumCircle({ n }) {
   return (
-    <div className="space-y-6 pb-32" data-testid="copywriting-page">
-      {/* Header */}
-      <div className="animate-fade-up">
-        <h1 className="font-heading text-3xl sm:text-4xl font-bold text-brand tracking-tight">Marketing Copy</h1>
-        <p className="text-stone-400 mt-1">Ceritakan produkmu — Feedify yang tulis copy-nya.</p>
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* ── Main Form ─────────────────────────────────────────────────────── */}
-        <div className="lg:col-span-2 space-y-5 animate-fade-up min-w-0">
-
-          {/* ① Product Brief */}
-          <div className="feedify-card p-5 space-y-5">
-            <SectionTitle>Product Brief</SectionTitle>
-
-            <Field label="Nama Produk *" hint="Nama produk yang akan dipromosikan.">
-              <input type="text" data-testid="copy-product-name"
-                value={form.product_name}
-                onChange={(e) => upd("product_name", e.target.value)}
-                placeholder="mis. Voyoa Sunscreen SPF 50+"
-                className="input" />
-            </Field>
-
-            <Field label="Deskripsi Produk *" hint="Jelaskan manfaat, bahan, harga, atau keunggulan produk. Atau pilih skenario di bawah sebagai titik awal — tinggal edit sesuai produkmu.">
-              <textarea data-testid="copy-product-desc"
-                value={form.product_description}
-                onChange={(e) => upd("product_description", e.target.value)}
-                placeholder="mis. Sunscreen ringan, non-comedogenic, cocok untuk kulit berminyak dan sensitif di cuaca tropis"
-                rows={3} className="input resize-none" />
-              {/* Quick prompt chips */}
-              <div className="flex flex-wrap gap-1.5 mt-2.5">
-                {QUICK_PROMPTS.map(({ label, desc, goal, cta }) => (
-                  <button key={label} type="button" data-testid={`quick-prompt-${label}`}
-                    onClick={() => applyQuickPrompt({ desc, goal, cta })}
-                    className="text-[10px] px-2.5 py-1.5 rounded-full bg-stone-100 text-stone-500 hover:bg-brand-gold/15 hover:text-brand transition-all border border-stone-200 hover:border-brand-gold/40 font-medium">
-                    ✨ {label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-stone-400 mt-1.5">Klik skenario → teks contoh muncul → edit angka & nama produk sesuai bisnismu</p>
-            </Field>
-
-            {/* USP — collapsible */}
-            {!showUsp ? (
-              <button type="button" onClick={() => setShowUsp(true)}
-                className="flex items-center gap-1.5 text-[11px] text-stone-400 hover:text-brand transition-colors">
-                <CaretDown size={10} /> Tambahkan USP (opsional)
-              </button>
-            ) : (
-              <div className="animate-fade-up">
-                <button type="button" onClick={() => setShowUsp(false)}
-                  className="flex items-center gap-1.5 text-[11px] text-stone-400 hover:text-brand transition-colors mb-3">
-                  <CaretUp size={10} /> Sembunyikan
-                </button>
-                <Field label="USP — Unique Selling Point" hint="Hal yang membuat produk berbeda dari kompetitor.">
-                  <input type="text" data-testid="copy-usp"
-                    value={form.usp}
-                    onChange={(e) => upd("usp", e.target.value)}
-                    placeholder="mis. Tidak bikin whitecast, ringan di kulit, aman untuk kulit sensitif"
-                    className="input" />
-                </Field>
-              </div>
-            )}
-          </div>
-
-          {/* ② Output Type */}
-          <div className="feedify-card p-5 space-y-3">
-            <SectionTitle>Output</SectionTitle>
-            <div className="flex flex-wrap gap-2">
-              {OUTPUT_TYPES.map(({ id, name, recommended }) => (
-                <button key={id} type="button" data-testid={`output-type-${id}`}
-                  onClick={() => upd("output_type", id)}
-                  className={`relative px-3.5 py-2 rounded-full border-2 text-xs font-semibold transition-all ${
-                    form.output_type === id
-                      ? "bg-brand text-brand-cream border-brand"
-                      : "bg-white border-stone-200 text-stone-600 hover:border-brand/40"
-                  }`}>
-                  {recommended && form.output_type !== id && (
-                    <span className="absolute -top-2 -right-1 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full">⭐</span>
-                  )}
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ③ Audience */}
-          <div className="feedify-card p-5 space-y-3">
-            <SectionTitle>Audience</SectionTitle>
-            <div className="flex flex-wrap gap-2">
-              {AUDIENCE_OPTIONS.map(({ id, name, sub }) => (
-                <button key={id} type="button" data-testid={`audience-${id}`}
-                  onClick={() => upd("audience", id)}
-                  className={`relative px-3.5 py-2 rounded-full border-2 text-xs font-semibold transition-all ${
-                    form.audience === id
-                      ? "bg-brand text-brand-cream border-brand"
-                      : "bg-white border-stone-200 text-stone-600 hover:border-brand/40"
-                  }`}>
-                  {sub && form.audience !== id && (
-                    <span className="absolute -top-2 -right-1 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full">{sub}</span>
-                  )}
-                  {name}
-                </button>
-              ))}
-            </div>
-            {form.audience === "custom" && (
-              <input type="text" autoFocus data-testid="audience-custom"
-                value={form.audience_custom}
-                onChange={(e) => upd("audience_custom", e.target.value)}
-                placeholder="Deskripsikan target audience kamu..."
-                className="input animate-fade-up" />
-            )}
-            {form.audience === "auto" && (
-              <p className="text-[10px] text-stone-400">Feedify akan menentukan audience terbaik berdasarkan deskripsi produk.</p>
-            )}
-          </div>
-
-          {/* ④ Brand Voice */}
-          <div className="feedify-card p-5 space-y-3">
-            <SectionTitle>Brand Voice</SectionTitle>
-            <div className="flex flex-wrap gap-2">
-              {BRAND_VOICES.map(({ id, name, badge }) => (
-                <button key={id} type="button" data-testid={`brand-voice-${id}`}
-                  onClick={() => upd("brand_voice", id)}
-                  className={`relative px-3.5 py-2 rounded-full border-2 text-xs font-semibold transition-all ${
-                    form.brand_voice === id
-                      ? "bg-brand text-brand-cream border-brand"
-                      : "bg-white border-stone-200 text-stone-600 hover:border-brand/40"
-                  }`}>
-                  {badge && form.brand_voice !== id && (
-                    <span className="absolute -top-2 -right-1 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full">{badge}</span>
-                  )}
-                  {name}
-                </button>
-              ))}
-            </div>
-            {form.brand_voice === "auto" && (
-              <p className="text-[10px] text-stone-400">Feedify akan menyesuaikan voice dari Brand DNA kamu secara otomatis.</p>
-            )}
-          </div>
-
-          {/* ⑤ Primary Goal */}
-          <div className="feedify-card p-5 space-y-3">
-            <SectionTitle>Primary Goal</SectionTitle>
-            <div className="flex flex-wrap gap-2">
-              {PRIMARY_GOALS.map(({ id, name, badge }) => (
-                <button key={id} type="button" data-testid={`goal-${id}`}
-                  onClick={() => upd("primary_goal", id)}
-                  className={`relative px-3.5 py-2 rounded-full border-2 text-xs font-semibold transition-all ${
-                    form.primary_goal === id
-                      ? "bg-brand text-brand-cream border-brand"
-                      : "bg-white border-stone-200 text-stone-600 hover:border-brand/40"
-                  }`}>
-                  {badge && form.primary_goal !== id && (
-                    <span className="absolute -top-2 -right-1 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full">{badge}</span>
-                  )}
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ⑥ CTA + Length */}
-          <div className="feedify-card p-5 space-y-5">
-            <div>
-              <SectionTitle className="mb-3">CTA Strength</SectionTitle>
-              <div className="grid grid-cols-3 gap-2.5">
-                {CTA_STRENGTHS.map(({ id, name, example }) => (
-                  <button key={id} type="button" data-testid={`cta-strength-${id}`}
-                    onClick={() => upd("cta_strength", id)}
-                    className={`p-3.5 rounded-xl border-2 text-left transition-all ${
-                      form.cta_strength === id ? "border-brand bg-brand-sand" : "border-stone-100 hover:border-brand/30 bg-white"
-                    }`}>
-                    <div className={`font-bold text-sm mb-1.5 ${form.cta_strength === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
-                    <div className="text-[10px] text-stone-400 leading-relaxed italic">{example}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <SectionTitle className="mb-3">Caption Length</SectionTitle>
-              <div className="grid grid-cols-3 gap-2.5">
-                {CAPTION_LENGTHS.map(({ id, name, est }) => (
-                  <button key={id} type="button" data-testid={`caption-length-${id}`}
-                    onClick={() => upd("caption_length", id)}
-                    className={`p-3.5 rounded-xl border-2 text-center transition-all ${
-                      form.caption_length === id ? "border-brand bg-brand-sand" : "border-stone-100 hover:border-brand/30 bg-white"
-                    }`}>
-                    <div className={`font-bold text-sm mb-1 ${form.caption_length === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
-                    <div className={`text-[10px] ${form.caption_length === id ? "text-brand/60" : "text-stone-400"}`}>{est}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ⑦ Feedify akan otomatis */}
-          <div className="rounded-2xl border border-green-100 p-5 bg-gradient-to-br from-green-50/60 to-white" data-testid="copy-ai-card">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkle size={14} weight="fill" className="text-brand-gold" />
-              <p className="text-sm font-semibold text-brand">Feedify akan otomatis</p>
-            </div>
-            <div className="space-y-2">
-              {[
-                "Menulis headline dan hook pembuka yang menarik perhatian",
-                "Menyesuaikan tone dan voice dengan karakter brand kamu",
-                "Menyusun body copy, CTA, dan closing yang efektif",
-                "Menghasilkan versi dengan emoji dan tanpa emoji",
-                "Menambahkan hashtag relevan dan keyword untuk SEO",
-              ].map((item) => (
-                <div key={item} className="flex items-center gap-2.5">
-                  <CheckCircle size={14} weight="fill" className="text-green-500 flex-shrink-0" />
-                  <span className="text-xs text-stone-600">{item}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400 mt-4">⏱ Estimasi proses ±10–20 detik.</p>
-          </div>
-        </div>
-
-        {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-        <div className="lg:sticky lg:top-6 lg:self-start space-y-4">
-          <BrandDnaCard />
-
-          {/* Quick summary */}
-          <div className="feedify-card p-4 space-y-2.5">
-            <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold">Konfigurasi</div>
-            <SummaryRow label="Output"  value={OUTPUT_TYPES.find(o => o.id === form.output_type)?.name || "—"} />
-            <SummaryRow label="Voice"   value={BRAND_VOICES.find(v => v.id === form.brand_voice)?.name || "—"} />
-            <SummaryRow label="Goal"    value={PRIMARY_GOALS.find(g => g.id === form.primary_goal)?.name || "—"} />
-            <SummaryRow label="CTA"     value={CTA_STRENGTHS.find(c => c.id === form.cta_strength)?.name || "—"} />
-            <SummaryRow label="Length"  value={CAPTION_LENGTHS.find(l => l.id === form.caption_length)?.name || "—"} />
-            <SummaryRow label="Audience" value={
-              form.audience === "auto"   ? "Auto (AI pilihkan)" :
-              form.audience === "custom" ? (form.audience_custom || "Custom") :
-              (AUDIENCE_LABEL_MAP[form.audience] || form.audience)
-            } />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Results ─────────────────────────────────────────────────────────── */}
-      {result?.result && !result.result.error && (
-        <div id="copy-result" className="space-y-5 animate-fade-up">
-          <div className="flex items-center gap-2">
-            <CheckCircle size={24} weight="fill" className="text-green-600" />
-            <h2 className="font-heading text-2xl font-bold text-brand">Marketing Copy Siap!</h2>
-          </div>
-
-          {(result.result.headlines || []).length > 0 && (
-            <ResultSection icon={Target} title="Headlines" subtitle="Pilih yang paling kuat">
-              <div className="space-y-2">
-                {result.result.headlines.map((h, i) => (
-                  <CopyableLine key={i} text={h} testid={`headline-${i}`} />
-                ))}
-              </div>
-            </ResultSection>
-          )}
-
-          {(result.result.captions || []).length > 0 && (
-            <ResultSection icon={Article} title="Captions" subtitle="Variasi gaya berbeda">
-              <div className="space-y-3">
-                {result.result.captions.map((c, i) => (
-                  <div key={i} className="border border-brand-sand rounded-xl p-4 bg-brand-sand/30">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs uppercase tracking-[0.15em] text-brand-light font-bold">{c.style}</span>
-                      <CopyButton text={c.text} testid={`caption-copy-${i}`} />
-                    </div>
-                    <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{c.text}</p>
-                  </div>
-                ))}
-              </div>
-            </ResultSection>
-          )}
-
-          {(result.result.cta_options || []).length > 0 && (
-            <ResultSection icon={MegaphoneSimple} title="Call-to-Action" subtitle="Siap pakai">
-              <div className="flex flex-wrap gap-2">
-                {result.result.cta_options.map((c, i) => (
-                  <CopyableChip key={i} text={c} testid={`cta-${i}`} />
-                ))}
-              </div>
-            </ResultSection>
-          )}
-
-          {(result.result.seo_keywords || result.result.hashtags || []).length > 0 && (
-            <ResultSection icon={Hash} title="Hashtags & SEO Keywords" subtitle="Relevan untuk caption & bio">
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {(result.result.seo_keywords || result.result.hashtags || []).map((h, i) => (
-                  <span key={i} className="px-2.5 py-1 bg-brand-sand rounded-full text-xs font-medium text-brand">{h}</span>
-                ))}
-              </div>
-              <CopyButton
-                text={(result.result.seo_keywords || result.result.hashtags || []).join(" ")}
-                testid="keywords-copy-all"
-                label="Copy semua"
-              />
-            </ResultSection>
-          )}
-
-          <div className="feedify-card p-5">
-            <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold mb-3">Lanjutkan dengan Feedify</div>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {NEXT_ACTIONS.filter(a => a.id !== from).map(({ id, label, href, Icon }) => (
-                <button key={id} type="button" onClick={() => nav(href)}
-                  data-testid={`next-action-${id}`}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-stone-100 hover:border-brand/30 hover:bg-brand-sand/30 transition-all text-left group">
-                  <Icon size={18} weight="duotone" className="text-brand-light group-hover:text-brand transition-colors flex-shrink-0" />
-                  <span className="text-sm font-semibold text-stone-700 group-hover:text-brand transition-colors">{label}</span>
-                  <ArrowRight size={14} className="text-stone-300 group-hover:text-brand ml-auto transition-colors" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Sticky Generate Bar ──────────────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 lg:left-64 backdrop-blur-md border-t border-stone-200"
-        style={{ background: "rgba(242,246,244,0.92)" }}>
-        <div className="max-w-4xl mx-auto px-4 py-3 flex flex-col items-center gap-1">
-          <button type="button" onClick={generate} disabled={generating} data-testid="generate-copy-btn"
-            className="w-full py-4 bg-brand text-brand-cream rounded-full font-bold text-base hover:bg-brand-light btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg shadow-brand/20">
-            {generating
-              ? <><CircleNotch size={20} className="animate-spin" /> Feedify sedang menulis...</>
-              : <><Sparkle size={20} weight="fill" /> Generate Marketing Copy</>}
-          </button>
-          {!generating && (
-            <p className="text-[10px] text-stone-400">≈ 10 detik &nbsp;·&nbsp; 1 kredit</p>
-          )}
-        </div>
-      </div>
+    <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+      {n}
     </div>
   );
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-function SectionTitle({ children, className = "" }) {
-  return (
-    <div className={`text-[10px] uppercase tracking-[0.18em] text-brand-light font-bold ${className}`}>{children}</div>
-  );
+function SectionTitle({ children }) {
+  return <div className="text-[10px] uppercase tracking-[0.18em] text-brand-light font-bold mb-3">{children}</div>;
 }
 
 function Field({ label, hint, children }) {
@@ -594,6 +149,25 @@ function ResultSection({ icon: Icon, title, subtitle, children }) {
   );
 }
 
+function CopyButton({ text, testid, label }) {
+  const [copied, setCopied] = useState(false);
+  const handle = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success("Disalin!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+  return (
+    <button type="button" onClick={handle} data-testid={testid}
+      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand-sand rounded-full transition-all flex-shrink-0">
+      {copied ? <Check size={12} weight="bold" /> : <Copy size={12} weight="bold" />}
+      {label || (copied ? "OK" : "Copy")}
+    </button>
+  );
+}
+
 function CopyableLine({ text, testid }) {
   return (
     <div className="flex items-center gap-2 p-3 bg-brand-sand/40 border border-brand-sand rounded-xl" data-testid={testid}>
@@ -614,30 +188,396 @@ function CopyableChip({ text, testid }) {
   );
 }
 
-function CopyButton({ text, testid, label }) {
-  const [copied, setCopied] = useState(false);
-  const handle = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      toast.success("Disalin!");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {}
-  };
-  return (
-    <button type="button" onClick={handle} data-testid={testid}
-      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand-sand rounded-full transition-all flex-shrink-0">
-      {copied ? <Check size={12} weight="bold" /> : <Copy size={12} weight="bold" />}
-      {label || (copied ? "OK" : "Copy")}
-    </button>
-  );
-}
+/* ─── main ───────────────────────────────────────────────── */
+export default function CopywritingPage() {
+  const [searchParams] = useSearchParams();
+  const nav = useNavigate();
+  const from = searchParams.get("from");
 
-function SummaryRow({ label, value }) {
+  /* Product library */
+  const [productId, setProductId] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => { const { data } = await api.get("/products"); return data; },
+  });
+  const selectedProduct = products.find(p => p.id === productId) || null;
+
+  const [form, setForm] = useState(DEFAULT_FORM);
+  const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState(null);
+  const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    api.get("/brand-profile").then(({ data }) => {
+      localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(data));
+    }).catch(() => {});
+  }, []);
+
+  /* When product changes, rebuild description */
+  const selectProduct = (p) => {
+    setProductId(p.id);
+    setDropdownOpen(false);
+    setForm(f => ({ ...f, product_description: buildDescription(p, f.content_type) }));
+  };
+
+  /* When type changes, rebuild description from current product */
+  const selectContentType = (typeId) => {
+    const ct = CONTENT_TYPES.find(t => t.id === typeId);
+    setForm(f => ({
+      ...f,
+      content_type: typeId,
+      cta_strength: ct?.cta || f.cta_strength,
+      product_description: selectedProduct
+        ? buildDescription(selectedProduct, typeId)
+        : f.product_description,
+    }));
+  };
+
+  const effectiveAudience = form.audience === "custom"
+    ? form.audience_custom
+    : (AUDIENCE_LABEL_MAP[form.audience] || "");
+
+  const canGenerate = !!selectedProduct;
+
+  const generate = async () => {
+    if (!selectedProduct) { toast.error("Pilih produk dari library dulu"); return; }
+    if (!form.product_description.trim()) { toast.error("Deskripsi produk wajib diisi"); return; }
+
+    setGenerating(true);
+    setResult(null);
+    try {
+      const ct = CONTENT_TYPES.find(t => t.id === form.content_type);
+      const payload = {
+        product_name:        selectedProduct.name,
+        product_description: form.product_description,
+        main_problem:        "",
+        usp:                 selectedProduct.usp || "",
+        target_audience:     effectiveAudience,
+        brand_voice:         "",
+        content_purpose:     ct?.goal || "soft_selling",
+        primary_goal:        ct?.goal || "soft_selling",
+        cta_strength:        form.cta_strength,
+        caption_length:      form.caption_length,
+        platform:            form.output_type,
+        save:                form.save,
+      };
+      const { data } = await api.post("/prompt/generate-copywriting", payload);
+      if (data.result?.error) { toast.error("Feedify gagal menghasilkan. Coba lagi."); return; }
+      setResult(data);
+      toast.success("Marketing copy siap!");
+      setTimeout(() => document.getElementById("copy-result")?.scrollIntoView({ behavior: "smooth" }), 100);
+    } catch (err) {
+      const handled = handleGenerateError(err);
+      if (!handled) toast.error("Gagal generate. Coba lagi.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
-    <div className="flex items-center justify-between text-xs gap-2">
-      <span className="text-stone-400 flex-shrink-0">{label}</span>
-      <span className="font-semibold text-stone-700 text-right max-w-[60%] truncate">{value}</span>
+    <div className="max-w-2xl mx-auto px-4 py-8 pb-32 lg:pb-10 space-y-4" data-testid="copywriting-page">
+
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center">
+          <Lightning size={20} weight="fill" />
+        </div>
+        <div>
+          <h1 className="font-heading text-xl font-bold text-brand">Marketing Copy</h1>
+          <p className="text-xs text-stone-500">Ceritakan produkmu — Feedify yang tulis copy-nya</p>
+        </div>
+      </div>
+
+      {/* ① Product Knowledge */}
+      <div className={`feedify-card p-5 ${!productId ? "border-2 border-red-200" : ""}`}>
+        <div className="flex items-center gap-3 mb-4">
+          <NumCircle n="①" />
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="font-heading font-bold text-brand text-sm">Product Knowledge</div>
+              <span className="text-[9px] font-bold text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">★ Wajib</span>
+            </div>
+            <div className="text-xs text-stone-400">Pilih produk dari library kamu</div>
+          </div>
+        </div>
+
+        {!productsLoading && products.length === 0 ? (
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 border border-stone-200">
+            <Package size={20} weight="duotone" className="text-stone-400 flex-shrink-0" />
+            <div>
+              <p className="text-xs text-stone-500">Belum ada produk tersimpan.</p>
+              <a href="/products" className="text-xs font-semibold text-brand hover:underline">+ Tambah produk ke library →</a>
+            </div>
+          </div>
+        ) : (
+          <div className="relative">
+            <button
+              onClick={() => setDropdownOpen(v => !v)}
+              className="w-full flex items-center gap-3 p-3 rounded-xl border border-stone-200 hover:border-brand/50 transition-all text-left bg-white"
+              data-testid="copy-product-selector-btn">
+              {selectedProduct ? (
+                <>
+                  {selectedProduct.photo_base64 ? (
+                    <img src={selectedProduct.photo_base64} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0">
+                      <Package size={18} weight="duotone" className="text-brand" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-stone-800 truncate">{selectedProduct.name}</p>
+                    {selectedProduct.category && <p className="text-xs text-stone-500">{selectedProduct.category}</p>}
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); setProductId(null); upd("product_description", ""); }}
+                    className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-all">
+                    <X size={13} weight="bold" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Package size={18} weight="duotone" className="text-stone-400 flex-shrink-0" />
+                  <span className="flex-1 text-sm text-stone-400">Pilih produk dari library...</span>
+                  <CaretDown size={14} className="text-stone-400 flex-shrink-0" />
+                </>
+              )}
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-white rounded-xl border border-stone-200 shadow-lg max-h-56 overflow-y-auto">
+                {products.map(p => (
+                  <button key={p.id} onClick={() => selectProduct(p)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-brand/5 transition-all text-left ${p.id === productId ? "bg-brand/5" : ""}`}
+                    data-testid={`copy-product-option-${p.id}`}>
+                    {p.photo_base64 ? (
+                      <img src={p.photo_base64} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0">
+                        <Package size={15} weight="duotone" className="text-brand" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-stone-800 truncate">{p.name}</p>
+                      {p.category && <p className="text-xs text-stone-400">{p.category}</p>}
+                    </div>
+                    {p.id === productId && <CheckCircle size={14} weight="fill" className="text-brand flex-shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ② Tipe Konten */}
+      <div className="feedify-card p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <NumCircle n="②" />
+          <div>
+            <div className="font-heading font-bold text-brand text-sm">Tipe Konten</div>
+            <div className="text-xs text-stone-400">Pilih tipe — deskripsi otomatis terisi dari produk yang dipilih</div>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {CONTENT_TYPES.map(({ id, label }) => (
+            <button key={id} type="button"
+              onClick={() => selectContentType(id)}
+              className={`px-4 py-2 rounded-full border-2 text-xs font-semibold transition-all ${
+                form.content_type === id
+                  ? "bg-brand text-brand-cream border-brand"
+                  : "bg-white border-stone-200 text-stone-600 hover:border-brand/40"
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ③ Deskripsi (auto-filled, editable) */}
+      <div className="feedify-card p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <NumCircle n="③" />
+          <div>
+            <div className="font-heading font-bold text-brand text-sm">Deskripsi Produk</div>
+            <div className="text-xs text-stone-400">Otomatis terisi — kamu masih bisa edit</div>
+          </div>
+        </div>
+        <textarea
+          data-testid="copy-product-desc"
+          value={form.product_description}
+          onChange={e => upd("product_description", e.target.value)}
+          placeholder="Pilih produk dan tipe konten di atas — deskripsi akan otomatis muncul di sini"
+          rows={5} className="input resize-none text-sm w-full" />
+      </div>
+
+      {/* ④ Output + Audience */}
+      <div className="feedify-card p-5 space-y-5">
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <NumCircle n="④" />
+            <div className="font-heading font-bold text-brand text-sm">Platform & Audience</div>
+          </div>
+          <SectionTitle>Platform Output</SectionTitle>
+          <div className="flex flex-wrap gap-2 mb-4">
+            {OUTPUT_TYPES.map(({ id, name, recommended }) => (
+              <button key={id} type="button" data-testid={`output-type-${id}`}
+                onClick={() => upd("output_type", id)}
+                className={`relative px-3.5 py-2 rounded-full border-2 text-xs font-semibold transition-all ${
+                  form.output_type === id
+                    ? "bg-brand text-brand-cream border-brand"
+                    : "bg-white border-stone-200 text-stone-600 hover:border-brand/40"
+                }`}>
+                {recommended && form.output_type !== id && (
+                  <span className="absolute -top-2 -right-1 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full">⭐</span>
+                )}
+                {name}
+              </button>
+            ))}
+          </div>
+
+          <SectionTitle>Target Audience</SectionTitle>
+          <div className="flex flex-wrap gap-2">
+            {AUDIENCE_OPTIONS.map(({ id, name }) => (
+              <button key={id} type="button" data-testid={`audience-${id}`}
+                onClick={() => upd("audience", id)}
+                className={`px-3.5 py-2 rounded-full border-2 text-xs font-semibold transition-all ${
+                  form.audience === id
+                    ? "bg-brand text-brand-cream border-brand"
+                    : "bg-white border-stone-200 text-stone-600 hover:border-brand/40"
+                }`}>
+                {name}
+              </button>
+            ))}
+          </div>
+          {form.audience === "custom" && (
+            <input type="text" autoFocus data-testid="audience-custom"
+              value={form.audience_custom}
+              onChange={e => upd("audience_custom", e.target.value)}
+              placeholder="Deskripsikan target audience kamu..."
+              className="input mt-3 animate-fade-up" />
+          )}
+        </div>
+      </div>
+
+      {/* ⑤ CTA + Length */}
+      <div className="feedify-card p-5 space-y-5">
+        <div className="flex items-center gap-3 mb-1">
+          <NumCircle n="⑤" />
+          <div className="font-heading font-bold text-brand text-sm">Gaya Penulisan</div>
+        </div>
+
+        <div>
+          <SectionTitle>CTA Strength</SectionTitle>
+          <div className="grid grid-cols-3 gap-2.5">
+            {CTA_STRENGTHS.map(({ id, name, example }) => (
+              <button key={id} type="button" data-testid={`cta-strength-${id}`}
+                onClick={() => upd("cta_strength", id)}
+                className={`p-3.5 rounded-xl border-2 text-left transition-all ${
+                  form.cta_strength === id ? "border-brand bg-brand-sand" : "border-stone-100 hover:border-brand/30 bg-white"
+                }`}>
+                <div className={`font-bold text-sm mb-1.5 ${form.cta_strength === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
+                <div className="text-[10px] text-stone-400 leading-relaxed italic">{example}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <SectionTitle>Caption Length</SectionTitle>
+          <div className="grid grid-cols-3 gap-2.5">
+            {CAPTION_LENGTHS.map(({ id, name, est }) => (
+              <button key={id} type="button" data-testid={`caption-length-${id}`}
+                onClick={() => upd("caption_length", id)}
+                className={`p-3.5 rounded-xl border-2 text-center transition-all ${
+                  form.caption_length === id ? "border-brand bg-brand-sand" : "border-stone-100 hover:border-brand/30 bg-white"
+                }`}>
+                <div className={`font-bold text-sm mb-1 ${form.caption_length === id ? "text-brand" : "text-stone-700"}`}>{name}</div>
+                <div className={`text-[10px] ${form.caption_length === id ? "text-brand/60" : "text-stone-400"}`}>{est}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Results ───────────────────────────────────────────── */}
+      {result?.result && !result.result.error && (
+        <div id="copy-result" className="space-y-5 animate-fade-up">
+          <div className="flex items-center gap-2">
+            <CheckCircle size={24} weight="fill" className="text-green-600" />
+            <h2 className="font-heading text-2xl font-bold text-brand">Marketing Copy Siap!</h2>
+          </div>
+
+          {(result.result.headlines || []).length > 0 && (
+            <ResultSection icon={Target} title="Headlines" subtitle="Pilih yang paling kuat">
+              <div className="space-y-2">
+                {result.result.headlines.map((h, i) => <CopyableLine key={i} text={h} testid={`headline-${i}`} />)}
+              </div>
+            </ResultSection>
+          )}
+
+          {(result.result.captions || []).length > 0 && (
+            <ResultSection icon={Article} title="Captions" subtitle="Variasi gaya berbeda">
+              <div className="space-y-3">
+                {result.result.captions.map((c, i) => (
+                  <div key={i} className="border border-brand-sand rounded-xl p-4 bg-brand-sand/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs uppercase tracking-[0.15em] text-brand-light font-bold">{c.style}</span>
+                      <CopyButton text={c.text} testid={`caption-copy-${i}`} />
+                    </div>
+                    <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{c.text}</p>
+                  </div>
+                ))}
+              </div>
+            </ResultSection>
+          )}
+
+          {(result.result.cta_options || []).length > 0 && (
+            <ResultSection icon={MegaphoneSimple} title="Call-to-Action" subtitle="Siap pakai">
+              <div className="flex flex-wrap gap-2">
+                {result.result.cta_options.map((c, i) => <CopyableChip key={i} text={c} testid={`cta-${i}`} />)}
+              </div>
+            </ResultSection>
+          )}
+
+          {(result.result.seo_keywords || result.result.hashtags || []).length > 0 && (
+            <ResultSection icon={Hash} title="Hashtags & Keywords">
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {(result.result.seo_keywords || result.result.hashtags || []).map((h, i) => (
+                  <span key={i} className="px-2.5 py-1 bg-brand-sand rounded-full text-xs font-medium text-brand">{h}</span>
+                ))}
+              </div>
+              <CopyButton text={(result.result.seo_keywords || result.result.hashtags || []).join(" ")} testid="keywords-copy-all" label="Copy semua" />
+            </ResultSection>
+          )}
+
+          <div className="feedify-card p-5">
+            <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold mb-3">Lanjutkan dengan Feedify</div>
+            <div className="grid sm:grid-cols-2 gap-2">
+              {NEXT_ACTIONS.filter(a => a.id !== from).map(({ id, label, href, Icon }) => (
+                <button key={id} type="button" onClick={() => nav(href)} data-testid={`next-action-${id}`}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-stone-100 hover:border-brand/30 hover:bg-brand-sand/30 transition-all text-left group">
+                  <Icon size={18} weight="duotone" className="text-brand-light group-hover:text-brand transition-colors flex-shrink-0" />
+                  <span className="text-sm font-semibold text-stone-700 group-hover:text-brand transition-colors">{label}</span>
+                  <ArrowRight size={14} className="text-stone-300 group-hover:text-brand ml-auto transition-colors" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── GENERATE — nempel di bawah form (semua viewport) ─── */}
+      <button
+        onClick={generate}
+        disabled={generating || !canGenerate}
+        className="inline-flex w-full h-12 bg-brand hover:bg-brand/90 text-brand-cream rounded-full font-heading font-bold text-sm btn-lift items-center justify-center gap-2 disabled:opacity-60 shadow-md transition-colors tracking-wide"
+        data-testid="generate-copy-btn">
+        {generating
+          ? <><CircleNotch size={16} className="animate-spin" /> Feedify sedang menulis...</>
+          : <><Lightning size={16} weight="fill" /> GENERATE — Marketing Copy</>}
+      </button>
     </div>
   );
 }

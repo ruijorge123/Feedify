@@ -9,8 +9,26 @@ import {
   House,
 } from "@phosphor-icons/react";
 
+// Module-level catalog cache — fetched once per app session, shared across all gallery instances
+let _catalogCache = null;
+let _catalogPromise = null;
+
+function fetchCatalog() {
+  if (_catalogCache) return Promise.resolve(_catalogCache);
+  if (!_catalogPromise) {
+    _catalogPromise = fetch("/gallery/index.json")
+      .then((r) => r.json())
+      .then((d) => { _catalogCache = d; return d; })
+      .catch(() => null);
+  }
+  return _catalogPromise;
+}
+
+// Auto-prefetch as soon as this module is imported (i.e. when any gallery page loads)
+fetchCatalog();
+
 const ICON_MAP = {
-  TShirt, ForkKnife, Drop, Storefront, StoreFront: Storefront,
+  TShirt, ForkKnife, Drop, Storefront, StoreFront: Storefront, Images,
   DeviceMobile, GraduationCap, User, Laptop,
   Books, BookOpen, Package, Star, Tag,
   Coffee, Wine, Hamburger, Cake, Camera,
@@ -18,44 +36,55 @@ const ICON_MAP = {
 };
 
 const CONTEXT_LABELS = {
-  banner: "Inspirasi Feed Post Brand",
-  carousel: "Inspirasi Carousel Brand",
-  food: "Inspirasi Foto F&B",
+  banner:      "Inspirasi Feed & Banner Brand",
+  carousel:    "Inspirasi Carousel Brand",
+  food:        "Inspirasi Foto F&B",
   marketplace: "Inspirasi Thumbnail Marketplace",
+  studio:      "Inspirasi Commercial Photography",
 };
 
 const CONTEXT_DESC = {
-  banner: "Pilih foto postingan brand sebagai referensi gaya visual",
-  carousel: "Foto tampil urut per brand — pilih sebagai referensi slide",
-  food: "Referensi foto makanan & minuman profesional",
+  banner:      "Pilih foto postingan brand sebagai referensi gaya visual",
+  carousel:    "Foto tampil urut per brand — pilih sebagai referensi slide",
+  food:        "Referensi foto makanan & minuman profesional",
   marketplace: "Referensi thumbnail produk marketplace",
+  studio:      "Referensi gaya foto commercial product photography",
 };
 
-export default function InspirationGallery({ open, onClose, onSelect, context = "banner" }) {
+export default function InspirationGallery({ open, onClose, onSelect, context = "banner", requiredCount = 1 }) {
+  const isMulti = requiredCount > 1;
   const [catalog, setCatalog] = useState(null);
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(isMulti ? [] : null);
 
   useEffect(() => {
     if (!open) return;
     setActiveCategory("all");
     setSearch("");
-    setSelected(null);
-    fetch("/gallery/index.json")
-      .then((r) => r.json())
-      .then(setCatalog)
-      .catch(() => {});
-  }, [open]);
+    setSelected(isMulti ? [] : null);
+    // Use module-level cache — no re-fetch on subsequent opens
+    if (_catalogCache) {
+      setCatalog(_catalogCache);
+    } else {
+      fetchCatalog().then((d) => { if (d) setCatalog(d); });
+    }
+  }, [open, isMulti]);
 
   if (!open) return null;
 
-  // Support both v1 (categories array) and v2 (contexts object)
+  // Support v2 (contexts object) and v3 (basePath per context)
   const contextData = catalog?.contexts?.[context];
+  const basePath = contextData?.basePath ?? "/gallery/skincare/";
   const categories = contextData?.categories ?? catalog?.categories ?? [];
 
   const allPhotos = categories.flatMap((c) =>
-    (c.photos || []).map((p) => ({ ...p, category: c.id, categoryName: c.name }))
+    (c.photos || []).map((p) => ({
+      ...p,
+      category: c.id,
+      categoryName: c.name,
+      url: `${basePath}${p.filename}`,
+    }))
   );
 
   const filtered = allPhotos.filter((p) => {
@@ -70,9 +99,23 @@ export default function InspirationGallery({ open, onClose, onSelect, context = 
   // For carousel: group photos by their "set" field (brand/set name), show as ordered rows
   const isCarousel = context === "carousel";
 
+  const handleToggleMulti = (photo) => {
+    setSelected((prev) => {
+      const idx = prev.findIndex((p) => p.id === photo.id);
+      if (idx >= 0) return prev.filter((p) => p.id !== photo.id);
+      if (prev.length >= requiredCount) return prev; // at capacity, ignore
+      return [...prev, photo];
+    });
+  };
+
   const handleSelect = () => {
-    if (!selected) return;
-    onSelect(selected);
+    if (isMulti) {
+      if (selected.length !== requiredCount) return;
+      onSelect(selected);
+    } else {
+      if (!selected) return;
+      onSelect(selected);
+    }
     onClose();
   };
 
@@ -150,14 +193,29 @@ export default function InspirationGallery({ open, onClose, onSelect, context = 
             <EmptyState category={activeCategory} categories={categories} context={context} />
           ) : isCarousel ? (
             // Carousel: neat list per brand/set, ordered rows
-            <CarouselLayout photos={filtered} selected={selected} onSelect={setSelected} />
+            <CarouselLayout
+              photos={filtered}
+              selected={selected}
+              onSelect={isMulti ? handleToggleMulti : setSelected}
+              isMulti={isMulti}
+            />
           ) : (
             // Default: responsive grid
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {filtered.map((photo) => {
-                const isSelected = selected?.id === photo.id;
+              {filtered.map((photo, idx) => {
+                const isSelected = isMulti
+                  ? selected.some((p) => p.id === photo.id)
+                  : selected?.id === photo.id;
                 return (
-                  <PhotoCard key={photo.id} photo={photo} isSelected={isSelected} onSelect={() => setSelected(isSelected ? null : photo)} />
+                  <PhotoCard
+                    key={photo.id}
+                    photo={photo}
+                    isSelected={isSelected}
+                    eager={idx < 12}
+                    onSelect={() =>
+                      isMulti ? handleToggleMulti(photo) : setSelected(isSelected ? null : photo)
+                    }
+                  />
                 );
               })}
             </div>
@@ -166,13 +224,29 @@ export default function InspirationGallery({ open, onClose, onSelect, context = 
 
         {/* Footer */}
         <div className="p-4 border-t border-stone-100 bg-white flex items-center gap-3">
-          {selected ? (
+          {isMulti ? (
+            <div className="flex-1 min-w-0">
+              <div className="flex gap-1 mb-1.5">
+                {Array.from({ length: requiredCount }).map((_, i) => {
+                  const ph = selected[i];
+                  return ph ? (
+                    <img key={ph.id} src={ph.url} alt="" className="h-8 w-8 rounded-md object-cover border-2 border-brand/40 flex-shrink-0" />
+                  ) : (
+                    <div key={i} className="h-8 w-8 rounded-md border-2 border-dashed border-stone-200 bg-stone-50 flex items-center justify-center flex-shrink-0">
+                      <span className="text-[9px] font-bold text-stone-300">{i + 1}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className={`text-xs font-semibold ${selected.length === requiredCount ? "text-brand" : "text-stone-400"}`}>
+                {selected.length === requiredCount
+                  ? `${requiredCount} slide siap dipakai`
+                  : `Pilih ${requiredCount - selected.length} slide lagi (${selected.length}/${requiredCount})`}
+              </p>
+            </div>
+          ) : selected ? (
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <img
-                src={`/gallery/${selected.category}/${selected.filename}`}
-                alt=""
-                className="h-10 w-10 rounded-lg object-cover flex-shrink-0 border border-brand-sand"
-              />
+              <img src={selected.url} alt="" className="h-10 w-10 rounded-lg object-cover flex-shrink-0 border border-brand-sand" />
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-brand truncate">{selected.description}</div>
                 <div className="text-xs text-stone-400 truncate">{selected.tags?.slice(0, 3).join(", ")}</div>
@@ -186,10 +260,14 @@ export default function InspirationGallery({ open, onClose, onSelect, context = 
           </button>
           <button
             onClick={handleSelect}
-            disabled={!selected}
+            disabled={isMulti ? selected.length !== requiredCount : !selected}
             className="px-5 py-2.5 rounded-full bg-brand text-white text-sm font-semibold disabled:opacity-40 hover:bg-brand-light transition-all"
           >
-            Pakai Referensi Ini
+            {isMulti
+              ? selected.length === requiredCount
+                ? `Pakai ${requiredCount} Referensi`
+                : `Pilih ${requiredCount - selected.length} Lagi`
+              : "Pakai Referensi Ini"}
           </button>
         </div>
       </div>
@@ -198,7 +276,7 @@ export default function InspirationGallery({ open, onClose, onSelect, context = 
   );
 }
 
-function PhotoCard({ photo, isSelected, onSelect }) {
+function PhotoCard({ photo, isSelected, eager, onSelect }) {
   return (
     <button
       type="button"
@@ -208,10 +286,12 @@ function PhotoCard({ photo, isSelected, onSelect }) {
       }`}
     >
       <img
-        src={`/gallery/${photo.category}/${photo.filename}`}
+        src={photo.url}
         alt={photo.description}
         className="w-full h-full object-cover object-top"
-        loading="lazy"
+        loading={eager ? "eager" : "lazy"}
+        decoding="async"
+        fetchpriority={eager ? "high" : "low"}
       />
       <div className={`absolute inset-0 bg-brand/60 flex flex-col items-center justify-center p-2 transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
         {isSelected && <CheckCircle size={28} weight="fill" className="text-white mb-1" />}
@@ -229,7 +309,7 @@ function PhotoCard({ photo, isSelected, onSelect }) {
 }
 
 // Carousel: group by set, display as horizontal rows (ordered slides)
-function CarouselLayout({ photos, selected, onSelect }) {
+function CarouselLayout({ photos, selected, onSelect, isMulti }) {
   // Group by set field (if exists), else by categoryName
   const groups = {};
   photos.forEach((p) => {
@@ -238,6 +318,11 @@ function CarouselLayout({ photos, selected, onSelect }) {
     groups[key].push(p);
   });
 
+  const getSelectionIndex = (photo) => {
+    if (!isMulti) return -1;
+    return selected.findIndex((p) => p.id === photo.id);
+  };
+
   return (
     <div className="space-y-6">
       {Object.entries(groups).map(([groupName, groupPhotos]) => (
@@ -245,19 +330,20 @@ function CarouselLayout({ photos, selected, onSelect }) {
           <div className="text-xs uppercase tracking-[0.15em] font-bold text-stone-400 mb-2">{groupName}</div>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
             {groupPhotos.map((photo, slideIdx) => {
-              const isSelected = selected?.id === photo.id;
+              const selIdx = getSelectionIndex(photo);
+              const isSelected = isMulti ? selIdx >= 0 : selected?.id === photo.id;
               return (
                 <button
                   key={photo.id}
                   type="button"
-                  onClick={() => onSelect(isSelected ? null : photo)}
+                  onClick={() => onSelect(photo)}
                   className={`flex-shrink-0 w-28 rounded-xl overflow-hidden border-2 transition-all ${
                     isSelected ? "border-brand shadow-md scale-[0.97]" : "border-stone-200 hover:border-brand/40"
                   }`}
                 >
                   <div className="relative aspect-square">
                     <img
-                      src={`/gallery/${photo.category}/${photo.filename}`}
+                      src={photo.url}
                       alt={photo.description}
                       className="w-full h-full object-cover"
                       loading="lazy"
@@ -267,7 +353,13 @@ function CarouselLayout({ photos, selected, onSelect }) {
                     </div>
                     {isSelected && (
                       <div className="absolute inset-0 bg-brand/50 flex items-center justify-center">
-                        <CheckCircle size={22} weight="fill" className="text-white" />
+                        {isMulti ? (
+                          <div className="h-7 w-7 rounded-full bg-brand flex items-center justify-center text-white font-bold text-sm shadow-md">
+                            {selIdx + 1}
+                          </div>
+                        ) : (
+                          <CheckCircle size={22} weight="fill" className="text-white" />
+                        )}
                       </div>
                     )}
                   </div>
@@ -286,7 +378,6 @@ function CarouselLayout({ photos, selected, onSelect }) {
 
 function EmptyState({ category, categories, context }) {
   const cat = categories?.find((c) => c.id === category);
-  const folderHint = category === "all" ? "<kategori>" : category;
   return (
     <div className="flex flex-col items-center justify-center h-56 text-center px-6">
       <div className="h-16 w-16 rounded-2xl bg-stone-100 flex items-center justify-center mb-4">
@@ -296,12 +387,9 @@ function EmptyState({ category, categories, context }) {
         {category === "all" ? "Gallery masih kosong" : `"${cat?.name || category}" masih kosong`}
       </p>
       <p className="text-xs text-stone-400 max-w-xs leading-relaxed">
-        Tambahkan foto ke folder{" "}
-        <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-500">
-          public/gallery/{folderHint}/
-        </code>{" "}
-        dan daftarkan di{" "}
-        <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-500">index.json</code> di bagian context <strong>{context}</strong>.
+        Tambahkan foto dan daftarkan di{" "}
+        <code className="bg-stone-100 px-1 py-0.5 rounded text-stone-500">gallery/index.json</code>{" "}
+        di bagian context <strong>{context}</strong>.
       </p>
     </div>
   );

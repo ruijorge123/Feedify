@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import api from "@/lib/api";
+import { subscribeToPush, unsubscribeFromPush, getPushStatus } from "@/lib/pushNotifications";
 import { toast } from 'react-toastify';
 import { Link } from "react-router-dom";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -37,11 +38,14 @@ function NotifPanel() {
   const [notif, setNotif] = useState(null);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
+  const [pushStatus, setPushStatus] = useState({ supported: false, subscribed: false, permission: "default" });
+  const [pushLoading, setPushLoading] = useState(false);
 
   useEffect(() => {
     api.get("/notifications/settings")
       .then(({ data }) => setNotif(data))
       .catch(() => setNotif({ default_reminder_hours: 24, notifications_enabled: true }));
+    getPushStatus().then(setPushStatus);
   }, []);
 
   const save = async () => {
@@ -50,6 +54,30 @@ function NotifPanel() {
     catch { toast.error("Gagal menyimpan"); }
     finally { setSaving(false); }
   };
+
+  const handlePushToggle = useCallback(async () => {
+    setPushLoading(true);
+    try {
+      if (pushStatus.subscribed) {
+        await unsubscribeFromPush();
+        toast.success("Notifikasi HP dinonaktifkan");
+        setPushStatus(s => ({ ...s, subscribed: false }));
+      } else {
+        await subscribeToPush();
+        toast.success("Notifikasi HP aktif! Kamu akan dapat pengingat langsung di HP.");
+        setPushStatus(s => ({ ...s, subscribed: true, permission: "granted" }));
+      }
+    } catch (err) {
+      const msg = err.message || "";
+      if (msg.includes("ditolak") || msg.includes("denied")) {
+        toast.error("Izin notifikasi diblokir. Aktifkan di pengaturan browser kamu.");
+      } else {
+        toast.error(msg || "Gagal mengatur notifikasi");
+      }
+    } finally {
+      setPushLoading(false);
+    }
+  }, [pushStatus.subscribed]);
 
   if (!notif) return null;
 
@@ -63,8 +91,8 @@ function NotifPanel() {
         <div className="flex items-center gap-2">
           <Bell size={18} weight="duotone" className="text-brand-gold" />
           <span className="font-heading font-bold text-brand text-sm">Pengaturan Notifikasi Pengingat</span>
-          {notif.notifications_enabled && (
-            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">ON</span>
+          {pushStatus.subscribed && (
+            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">HP ✓</span>
           )}
         </div>
         {open ? <CaretUp size={14} className="text-stone-400" /> : <CaretDown size={14} className="text-stone-400" />}
@@ -72,13 +100,43 @@ function NotifPanel() {
 
       {open && (
         <div className="px-5 pb-5 space-y-4 border-t border-brand-sand/50">
-          {/* Enable toggle */}
-          <div className={`mt-4 rounded-xl p-4 border-2 transition-all ${notif.notifications_enabled ? "border-brand bg-brand/5" : "border-stone-200 bg-stone-50"}`}>
+
+          {/* Web Push — kirim notif ke HP */}
+          {pushStatus.supported && (
+            <div className={`mt-4 rounded-xl p-4 border-2 transition-all ${pushStatus.subscribed ? "border-brand bg-brand/5" : "border-stone-200 bg-stone-50"}`}>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-brand text-sm">Notifikasi ke HP / Browser</div>
+                  <div className="text-xs text-stone-500 mt-0.5 leading-snug">
+                    {pushStatus.subscribed
+                      ? "Aktif — reminder dikirim langsung ke HP kamu"
+                      : pushStatus.permission === "denied"
+                        ? "Diblokir — aktifkan di pengaturan browser"
+                        : "Izinkan agar reminder muncul di HP meski browser tertutup"}
+                  </div>
+                </div>
+                <button
+                  onClick={handlePushToggle}
+                  disabled={pushLoading || pushStatus.permission === "denied"}
+                  data-testid="push-toggle"
+                  className={`flex-shrink-0 h-7 w-12 rounded-full transition-all duration-200 relative disabled:opacity-50 ${pushStatus.subscribed ? "bg-brand" : "bg-stone-300"}`}
+                >
+                  {pushLoading
+                    ? <CircleNotch size={14} className="animate-spin text-white absolute inset-0 m-auto" />
+                    : <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all duration-200 ${pushStatus.subscribed ? "left-5" : "left-0.5"}`} />
+                  }
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Enable app reminder toggle */}
+          <div className={`rounded-xl p-4 border-2 transition-all ${notif.notifications_enabled ? "border-brand/40 bg-brand/3" : "border-stone-200 bg-stone-50"}`}>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="font-semibold text-brand text-sm">Notifikasi Pengingat</div>
+                <div className="font-semibold text-brand text-sm">Pengingat di Aplikasi</div>
                 <div className="text-xs text-stone-500 mt-0.5">
-                  {notif.notifications_enabled ? "Aktif — Feedify kirim reminder sebelum jadwal posting" : "Nonaktif"}
+                  {notif.notifications_enabled ? "Aktif" : "Nonaktif"}
                 </div>
               </div>
               <button
@@ -128,9 +186,6 @@ export default function ContentCalendarPage() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ ...EMPTY_FORM, scheduled_date: ymd(today) });
-  const [ideas, setIdeas] = useState(null);
-  const [generatingIdeas, setGeneratingIdeas] = useState(false);
-  const [showIdeas, setShowIdeas] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, type: null, id: null, loading: false });
 
@@ -213,29 +268,6 @@ export default function ContentCalendarPage() {
     }
   };
 
-  const generateIdeas = async () => {
-    setGeneratingIdeas(true);
-    setIdeas(null);
-    setShowIdeas(true);
-    try {
-      const { data } = await api.post("/calendar/generate-ideas", { month: cursor.getMonth() + 1, year: cursor.getFullYear() });
-      setIdeas(data);
-      toast.success("30 ide konten siap!");
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Gagal generate ide");
-      setShowIdeas(false);
-    } finally {
-      setGeneratingIdeas(false);
-    }
-  };
-
-  const applyIdea = (idea) => {
-    const dateStr = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(idea.day)}`;
-    setEditing(null);
-    setForm({ ...EMPTY_FORM, title: idea.theme, scheduled_date: dateStr, notes: `${idea.content_type} · ${idea.hook}\n\nVisual: ${idea.visual_suggestion}\n${idea.hashtag_cluster}`, status: "draft" });
-    setShowModal(true);
-  };
-
   const removeEvent = (id) => setConfirmDialog({ open: true, type: "event", id, loading: false });
   const deleteSchedule = (id) => setConfirmDialog({ open: true, type: "schedule", id, loading: false });
 
@@ -286,11 +318,6 @@ export default function ContentCalendarPage() {
             <button onClick={() => openAdd(today)} data-testid="add-entry-btn"
               className="px-5 py-3 bg-brand text-brand-cream rounded-full font-semibold hover:bg-brand-light btn-lift inline-flex items-center gap-2 btn-touch">
               <Plus size={18} weight="bold" /> Tambah Konten
-            </button>
-            <button onClick={generateIdeas} disabled={generatingIdeas} data-testid="generate-ideas-btn"
-              className="px-4 py-3 border-2 border-brand-sand text-brand rounded-full font-semibold hover:border-brand hover:bg-brand-sand/40 inline-flex items-center gap-2 btn-touch disabled:opacity-60">
-              {generatingIdeas ? <CircleNotch size={16} className="animate-spin" /> : <Sparkle size={16} weight="fill" />}
-              {generatingIdeas ? "Generating..." : "Generate Ide"}
             </button>
           </div>
         </div>
@@ -438,47 +465,6 @@ export default function ContentCalendarPage() {
           </div>
         )}
       </div>
-
-      {/* AI Ideas Panel */}
-      {showIdeas && (
-        <div className="animate-fade-up" data-testid="ideas-panel">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <LightbulbFilament size={22} weight="duotone" className="text-brand-gold" />
-              <h2 className="font-heading text-xl font-bold text-brand">30 Ide Konten — {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}</h2>
-              {generatingIdeas && <CircleNotch size={16} className="animate-spin text-brand-light" />}
-            </div>
-            <button onClick={() => setShowIdeas(false)} className="h-8 w-8 rounded-full bg-brand-sand text-brand hover:bg-brand-gold/30 flex items-center justify-center font-bold">✕</button>
-          </div>
-          {generatingIdeas && (
-            <div className="feedify-card p-8 text-center text-stone-500">
-              <CircleNotch size={28} className="animate-spin mx-auto mb-3 text-brand-light" />
-              <div className="text-sm">Feedify sedang buat 30 ide konten untuk brand Anda...</div>
-            </div>
-          )}
-          {ideas && !generatingIdeas && (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {(ideas.ideas || []).map((idea, i) => (
-                <div key={i} className="feedify-card p-4 space-y-2" data-testid={`idea-${idea.day}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-lg bg-brand text-brand-cream flex items-center justify-center font-heading font-bold text-sm flex-shrink-0">{idea.day}</div>
-                      <span className="text-[10px] uppercase tracking-[0.12em] font-bold text-brand-light">{idea.content_type}</span>
-                    </div>
-                    <button onClick={() => applyIdea(idea)} data-testid={`use-idea-${idea.day}`}
-                      className="flex-shrink-0 px-2 py-1 bg-brand-gold/20 text-brand rounded-full text-[10px] font-bold hover:bg-brand-gold/40 inline-flex items-center gap-1">
-                      Pakai <ArrowRight size={10} weight="bold" />
-                    </button>
-                  </div>
-                  <div className="font-heading text-sm font-semibold text-brand">{idea.theme}</div>
-                  <div className="text-xs text-stone-600 italic">"{idea.hook}"</div>
-                  {idea.hashtag_cluster && <div className="text-[10px] text-stone-400 truncate">{idea.hashtag_cluster}</div>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Event modal — tambah/edit konten manual */}
       {showModal && (

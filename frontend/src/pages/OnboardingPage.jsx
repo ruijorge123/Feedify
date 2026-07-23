@@ -485,7 +485,7 @@ function OnboardingPaywall({ userName }) {
   const navigate = useNavigate();
   const firstName = userName?.split(" ")[0] || "Kamu";
   const ITEMS = [
-    { label: "Feed Post / Banner", note: "1 kredit" },
+    { label: "Feed & Banner",       note: "1 kredit" },
     { label: "Carousel Instagram", note: "1 kredit / slide" },
     { label: "F&B Menu Visual",    note: "1 kredit" },
     { label: "Copywriting Caption", note: "Gratis" },

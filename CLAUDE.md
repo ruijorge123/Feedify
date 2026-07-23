@@ -44,6 +44,9 @@ SMTP_PASSWORD=...
 SMTP_HOST=smtp.gmail.com      # default
 SMTP_PORT=587                 # default
 SMTP_FROM=...
+VAPID_PUBLIC_KEY=...           # enables Web Push reminders (pywebpush)
+VAPID_PRIVATE_KEY=...
+VAPID_EMAIL=mailto:support@feedify.id  # default
 ```
 
 ### Frontend
@@ -114,6 +117,12 @@ Admins can lock individual menus via `POST /api/admin/menu-lockdown` (payload: `
 ### Voucher & Referral
 Daily voucher codes are auto-generated (`_get_or_create_daily_voucher`). Validated via `POST /api/vouchers/validate`. Referral links generated at `GET /api/referral/my-link` and applied via `POST /api/referral/apply`.
 
+### Web Push Reminders
+`backend/server.py` sends scheduling reminders via `pywebpush` if `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` are set (degrades to a no-op otherwise, gated by `_WEBPUSH_AVAILABLE`). Subscriptions are stored per-user in the `push_subscriptions` collection (`POST /api/push/subscribe`, `DELETE /api/push/subscribe`, `GET /api/push/status`); `GET /api/push/vapid-public-key` exposes the public key to the frontend for `PushManager.subscribe()`.
+
+### Market Intelligence Module
+`backend/market/` is a self-contained APIRouter package (mounted at the bottom of `server.py` via `build_router(get_current_user, db)`, prefix `/api/market-intelligence`) providing keyword/trend research with **no paid API**: `google_trends.py` (via `pytrends`), `google_rss.py` (Google Trends RSS for "trending now"), `google_suggest.py` (autocomplete), `ai_summary.py` (scoring/heuristics + AI-written summaries), `cache.py` (in-memory TTL caches, cleaned up by a startup task). Endpoints: `/trends`, `/trending`, `/suggest`, `/opportunity` (full analysis: demand/competition/content-potential scores, risk flags, content & campaign ideas). `/opportunity` is rate-limited to 3 calls/user/day, tracked in `users.market_research_daily`.
+
 ## Design System Rules
 
 Source of truth: `design_guidelines.json`. Never deviate from these:
@@ -128,7 +137,7 @@ Source of truth: `design_guidelines.json`. Never deviate from these:
 
 ## Content Dashboards
 
-The app has nine generation dashboards:
+The app has ten generation dashboards, each gated by `menuKey` in `<MenuLockGate>` (see Menu Lockdown above):
 - **Banner** (`/generate/banner`) — single static promotional image
 - **Studio** (`/studio`) — commercial product photography (`StudioPage.jsx`)
 - **Carousel** (`/generate/carousel`) — multi-slide Instagram carousel (3–7 slides, each costs 1 credit)
@@ -137,11 +146,15 @@ The app has nine generation dashboards:
 - **Talking Avatar** (`/generate/talking-avatar`) — image-to-talking-video via HeyGen (`TalkingAvatarPage.jsx`)
 - **Food Menu** (`/generate/food`) — F&B specific image with mood/layout presets; **admin-only** (wrapped in `AdminRoute`)
 - **Marketplace** (`/generate/marketplace`) — marketplace product listing image
-- **Growth Consultant** (`/growth-consultant`) — AI-powered business growth advice (`GrowthConsultantPage.jsx`)
+- **Feed Generator** (`/generate/feed-generator`) — Instagram feed post copy/prompt generator, split by content-type (awareness/soft-selling/promo) (`FeedGeneratorPage.jsx`)
+- **Growth Consultant** (`/growth-consultant`) — AI-powered business growth advice, backed by the Market Intelligence module (`GrowthConsultantPage.jsx`)
 
-Plus planning tools: **Content Calendar** (`/calendar`) and **History** (`/history`).
+Plus planning tools: **Content Calendar** (`/calendar`), **History** (`/history`), and **Product Library** (`/products`, `ProductLibraryPage.jsx`) — saved per-category product profiles (ingredients/benefits/target for skincare, etc.) reused across generators.
 
 All generator routes (and most planning tools) are wrapped in `<MenuLockGate>` — see Menu Lockdown above.
+
+### ChatGPT Hand-off Pattern (Manual Testing Mode)
+Several generator pages (e.g. Feed Generator) expose a "Lihat Prompt JSON" / copy-to-clipboard flow via `frontend/src/lib/chatgpt.js`, which builds a system-directive + JSON spec string and can open ChatGPT directly (`openChatGPT`) instead of calling `gpt-image-1` server-side. This is a manual-testing bridge for validating prompts without spending OpenAI API credits — the production path still goes through the backend `_build_*_prompt()` → `gpt-image-1` pipeline.
 
 ## Onboarding Gate
 

@@ -11,7 +11,6 @@ import {
   MagnifyingGlass,
   Crown,
   UserCircle,
-  Coin,
   Images,
   GoogleLogo,
   CalendarBlank,
@@ -25,8 +24,6 @@ import {
   Copy,
   ArrowsClockwise,
   CheckCircle,
-  Plus,
-  Minus,
   TrendUp,
   ChartBar,
   UserPlus,
@@ -43,8 +40,14 @@ import {
   Camera,
   Microphone,
   EyeSlash,
+  Receipt,
+  XCircle,
+  Timer,
+  WarningCircle,
+  ChatCircleDots,
 } from "@phosphor-icons/react";
 import { Switch } from "@/components/ui/switch";
+import ProductTour, { resetTour } from "@/components/ProductTour";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -57,7 +60,7 @@ const ROLE_BADGE = {
 };
 
 const TYPE_LABEL = {
-  banner: "Feed Post",
+  banner: "Feed & Banner",
   carousel: "Carousel",
   copywriting: "Copywriting",
   food_menu: "F&B Menu",
@@ -163,94 +166,6 @@ function RoleDialog({ target, currentUserId, open, onOpenChange, onSaved }) {
   );
 }
 
-// ─── Kredit Dialog ─────────────────────────────────────────────────────────
-
-function CreditDialog({ target, open, onOpenChange, onSaved }) {
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [saving, setSaving] = useState(false);
-  const parsed = parseInt(amount) || 0;
-
-  useEffect(() => { if (open) { setAmount(""); setNote(""); } }, [open]);
-
-  const save = async (sign) => {
-    const final = Math.abs(parsed) * sign;
-    if (!final) { toast.error("Masukkan jumlah kredit"); return; }
-    setSaving(true);
-    try {
-      const { data } = await api.patch(`/admin/users/${target.id}/credits`, { amount: final, note: note || (sign > 0 ? "Tambah kredit manual" : "Kurangi kredit manual") });
-      toast.success(`Kredit ${target.name} sekarang ${data.new_balance}`);
-      onSaved(target.id, data.new_balance);
-      onOpenChange(false);
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Gagal update kredit");
-    } finally { setSaving(false); }
-  };
-
-  if (!target) return null;
-
-  return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl p-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
-          <DialogPrimitive.Close className="absolute right-4 top-4 p-1.5 rounded-full text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-all">
-            <X size={16} />
-          </DialogPrimitive.Close>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="h-11 w-11 rounded-full bg-brand-gold/20 border border-brand-gold/40 flex items-center justify-center flex-shrink-0">
-              <Coin size={20} weight="duotone" className="text-brand-gold" />
-            </div>
-            <div>
-              <DialogPrimitive.Title className="font-heading text-lg font-bold text-brand leading-tight">Kelola Kredit</DialogPrimitive.Title>
-              <DialogPrimitive.Description className="text-xs text-stone-500 mt-0.5">{target.name} · Saldo: {target.credit_balance} kredit</DialogPrimitive.Description>
-            </div>
-          </div>
-
-          <div className="space-y-4 mb-5">
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 block mb-2">Jumlah Kredit</label>
-              <input
-                type="number"
-                min="1"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="mis. 10"
-                data-testid="credit-amount-input"
-                className="input w-full text-center text-2xl font-bold text-brand"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 block mb-2">Catatan (opsional)</label>
-              <input
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="mis. Kompensasi error generate"
-                className="input w-full text-sm"
-                data-testid="credit-note-input"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => save(-1)} disabled={saving || !parsed}
-              data-testid="credit-deduct-btn"
-              className="py-3 bg-red-50 border border-red-200 text-red-600 rounded-full font-bold hover:bg-red-100 transition-all btn-touch disabled:opacity-40 flex items-center justify-center gap-1.5">
-              <Minus size={15} weight="bold" /> Kurangi
-            </button>
-            <button onClick={() => save(1)} disabled={saving || !parsed}
-              data-testid="credit-add-btn"
-              className="py-3 bg-brand text-brand-cream rounded-full font-bold hover:bg-brand-light transition-all btn-touch disabled:opacity-40 flex items-center justify-center gap-1.5">
-              <Plus size={15} weight="bold" /> Tambah
-            </button>
-          </div>
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
-  );
-}
-
 // ─── User Detail Drawer ────────────────────────────────────────────────────
 
 function UserDetailDrawer({ userId, open, onClose }) {
@@ -307,10 +222,9 @@ function UserDetailDrawer({ userId, open, onClose }) {
               </div>
 
               {/* Stats row */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: "Kredit", value: detail.credit_balance, icon: Coin, color: "text-brand-gold" },
-                  { label: "Konten", value: detail.recent_content?.length > 0 ? "ada" : "0", icon: Images, color: "text-emerald-600", raw: detail.recent_content?.length },
+                  { label: "Konten", icon: Images, color: "text-emerald-600", raw: detail.recent_content?.length },
                   { label: "Referral", value: detail.user.referral_count, icon: UserPlus, color: "text-brand" },
                 ].map(({ label, value, icon: Icon, color, raw }) => (
                   <div key={label} className="feedify-card p-3 text-center">
@@ -381,31 +295,6 @@ function UserDetailDrawer({ userId, open, onClose }) {
                 </div>
               )}
 
-              {/* Credit history */}
-              {detail.credit_history?.length > 0 && (
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-[0.15em] text-stone-400 mb-3">Riwayat Kredit (10 Terakhir)</div>
-                  <div className="space-y-1.5">
-                    {detail.credit_history.map((t, i) => {
-                      const isAdd = t.amount > 0;
-                      return (
-                        <div key={i} className="flex items-center gap-3 p-2.5 bg-stone-50 rounded-xl">
-                          <div className={`h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 ${isAdd ? "bg-emerald-100" : "bg-red-100"}`}>
-                            {isAdd ? <Plus size={12} weight="bold" className="text-emerald-600" /> : <Minus size={12} weight="bold" className="text-red-500" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold text-stone-700 truncate">{t.description || t.type}</div>
-                            <div className="text-[10px] text-stone-400">{formatDateTime(t.created_at)}</div>
-                          </div>
-                          <div className={`text-sm font-bold flex-shrink-0 ${isAdd ? "text-emerald-600" : "text-red-500"}`}>
-                            {isAdd ? "+" : ""}{t.amount}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -489,12 +378,11 @@ function AnalyticsPanel() {
       {data && (
             <>
               {/* Quick stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {[
                   { label: "Konten Hari Ini", value: data.content.today, icon: TrendUp, color: "text-emerald-600", bg: "bg-emerald-50" },
                   { label: "Konten Minggu Ini", value: data.content.week, icon: ChartBar, color: "text-brand", bg: "bg-brand/5" },
                   { label: "User Baru Minggu Ini", value: data.users.new_week, icon: UserPlus, color: "text-blue-500", bg: "bg-blue-50" },
-                  { label: "Kredit Dikeluarkan", value: data.credits_issued_week, icon: Lightning, color: "text-brand-gold", bg: "bg-brand-gold/10" },
                 ].map(({ label, value, icon: Icon, color, bg }) => (
                   <div key={label} className={`${bg} rounded-xl p-3.5`}>
                     <Icon size={16} weight="duotone" className={`${color} mb-1.5`} />
@@ -597,6 +485,253 @@ function ConfirmLockModal({ open, title, description, confirmLabel, danger, load
       </div>
     </div>,
     document.body
+  );
+}
+
+// ─── Payment Verification Panel (manual transfer — Lifetime plan) ──────────
+
+const PAYMENT_STATUS_BADGE = {
+  menunggu_transfer:   { label: "Belum Transfer",       cls: "bg-stone-100 text-stone-500" },
+  menunggu_verifikasi: { label: "Menunggu Verifikasi",  cls: "bg-amber-100 text-amber-700" },
+  lunas:               { label: "Lunas",                cls: "bg-emerald-100 text-emerald-600" },
+  ditolak:             { label: "Ditolak",               cls: "bg-red-100 text-red-500" },
+};
+
+const PAYMENT_FILTERS = [
+  { key: "",                    label: "Semua" },
+  { key: "menunggu_verifikasi", label: "Menunggu Verifikasi" },
+  { key: "lunas",                label: "Lunas" },
+  { key: "ditolak",               label: "Ditolak" },
+];
+
+function ProofImageModal({ src, onClose }) {
+  if (!src) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-backdrop-fade"
+      onClick={onClose} data-testid="payment-verification-image-modal">
+      <button onClick={onClose} className="absolute top-4 right-4 h-9 w-9 rounded-full bg-white/90 flex items-center justify-center text-stone-600">
+        <X size={16} weight="bold" />
+      </button>
+      <img src={src} alt="Bukti transfer" onClick={(e) => e.stopPropagation()}
+        className="max-h-[85vh] max-w-full rounded-2xl object-contain shadow-2xl" />
+    </div>,
+    document.body
+  );
+}
+
+function PaymentVerificationPanel() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null); // {order, newStatus, danger, title, description}
+  const [saving, setSaving] = useState(false);
+  const [previewSrc, setPreviewSrc] = useState(null);
+
+  const load = useCallback(async () => {
+    try {
+      const { data } = await api.get("/admin/manual-payments", { params: filter ? { status: filter } : {} });
+      setItems(data);
+    } catch { toast.error("Gagal memuat data verifikasi pembayaran"); }
+    finally { setLoading(false); }
+  }, [filter]);
+
+  useEffect(() => { setLoading(true); load(); }, [load]);
+
+  const applyAction = async () => {
+    if (!confirmAction) return;
+    setSaving(true);
+    try {
+      if (confirmAction.newStatus === "lunas") {
+        await api.post(`/admin/manual-payments/${confirmAction.order.id}/approve`);
+      } else {
+        await api.post(`/admin/manual-payments/${confirmAction.order.id}/reject`, { status: confirmAction.newStatus });
+      }
+      toast.success("Status pembayaran diperbarui");
+      setConfirmAction(null);
+      load();
+    } catch { toast.error("Gagal memperbarui status"); }
+    finally { setSaving(false); }
+  };
+
+  const pendingCount = items.filter((i) => i.status === "menunggu_verifikasi").length;
+
+  if (loading) return (
+    <div className="feedify-card p-6 animate-pulse">
+      <div className="h-4 bg-stone-100 rounded w-1/3 mb-3" />
+      <div className="h-10 bg-stone-100 rounded w-1/2" />
+    </div>
+  );
+
+  return (
+    <CollapsibleCard icon={Receipt} title="Verifikasi Pembayaran Manual" testid="payment-verification-panel"
+      iconClassName={pendingCount > 0 ? "text-amber-500" : "text-brand"}
+      badge={pendingCount > 0 && (
+        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 bg-amber-100 text-amber-700">
+          {pendingCount} menunggu
+        </span>
+      )}>
+      <div className="flex gap-2 flex-wrap mb-4">
+        {PAYMENT_FILTERS.map((f) => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              filter === f.key ? "bg-brand text-white" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+            }`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {items.length === 0 ? (
+        <div className="text-center py-8 text-sm text-stone-400">Belum ada order untuk filter ini.</div>
+      ) : (
+        <div className="space-y-2 overflow-x-auto">
+          {items.map((o) => {
+            const badge = PAYMENT_STATUS_BADGE[o.status] || { label: o.status, cls: "bg-stone-100 text-stone-500" };
+            return (
+              <div key={o.id} className="flex items-center gap-3 p-3 rounded-xl border border-stone-100 hover:border-stone-200 transition-colors"
+                data-testid={`payment-verification-row-${o.id}`}>
+                {o.proof_photo_base64 ? (
+                  <button onClick={() => setPreviewSrc(o.proof_photo_base64)} className="flex-shrink-0">
+                    <img src={o.proof_photo_base64} alt="" className="h-12 w-12 rounded-lg object-cover border border-stone-200" />
+                  </button>
+                ) : (
+                  <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-stone-50 border border-stone-200 flex items-center justify-center">
+                    <Receipt size={16} className="text-stone-300" weight="duotone" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-stone-800 truncate">{o.name || o.email}</p>
+                  <p className="text-xs text-stone-400 truncate">{o.email} · Rp{Number(o.amount).toLocaleString("id-ID")}</p>
+                </div>
+                <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-full ${badge.cls}`}>{badge.label}</span>
+                <div className="flex-shrink-0 flex gap-1.5">
+                  {o.status === "lunas" ? (
+                    <button
+                      onClick={() => setConfirmAction({ order: o, newStatus: "menunggu_verifikasi", danger: true,
+                        title: "Batalkan status Lunas?", description: `Akun ${o.email} akan kembali jadi belum bayar dan akses Lifetime dicabut. Kredit yang sudah ditambahkan tidak ditarik kembali.` })}
+                      data-testid={`payment-verification-revert-${o.id}`}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold border border-stone-200 text-stone-500 hover:border-red-300 hover:text-red-500">
+                      Batalkan
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setConfirmAction({ order: o, newStatus: "lunas", danger: false,
+                          title: "Tandai Lunas?", description: `Akses Lifetime akan langsung aktif untuk ${o.email}.` })}
+                        data-testid={`payment-verification-approve-${o.id}`}
+                        className="px-3 py-1.5 rounded-full text-xs font-semibold bg-brand text-white hover:bg-brand-light">
+                        Tandai Lunas
+                      </button>
+                      {o.status !== "ditolak" && (
+                        <button
+                          onClick={() => setConfirmAction({ order: o, newStatus: "ditolak", danger: true,
+                            title: "Tolak bukti transfer?", description: `Order ${o.email} akan ditandai ditolak. User bisa upload ulang bukti transfer.` })}
+                          data-testid={`payment-verification-reject-${o.id}`}
+                          className="px-3 py-1.5 rounded-full text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50">
+                          Tolak
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <ConfirmLockModal
+        open={!!confirmAction}
+        title={confirmAction?.title}
+        description={confirmAction?.description}
+        confirmLabel={confirmAction?.newStatus === "lunas" ? "Ya, Tandai Lunas" : "Ya, Lanjutkan"}
+        danger={confirmAction?.danger}
+        loading={saving}
+        onConfirm={applyAction}
+        onCancel={() => setConfirmAction(null)}
+      />
+      <ProofImageModal src={previewSrc} onClose={() => setPreviewSrc(null)} />
+    </CollapsibleCard>
+  );
+}
+
+// ─── Feedback / Masukan User Panel ──────────────────────────────────────────
+
+function FeedbackPanel() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      const { data } = await api.get("/admin/feedback");
+      setItems(data);
+    } catch { toast.error("Gagal memuat masukan user"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleRead = async (item) => {
+    const next = !item.read;
+    setItems((prev) => prev.map((f) => f.id === item.id ? { ...f, read: next } : f)); // optimistic
+    try {
+      await api.post(`/admin/feedback/${item.id}/read`, { read: next });
+    } catch {
+      setItems((prev) => prev.map((f) => f.id === item.id ? { ...f, read: !next } : f)); // revert
+      toast.error("Gagal memperbarui status");
+    }
+  };
+
+  const unreadCount = items.filter((f) => !f.read).length;
+
+  if (loading) return (
+    <div className="feedify-card p-6 animate-pulse">
+      <div className="h-4 bg-stone-100 rounded w-1/3 mb-3" />
+      <div className="h-10 bg-stone-100 rounded w-1/2" />
+    </div>
+  );
+
+  return (
+    <CollapsibleCard icon={ChatCircleDots} title="Masukan & Kritik User" testid="feedback-panel"
+      iconClassName={unreadCount > 0 ? "text-brand-gold" : "text-brand"}
+      badge={unreadCount > 0 && (
+        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 bg-brand-gold/20 text-brand">
+          {unreadCount} baru
+        </span>
+      )}>
+      {items.length === 0 ? (
+        <div className="text-center py-8 text-sm text-stone-400">Belum ada masukan dari user.</div>
+      ) : (
+        <div className="space-y-2.5">
+          {items.map((f) => (
+            <div key={f.id}
+              className={`p-4 rounded-xl border transition-colors ${f.read ? "border-stone-100 bg-white" : "border-brand-gold/40 bg-brand-gold/5"}`}
+              data-testid={`feedback-item-${f.id}`}>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-stone-800 truncate">{f.name || f.email}</span>
+                    {!f.read && <span className="text-[9px] font-bold text-brand bg-brand-gold/30 px-1.5 py-0.5 rounded-full">BARU</span>}
+                  </div>
+                  <div className="text-xs text-stone-400 truncate">{f.email} · {formatDate(f.created_at)}</div>
+                </div>
+                <button
+                  onClick={() => toggleRead(f)}
+                  data-testid={`feedback-toggle-read-${f.id}`}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                    f.read
+                      ? "border border-stone-200 text-stone-500 hover:border-brand hover:text-brand"
+                      : "bg-brand text-white hover:bg-brand-light"
+                  }`}>
+                  {f.read ? "Tandai belum dibaca" : "Tandai sudah dibaca"}
+                </button>
+              </div>
+              <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-wrap break-words">{f.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </CollapsibleCard>
   );
 }
 
@@ -943,8 +1078,8 @@ export default function AdminPage() {
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [roleDialog, setRoleDialog] = useState({ open: false, target: null });
-  const [creditDialog, setCreditDialog] = useState({ open: false, target: null });
   const [detailDrawer, setDetailDrawer] = useState({ open: false, userId: null });
+  const [tourOpen, setTourOpen] = useState(false);
 
   const LIMIT = 20;
 
@@ -967,7 +1102,6 @@ export default function AdminPage() {
 
   const handleSearch = (e) => { e.preventDefault(); setSearch(searchInput); setPage(1); };
   const handleRoleSaved = (userId, newRole) => setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u));
-  const handleCreditSaved = (userId, newBalance) => setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, credit_balance: newBalance } : u));
 
   const totalPages = Math.ceil(total / LIMIT);
   const adminCount = users.filter((u) => u.role === "admin").length;
@@ -985,7 +1119,24 @@ export default function AdminPage() {
         <p className="text-stone-500 text-sm mt-1">Kelola semua pengguna Feedify</p>
       </div>
 
+      {/* Tur Fitur preview */}
+      <div className="feedify-card p-4 flex items-center justify-between gap-4 animate-fade-up">
+        <div>
+          <p className="font-semibold text-brand text-sm">Tur Fitur Onboarding</p>
+          <p className="text-xs text-stone-500 mt-0.5">Preview tour yang dilihat user baru saat pertama login</p>
+        </div>
+        <button
+          onClick={() => { resetTour(); setTourOpen(true); }}
+          className="flex-shrink-0 flex items-center gap-2 bg-brand text-brand-cream text-sm font-semibold px-4 py-2 rounded-full hover:bg-brand-light transition-colors"
+          data-testid="admin-preview-tour"
+        >
+          ▶ Lihat Tour
+        </button>
+      </div>
+
       <MaintenancePanel />
+      <PaymentVerificationPanel />
+      <FeedbackPanel />
       <MenuLockdownPanel />
       <DailyVoucherPanel />
       <AnalyticsPanel />
@@ -1040,7 +1191,7 @@ export default function AdminPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-brand-sand/30 text-left">
-                {["User", "Daftar", "Role", "Kredit", "Konten", "Referral", "Aksi"].map((h) => (
+                {["User", "Daftar", "Role", "Konten", "Referral", "Aksi"].map((h) => (
                   <th key={h} className="px-4 py-3 text-xs uppercase tracking-[0.12em] text-stone-500 font-semibold">{h}</th>
                 ))}
               </tr>
@@ -1063,6 +1214,11 @@ export default function AdminPage() {
                           {u.google_linked && <GoogleLogo size={12} weight="fill" className="text-blue-400" />}
                         </div>
                         <div className="text-xs text-stone-400 truncate max-w-[180px]">{u.email}</div>
+                        {u.role !== "admin" && (
+                          <span className={`inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${u.is_lifetime ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-700"}`}>
+                            {u.is_lifetime ? "✅ Lifetime" : "Belum bayar"}
+                          </span>
+                        )}
                       </div>
                     </button>
                   </td>
@@ -1075,12 +1231,6 @@ export default function AdminPage() {
                       {u.role}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 text-stone-700 font-semibold text-xs">
-                      <Coin size={13} weight="duotone" className="text-brand-gold" />
-                      {u.credit_balance}
-                    </div>
-                  </td>
                   <td className="px-4 py-3 text-stone-600 text-xs font-semibold">{u.content_count}</td>
                   <td className="px-4 py-3 text-xs text-stone-500">
                     <code className="bg-brand-sand/50 px-1.5 py-0.5 rounded font-mono text-[10px]">{u.referral_code}</code>
@@ -1089,13 +1239,6 @@ export default function AdminPage() {
                   <td className="px-4 py-3">
                     {u.id !== user?.id ? (
                       <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setCreditDialog({ open: true, target: u })}
-                          data-testid={`edit-credits-${u.id}`}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold border border-brand-gold/40 text-brand-gold hover:bg-brand-gold/10 btn-touch transition-all"
-                        >
-                          <Coin size={11} weight="duotone" /> Kredit
-                        </button>
                         <button
                           onClick={() => setRoleDialog({ open: true, target: u })}
                           data-testid={`edit-role-${u.id}`}
@@ -1111,7 +1254,7 @@ export default function AdminPage() {
                 </tr>
               ))}
               {!loading && users.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-stone-400 text-sm">Tidak ada user ditemukan</td></tr>
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-stone-400 text-sm">Tidak ada user ditemukan</td></tr>
               )}
             </tbody>
           </table>
@@ -1135,6 +1278,11 @@ export default function AdminPage() {
                       {u.google_linked && <GoogleLogo size={11} weight="fill" className="text-blue-400 flex-shrink-0" />}
                     </div>
                     <div className="text-xs text-stone-400 truncate">{u.email}</div>
+                    {u.role !== "admin" && (
+                      <span className={`inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${u.is_lifetime ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-700"}`}>
+                        {u.is_lifetime ? "✅ Lifetime" : "Belum bayar"}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${ROLE_BADGE[u.role] || ROLE_BADGE.user}`}>
@@ -1144,15 +1292,10 @@ export default function AdminPage() {
               </button>
               <div className="flex items-center gap-4 text-xs text-stone-500">
                 <span className="flex items-center gap-1"><CalendarBlank size={11} />{formatDate(u.created_at)}</span>
-                <span className="flex items-center gap-1"><Coin size={11} weight="duotone" className="text-brand-gold" />{u.credit_balance}</span>
                 <span className="flex items-center gap-1"><Images size={11} />{u.content_count}</span>
               </div>
               {u.id !== user?.id && (
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setCreditDialog({ open: true, target: u })}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border border-brand-gold/40 text-brand-gold hover:bg-brand-gold/10 btn-touch">
-                    <Coin size={12} weight="duotone" /> Kredit
-                  </button>
                   <button onClick={() => setRoleDialog({ open: true, target: u })}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border border-brand-sand text-stone-600 hover:bg-brand-sand btn-touch">
                     <PencilSimple size={12} /> Role
@@ -1191,17 +1334,12 @@ export default function AdminPage() {
         currentUserId={user?.id}
         onSaved={handleRoleSaved}
       />
-      <CreditDialog
-        open={creditDialog.open}
-        onOpenChange={(v) => setCreditDialog((s) => ({ ...s, open: v }))}
-        target={creditDialog.target}
-        onSaved={handleCreditSaved}
-      />
       <UserDetailDrawer
         open={detailDrawer.open}
         userId={detailDrawer.userId}
         onClose={() => setDetailDrawer({ open: false, userId: null })}
       />
+      <ProductTour forceOpen={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 }

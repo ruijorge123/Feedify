@@ -44,7 +44,7 @@ export default function GeneratedPreview({
             <div className="text-xs text-stone-500 mt-1">Estimasi 30-60 detik</div>
           </div>
         ) : imageBase64 ? (
-          <img src={dataUrl} alt="Generated" className="h-full w-full object-cover" data-testid={`${testid}-image`} />
+          <img src={dataUrl} alt="Generated" className="w-full h-full object-contain" data-testid={`${testid}-image`} />
         ) : (
           <div className="text-center px-6" data-testid={`${testid}-empty`}>
             <ImageSquare size={36} className="text-brand-light/50 mx-auto mb-2" weight="duotone" />

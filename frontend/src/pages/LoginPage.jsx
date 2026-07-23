@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "react-toastify";
 import { Sparkle, Envelope, ArrowRight, ArrowLeft } from "@phosphor-icons/react";
@@ -409,6 +409,15 @@ export default function LoginPage() {
   const [gLoading, setGLoading] = useState(false);
   const { login, setUser }      = useAuth();
   const navigate                = useNavigate();
+  const [searchParams]          = useSearchParams();
+  const redirectTo              = searchParams.get("redirect") || null;
+
+  const afterLoginNav = (u) => {
+    if (redirectTo) return navigate(redirectTo);
+    // Always land on the homepage after login — user taps "Masuk Dashboard" manually,
+    // regardless of role/lifetime/onboarding status. No auto-jump into the app.
+    navigate("/");
+  };
 
   /* ── Auth handlers (UNCHANGED) ─────────────────────────────────────────── */
 
@@ -418,7 +427,7 @@ export default function LoginPage() {
     try {
       const u = await login(email, password);
       toast.success("Berhasil masuk!");
-      navigate(u.has_brand_profile ? "/dashboard" : "/onboarding");
+      afterLoginNav(u);
     } catch (err) {
       const detail = err?.response?.data?.detail;
       if (detail === "EMAIL_NOT_VERIFIED") {
@@ -442,7 +451,7 @@ export default function LoginPage() {
         localStorage.setItem("feedify_user", JSON.stringify(data.user));
         setUser(data.user);
         toast.success(`Halo, ${data.user.name.split(" ")[0]}!`);
-        navigate(data.user.has_brand_profile ? "/dashboard" : "/onboarding");
+        afterLoginNav(data.user);
       } catch {
         toast.error("Gagal masuk dengan Google. Coba lagi.");
         setGLoading(false);

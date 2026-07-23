@@ -78,18 +78,18 @@ export default function BrandKitPage() {
       <div ref={printRef} className="brand-kit-doc feedify-card p-8 sm:p-12 space-y-10" data-testid="brand-kit-doc">
 
         {/* Header */}
-        <div className="flex items-start justify-between border-b-2 pb-8" style={{ borderColor: brand.color_primary }}>
-          <div>
+        <div className="flex items-start justify-between gap-4 border-b-2 pb-8" style={{ borderColor: brand.color_primary }}>
+          <div className="min-w-0 flex-1">
             <div className="text-xs uppercase tracking-[0.25em] font-semibold mb-2" style={{ color: brand.color_primary }}>
               Brand Identity Kit
             </div>
-            <h1 className="font-heading text-4xl sm:text-5xl font-bold mb-1" style={{ color: brand.color_primary }}>
+            <h1 className="font-heading text-3xl sm:text-5xl font-bold mb-1 break-words" style={{ color: brand.color_primary }}>
               {brand.brand_name}
             </h1>
             <div className="text-stone-500 text-sm">{brand.category}</div>
           </div>
           {brand.logo_base64 && (
-            <img src={brand.logo_base64} alt="logo" className="h-20 w-20 object-contain rounded-xl" />
+            <img src={brand.logo_base64} alt="logo" className="h-16 w-16 sm:h-20 sm:w-20 object-contain rounded-xl flex-shrink-0" />
           )}
         </div>
 

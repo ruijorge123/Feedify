@@ -17,7 +17,6 @@ import {
   Info,
 } from "@phosphor-icons/react";
 import api from "@/lib/api";
-import { useCredits, notifyCreditsUpdate } from "@/lib/credits";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -55,7 +54,7 @@ function ComingSoonState() {
         <Hourglass size={13} weight="fill" className="text-brand-gold" />
         <span className="text-xs font-bold text-brand-gold uppercase tracking-wider">Segera Hadir</span>
       </div>
-      <h2 className="font-heading text-2xl font-bold text-brand mb-3">Talking Avatar</h2>
+      <h2 className="font-heading text-2xl font-bold text-brand mb-3">Video Presenter</h2>
       <p className="text-stone-500 text-sm leading-relaxed max-w-sm mb-8">
         Ubah foto produk menjadi video avatar berbicara yang mempromosikan brand kamu — dengan suara Indonesia yang natural.
       </p>
@@ -194,8 +193,6 @@ function VideoResult({ url }) {
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function TalkingAvatarPage() {
-  const { credits } = useCredits();
-  const balance = credits?.balance ?? credits?.credits_remaining ?? null;
 
   const [available, setAvailable] = useState(null); // null = loading, true/false
   const [photo,     setPhoto]     = useState(null);
@@ -235,10 +232,6 @@ export default function TalkingAvatarPage() {
   };
 
   const handleGenerate = async () => {
-    if (balance !== null && balance < selectedDuration.credits) {
-      toast.error(`Kredit tidak cukup. Butuh ${selectedDuration.credits} kredit, kamu punya ${balance}.`);
-      return;
-    }
     setGenerating(true);
     setJobStatus("waiting");
     setVideoUrl(null);
@@ -256,7 +249,6 @@ export default function TalkingAvatarPage() {
         // Immediate result
         setVideoUrl(data.video_url);
         setJobStatus("done");
-        if (data.credits) notifyCreditsUpdate(data.credits);
       } else if (data.job_id) {
         // Poll for completion
         pollRef.current = setInterval(async () => {
@@ -266,7 +258,6 @@ export default function TalkingAvatarPage() {
               clearInterval(pollRef.current);
               setVideoUrl(poll.video_url);
               setJobStatus("done");
-              if (poll.credits) notifyCreditsUpdate(poll.credits);
               setGenerating(false);
             } else if (poll.status === "failed") {
               clearInterval(pollRef.current);
@@ -312,20 +303,12 @@ export default function TalkingAvatarPage() {
               <Microphone size={20} weight="fill" color="#E5C158" />
             </div>
             <div>
-              <h1 className="font-heading text-2xl font-bold text-brand">Talking Avatar</h1>
+              <h1 className="font-heading text-2xl font-bold text-brand">Video Presenter</h1>
               <p className="text-stone-500 text-sm">Foto produk → video avatar berbicara</p>
             </div>
           </div>
         </div>
-        {/* Credit info */}
-        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-          {DURATIONS.map(d => (
-            <div key={d.seconds} className="flex items-center gap-1.5 text-xs text-stone-500">
-              <Lightning size={12} weight="fill" className="text-brand-gold" />
-              <span>{d.label} = <strong className="text-brand">{d.credits} kredit</strong></span>
-            </div>
-          ))}
-        </div>
+
       </div>
 
       {/* Coming Soon if HeyGen not configured */}
@@ -422,10 +405,7 @@ export default function TalkingAvatarPage() {
                           {d.label}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Lightning size={11} weight="fill" className="text-brand-gold" />
-                        <span className="text-xs font-bold text-brand">{d.credits}</span>
-                      </div>
+
                     </button>
                   ))}
                 </div>
@@ -447,10 +427,7 @@ export default function TalkingAvatarPage() {
                 <>
                   <Play size={18} weight="fill" />
                   Generate Video
-                  <span className="ml-1 flex items-center gap-1 text-brand-gold text-xs">
-                    <Lightning size={11} weight="fill" />
-                    {selectedDuration?.credits}
-                  </span>
+
                 </>
               )}
             </button>

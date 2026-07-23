@@ -1,574 +1,526 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { toast } from 'react-toastify';
-import { handleGenerateError } from "@/lib/moderation";
+import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext";
 import {
-  Stack, Sparkle, CircleNotch, CheckCircle, ArrowsClockwise, Lightning,
-  DownloadSimple, ChatCircle, Copy, Check, Hash, Images, Camera,
-  WarningCircle, HourglassMedium, CaretDown, CaretUp, Plus,
+  Sparkle, CircleNotch, CheckCircle, X,
+  Images, Package, CaretDown, DownloadSimple, User,
 } from "@phosphor-icons/react";
 import BrandDnaCard from "@/components/BrandDnaCard";
-import NoCreditsModal from "@/components/NoCreditsModal";
-import ReferenceUpload from "@/components/ReferenceUpload";
 import InspirationGallery from "@/components/InspirationGallery";
-import { notifyCreditsUpdate } from "@/lib/credits";
+import PromptSuccessCard from "@/components/PromptSuccessCard";
 
-// ── Constants ──────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-const CONTENT_INTENTS = [
-  { id: "auto",  name: "Auto",           sub: "Feedify infer dari prompt",   template: "problem-solution", goal: "edukasi",  recommended: true },
-  { id: "teach", name: "Teach Something",sub: "Edukasi, tips, myth vs fact", template: "listicle",         goal: "edukasi" },
-  { id: "sell",  name: "Sell Something", sub: "Promo, launch, soft selling", template: "problem-solution", goal: "promo" },
-];
-
-const VISUAL_MOODS = [
-  { id: "auto",    name: "Auto",    desc: "Feedify pilih mood terbaik.",   preset: "Minimal Clean",    recommended: true },
-  { id: "minimal", name: "Minimal", desc: "Clean & modern.",               preset: "Minimal Clean" },
-  { id: "premium", name: "Premium", desc: "Elegant commercial look.",      preset: "Luxury Editorial" },
-  { id: "luxury",  name: "Luxury",  desc: "High-end branding.",            preset: "Luxury Spa" },
-  { id: "bold",    name: "Bold",    desc: "High contrast & eye-catching.", preset: "Editorial Bold" },
-];
-
-const ASPECT_RATIOS = [
-  { key: "1:1",  label: "Instagram Feed", sub: "1:1",  value: "1:1 (Square Feed)" },
-  { key: "4:5",  label: "Portrait",       sub: "4:5",  value: "4:5 (Portrait Feed)", recommended: true },
-  { key: "9:16", label: "Story / Reels",  sub: "9:16", value: "9:16 (Story/Reels)" },
+const INTENTS = [
+  { id: "sell",        emoji: "🛒", label: "Jualan",      goal: "promo",   flow: "problem_solution", desc: "Promo, launch, soft selling" },
+  { id: "educate",     emoji: "📚", label: "Edukasi",     goal: "edukasi", flow: "listicle",         desc: "Tips, myth vs fact, how-to" },
+  { id: "storytelling",emoji: "✨", label: "Storytelling", goal: "edukasi", flow: "story_brand",      desc: "Before-after, brand journey" },
 ];
 
 const STORY_FLOWS = [
-  { id: "auto",             emoji: "✨", name: "Auto",              desc: "Feedify pilih flow terbaik.",        recommended: true },
-  { id: "problem_solution", emoji: "⚡", name: "Problem → Solution",desc: "Bangun masalah lalu solusi." },
-  { id: "myth_fact",        emoji: "🔍", name: "Myth → Fact",       desc: "Edukasi, bongkar mitos." },
-  { id: "before_after",     emoji: "🔄", name: "Before → After",    desc: "Transformasi visual." },
-  { id: "step_by_step",     emoji: "📋", name: "Step by Step",      desc: "Tutorial langkah demi langkah." },
-  { id: "story_brand",      emoji: "📖", name: "Story Brand",       desc: "Storytelling perjalanan brand." },
-  { id: "listicle",         emoji: "📝", name: "Listicle",          desc: "Daftar poin actionable." },
+  { id: "auto",             emoji: "✨", label: "Auto",            desc: "AI pilih flow terbaik" },
+  { id: "problem_solution", emoji: "⚡", label: "Masalah → Solusi", desc: "" },
+  { id: "myth_fact",        emoji: "🔍", label: "Myth vs Fact",    desc: "" },
+  { id: "before_after",     emoji: "🔄", label: "Before After",    desc: "" },
+  { id: "step_by_step",     emoji: "📋", label: "Step by Step",    desc: "" },
+  { id: "listicle",         emoji: "📝", label: "Listicle",        desc: "" },
+  { id: "story_brand",      emoji: "📖", label: "Story Brand",     desc: "" },
 ];
 
-const PEOPLE_GENDERS = [
-  { id: "auto",   name: "Auto"   },
-  { id: "female", name: "Female" },
-  { id: "male",   name: "Male"   },
-  { id: "couple", name: "Couple" },
-  { id: "family", name: "Family" },
-];
-const PEOPLE_AGES = [
-  { id: "young_adult", name: "Young Adult" },
-  { id: "adult",       name: "Adult"       },
-  { id: "mature",      name: "Mature"      },
-];
-const SCENE_FOCUS = [
-  { id: "product_first", name: "Product Focus" },
-  { id: "balanced",      name: "Balanced"      },
-  { id: "human_first",   name: "Human Focus"   },
+const ASPECT_RATIOS = [
+  { key: "1:1",  label: "1:1",  sub: "Square",         value: "1:1 (Square Feed)",      w: 1, h: 1 },
+  { key: "4:5",  label: "4:5",  sub: "Rekomendasi",    value: "4:5 (Portrait Feed)",    w: 4, h: 5, recommended: true },
+  { key: "9:16", label: "9:16", sub: "Story · Reels",  value: "9:16 (Story/Reels)",     w: 9, h: 16 },
 ];
 
-const FLOW_TEMPLATES = {
-  auto:             ["Cover", "Hook", "Insight", "Proof", "CTA"],
-  problem_solution: ["Masalah", "Kenapa Terjadi?", "Solusinya", "Bukti Nyata", "Mulai Sekarang"],
-  myth_fact:        ["Mitos yang Beredar", "Kenapa Dipercaya?", "Faktanya Begini", "Perbandingan", "Kesimpulan"],
-  before_after:     ["Kondisi Sebelum", "Masalah Utama", "Proses Perubahan", "Hasilnya Nyata", "Transformasi"],
-  step_by_step:     ["Tujuan", "Yang Dibutuhkan", "Langkah 1", "Langkah 2", "Hasil Akhir"],
-  story_brand:      ["Kondisi Awal", "Masalah Datang", "Solusi Ditemukan", "Transformasi", "Jadilah Bagian Cerita"],
-  listicle:         ["5 Hal Penting", "Poin #1 & #2", "Poin #3", "Poin #4 & #5", "Simpan & Bagikan"],
+// Slide roles per story flow × slide count
+const FLOW_ROLES = {
+  auto: {
+    3: ["Hook", "Isi Utama", "CTA"],
+    4: ["Hook", "Point 1", "Point 2", "CTA"],
+    5: ["Hook", "Point 1", "Point 2", "Point 3", "CTA"],
+    6: ["Hook", "Point 1", "Point 2", "Point 3", "Point 4", "CTA"],
+    7: ["Hook", "Point 1", "Point 2", "Point 3", "Point 4", "Point 5", "CTA"],
+  },
+  problem_solution: {
+    3: ["Hook 🎯", "Masalah", "Solusi + CTA"],
+    4: ["Hook 🎯", "Masalah", "Solusi", "CTA"],
+    5: ["Hook 🎯", "Masalah", "Kenapa?", "Solusi", "CTA"],
+    6: ["Hook 🎯", "Masalah", "Kenapa?", "Dampak", "Solusi", "CTA"],
+    7: ["Hook 🎯", "Masalah", "Kenapa?", "Dampak", "Insight", "Solusi", "CTA"],
+  },
+  myth_fact: {
+    3: ["Hook 🔍", "Mitos", "Fakta + CTA"],
+    4: ["Hook 🔍", "Mitos 1", "Fakta 1", "CTA"],
+    5: ["Hook 🔍", "Mitos 1", "Fakta 1", "Mitos 2", "CTA"],
+    6: ["Hook 🔍", "Mitos 1", "Fakta 1", "Mitos 2", "Fakta 2", "CTA"],
+    7: ["Hook 🔍", "Mitos 1", "Fakta 1", "Mitos 2", "Fakta 2", "Fakta 3", "CTA"],
+  },
+  before_after: {
+    3: ["Hook 🔄", "Before", "After + CTA"],
+    4: ["Hook 🔄", "Before", "Proses", "After + CTA"],
+    5: ["Hook 🔄", "Before", "Proses", "After", "CTA"],
+    6: ["Hook 🔄", "Before", "Masalah", "Proses", "After", "CTA"],
+    7: ["Hook 🔄", "Before", "Masalah", "Proses", "Hasil", "After", "CTA"],
+  },
+  step_by_step: {
+    3: ["Hook 📋", "Step 1 & 2", "Step 3 + CTA"],
+    4: ["Hook 📋", "Step 1", "Step 2", "Step 3 + CTA"],
+    5: ["Hook 📋", "Step 1", "Step 2", "Step 3", "CTA"],
+    6: ["Hook 📋", "Step 1", "Step 2", "Step 3", "Step 4", "CTA"],
+    7: ["Hook 📋", "Step 1", "Step 2", "Step 3", "Step 4", "Step 5", "CTA"],
+  },
+  listicle: {
+    3: ["Hook 📝", "Tips 1–3", "CTA"],
+    4: ["Hook 📝", "Tips 1–2", "Tips 3–4", "CTA"],
+    5: ["Hook 📝", "Tip 1", "Tip 2", "Tip 3", "CTA"],
+    6: ["Hook 📝", "Tip 1", "Tip 2", "Tip 3", "Tip 4", "CTA"],
+    7: ["Hook 📝", "Tip 1", "Tip 2", "Tip 3", "Tip 4", "Tip 5", "CTA"],
+  },
+  story_brand: {
+    3: ["Hook 📖", "Perjalanan", "Hasil + CTA"],
+    4: ["Hook 📖", "Problem", "Perubahan", "Hasil + CTA"],
+    5: ["Hook 📖", "Before", "Problem", "Turning Point", "After + CTA"],
+    6: ["Hook 📖", "Before", "Problem", "Turning Point", "After", "CTA"],
+    7: ["Hook 📖", "Before", "Problem", "Turning Point", "Bukti", "After", "CTA"],
+  },
 };
 
-const QUICK_CHIPS = [
-  { label: "Myth vs Fact",   flow: "myth_fact",        text: "Buat carousel Myth vs Fact tentang sunscreen.\nTargetnya wanita usia 20–30 tahun.\nBahas 5 mitos yang paling sering dipercaya.\nVisual clean premium.\nCTA follow Instagram." },
-  { label: "Promo",          flow: "problem_solution",  text: "Buat carousel promo untuk [produk saya].\nHighlight keunggulan utama dan harga spesial.\nTarget [target audiens].\nCTA order via WhatsApp." },
-  { label: "Tips Praktis",   flow: "step_by_step",      text: "Buat carousel tips tentang [topik].\nBerikan 5 tips yang actionable dan mudah dipahami.\nTone santai tapi informatif." },
-  { label: "Edukasi",        flow: "listicle",          text: "Buat carousel edukasi tentang [topik].\nJelaskan secara simpel dengan visual yang menarik.\nTarget [target audiens]." },
-  { label: "Soft Selling",   flow: "story_brand",       text: "Buat konten soft selling untuk [produk].\nEdukasi dulu, bangun kepercayaan, lalu ajak beli di akhir dengan halus." },
-  { label: "Product Launch", flow: "problem_solution",  text: "Saya mau launch produk baru: [nama produk].\nBangun excitement, perkenalkan fitur unggulan, dan ajak pre-order." },
-  { label: "Before After",   flow: "before_after",      text: "Buat carousel before after penggunaan [produk].\nTunjukkan transformasi nyata dan hasil yang bisa dirasakan." },
-  { label: "Story Brand",    flow: "story_brand",       text: "Buat storytelling tentang perjalanan brand kami.\nCeritakan asal-usul, nilai, dan kenapa kami berbeda dari kompetitor." },
+const MODEL_STYLES = [
+  { id: "hijab",         label: "Hijab",        emoji: "🧕", value: "Berhijab, gaya modest fashion Indonesia" },
+  { id: "hijab-modern",  label: "Hijab Modern", emoji: "✨", value: "Hijab modern kontemporer, hijab trendy" },
+  { id: "korean",        label: "Korean",        emoji: "🌸", value: "Korean beauty style, K-beauty aesthetic" },
+  { id: "natural",       label: "Natural",       emoji: "🌿", value: "Penampilan natural, minimal makeup" },
+  { id: "sporty",        label: "Sporty",        emoji: "⚡", value: "Sporty casual, athleisure" },
+  { id: "kasual",        label: "Kasual",        emoji: "👕", value: "Kasual sehari-hari" },
+  { id: "elegan",        label: "Elegan",        emoji: "💎", value: "Elegan dan sophisticated" },
+  { id: "profesional",   label: "Profesional",   emoji: "👔", value: "Profesional, business attire" },
 ];
 
-const MODEL_GENDERS    = [{ id:"auto",name:"Auto" },{ id:"female",name:"Female" },{ id:"male",name:"Male" }];
-const MODEL_AGES       = [{ id:"teen",name:"Teen" },{ id:"young_adult",name:"Young Adult" },{ id:"adult",name:"Adult" }];
-const VISUAL_PRIORITIES= [{ id:"product_first",name:"Product" },{ id:"balanced",name:"Balanced" },{ id:"human_first",name:"Human" }];
+const MODEL_AGES = [
+  { id: "18-22", label: "18–22 th" },
+  { id: "22-27", label: "22–27 th" },
+  { id: "27-35", label: "27–35 th" },
+  { id: "35-45", label: "35–45 th" },
+];
 
-const MOOD_CHIPS = ["Warm","Fresh","Luxury","Premium","Editorial","Soft","Natural","Golden Hour","Minimal","Cozy"];
+const CTA_SUGGESTIONS = [
+  "Pesan Sekarang", "Beli Sekarang", "Coba Gratis",
+  "DM untuk Info", "Klik Link Bio", "Shop Now", "Dapatkan Promo",
+];
 
-// Slide roles
-const SLIDE_ROLE_DATA = {
-  cover:      { name: "Cover",      desc: "Visual kuat · Headline" },
-  hook:       { name: "Hook",       desc: "Masalah · Pertanyaan" },
-  insight:    { name: "Insight",    desc: "Penjelasan + visual" },
-  comparison: { name: "Comparison", desc: "Before/After · Myth vs Fact" },
-  tips:       { name: "Tips",       desc: "Poin singkat actionable" },
-  cta:        { name: "CTA",        desc: "Logo · Pesan · Aksi" },
-};
-
-function getSlideRole(index, total) {
-  if (index === 0) return "cover";
-  if (index === total - 1) return "cta";
-  const mids = ["hook", "insight", "comparison", "tips"];
-  return mids[(index - 1) % mids.length];
-}
-
-const BRAND_CACHE_KEY = "feedify_brand_cache";
-
-const DEFAULT_FORM = {
-  describe:          "",
-  content_intent:    "auto",
-  brand_name:        "",
-  product_name:      "",
-  slide_count:       3,
-  aspect_ratio:      "4:5 (Portrait Feed)",
-  visual_mood:       "auto",
-  photo_type:        "product_only",
-  story_flow:        "auto",
-  include_people:    false,
-  people_gender:     "auto",
-  people_age:        "young_adult",
-  people_appearance: "",
-  wardrobe_notes:    "",
-  scene_focus:       "balanced",
-  model_gender:      "auto",
-  model_age:         "young_adult",
-  visual_priority:   "balanced",
-  mood_chips:        [],
-  mood_custom:       "",
-};
-
-function parseDescribe(text) {
-  if (!text.trim()) return null;
-  const lower = text.toLowerCase();
-  const result = {};
-  const prodMatch = text.match(/(?:jual|produk|brand|product|launch)\s+([^\.\,\n]{3,35})/i);
-  if (prodMatch) result.product = prodMatch[1].trim();
-  let aud = [];
-  if (/wanita|perempuan|ibu|cewek/i.test(lower)) aud.push("Wanita");
-  else if (/pria|laki-laki|cowok/i.test(lower)) aud.push("Pria");
-  const ageM = text.match(/usia\s+(\d+[\s–\-]+\d+)/i);
-  if (ageM) aud.push(ageM[1].replace(/\s/g, ""));
-  if (aud.length) result.audience = aud.join(" ");
-  if (/whatsapp|wa\.me|\bwa\b/i.test(lower)) result.cta = "WhatsApp";
-  else if (/shopee|tokopedia|marketplace/i.test(lower)) result.cta = "Marketplace";
-  else if (/follow.*ig|instagram/i.test(lower)) result.cta = "Instagram";
-  else if (/link bio/i.test(lower)) result.cta = "Link Bio";
-  return result;
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function CarouselGeneratorPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
 
-  const [form, setForm] = useState(() => {
-    try {
-      const cached = localStorage.getItem(BRAND_CACHE_KEY);
-      if (cached) {
-        const b = JSON.parse(cached);
-        if (b?.brand_name) return { ...DEFAULT_FORM, brand_name: b.brand_name };
-      }
-    } catch {}
-    return DEFAULT_FORM;
+  // Product library
+  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
+
+  // Inspiration photo
+  const [referenceImg, setReferenceImg]    = useState(null);  // manual upload (single)
+  const [referenceSlides, setReferenceSlides] = useState([]); // gallery multi-select (N slides)
+  const [galleryOpen, setGalleryOpen]      = useState(false);
+
+  // Content config
+  const [intent, setIntent]         = useState("sell");
+  const [storyFlow, setStoryFlow]   = useState("auto");
+  const [topic, setTopic]           = useState("");
+  const [slideCount, setSlideCount] = useState(3);
+  const [aspectRatio, setAspectRatio] = useState("4:5 (Portrait Feed)");
+
+  // Model
+  const [modelEnabled, setModelEnabled] = useState(false);
+  const [modelGender, setModelGender]   = useState("wanita");
+  const [modelStyle, setModelStyle]     = useState(null);
+  const [modelAge, setModelAge]         = useState(null);
+
+  // CTA
+  const [ctaEnabled, setCtaEnabled] = useState(false);
+  const [ctaText, setCtaText]       = useState("");
+
+  // Generate state
+  const [generating, setGenerating]   = useState(false);
+  const [promptResult, setPromptResult] = useState(null);
+  const promptCardRef = useRef(null);
+
+  // Clear gallery slides when slide count changes
+  useEffect(() => { setReferenceSlides([]); }, [slideCount]);
+
+  // Products
+  const { data: products = [], isLoading: productsLoading } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => { const { data } = await api.get("/products"); return data; },
   });
+  const selectedProduct = products.find(p => p.id === selectedProductId) || null;
 
-  const upd = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const activeIntent = INTENTS.find(i => i.id === intent) || INTENTS[0];
 
-  const [brand, setBrand] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(BRAND_CACHE_KEY)); } catch { return null; }
-  });
-
-  const [productPhoto, setProductPhoto]     = useState(null);
-  const [generating, setGenerating]         = useState(false);
-  const [carouselId, setCarouselId]         = useState(null);
-  const [totalSlides, setTotalSlides]       = useState(0);
-  const [slideStatuses, setSlideStatuses]   = useState([]);
-  const [slideImages, setSlideImages]       = useState([]);
-  const [slideRoles, setSlideRoles]         = useState([]);
-  const [genPhase, setGenPhase]             = useState("");
-  const [selectedSlide, setSelectedSlide]   = useState(0);
-  const [noCredits, setNoCredits]           = useState(false);
-  const [regeneratingSlide, setRegeneratingSlide] = useState(null);
-  const [referenceImg, setReferenceImg]     = useState(null);
-  const [galleryOpen, setGalleryOpen]       = useState(false);
-  const [captions, setCaptions]             = useState(null);
-  const [generatingCaptions, setGeneratingCaptions] = useState(false);
-  const [promptPreview, setPromptPreview]   = useState(null);
-  const [previewing, setPreviewing]         = useState(false);
-  const [validationWarnings, setValidationWarnings] = useState([]);
-  const [showModelAdvanced, setShowModelAdvanced]   = useState(false);
-  const [moodCustomMode, setMoodCustomMode] = useState(false);
-  const readerRef = useRef(null);
-
-  useEffect(() => {
-    api.get("/brand-profile").then(({ data }) => {
-      setBrand(data);
-      localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(data));
-      if (data?.brand_name) upd("brand_name", data.brand_name);
-    }).catch(() => {});
-  }, []);
-
-  const smartSummary = useMemo(() => parseDescribe(form.describe), [form.describe]);
-  const moodOverrideText = useMemo(() => {
-    const parts = [...form.mood_chips, ...(form.mood_custom.trim() ? [form.mood_custom.trim()] : [])];
-    return parts.join(", ");
-  }, [form.mood_chips, form.mood_custom]);
-
-  const buildPayload = () => {
-    const intent = CONTENT_INTENTS.find(c => c.id === form.content_intent) || CONTENT_INTENTS[0];
-    const mood   = VISUAL_MOODS.find(s => s.id === form.visual_mood) || VISUAL_MOODS[0];
-    return {
-      topic:            form.describe,
-      target_audience:  smartSummary?.audience || "",
-      content_goal:     intent.goal,
-      campaign_goal:    intent.goal,
-      final_cta:        smartSummary?.cta || "",
-      call_to_action:   smartSummary?.cta || "",
-      template:         intent.template,
-      brand_name:       form.brand_name,
-      product_name:     form.product_name || form.brand_name,
-      slide_count:      form.slide_count,
-      aspect_ratio:     form.aspect_ratio,
-      visual_type:      form.include_people ? "human_product" : "product_only",
-      photo_style:      "auto",
-      style_preset:     mood.preset,
-      visual_priority:  form.scene_focus,
-      ai_director_mode: "smart",
-      human_enabled:    form.include_people,
-      human_mode:       form.include_people ? "manual" : "none",
-      talent_gender:    form.include_people ? form.people_gender     : "auto",
-      talent_age_group: form.include_people ? form.people_age        : "young_adult",
-      talent_ethnicity: "auto",
-      model_gender:     form.include_people ? form.people_gender     : "auto",
-      model_age:        form.include_people ? form.people_age        : "young_adult",
-      model_ethnicity:  "auto",
-      model_fashion:    form.include_people ? form.wardrobe_notes    : "auto",
-      model_expression: "auto",
-      model_interaction:"auto",
-      model_character:  form.include_people ? form.people_appearance : "",
-      talent_role:      "auto",
-      mood_override:    moodOverrideText,
-      story_flow:       form.story_flow,
-      lighting_override:    "",
-      composition_override: "",
-      camera_style_override:"",
-      mixed_allow_human: false,
-      save: true,
-      ...(productPhoto ? { product_photo_base64: productPhoto.split(",")[1] } : {}),
-    };
-  };
-
-  const validate = () => {
-    if (!form.describe.trim()) { toast.error("Ceritakan dulu carousel-mu"); return false; }
-    return true;
-  };
-
-  const generateCaptions = async () => {
-    setGeneratingCaptions(true);
-    setCaptions(null);
-    try {
-      const { data } = await api.post("/prompt/generate-caption-bundle", {
-        product_name:    form.product_name || form.brand_name || brand?.brand_name || "",
-        headline:        form.describe.slice(0, 80),
-        target_audience: smartSummary?.audience || "",
-        platform:        "instagram",
-        content_purpose: "soft_selling",
-      });
-      if (!data.error) setCaptions(data);
-    } catch {}
-    finally { setGeneratingCaptions(false); }
-  };
+  // ── Generate ──────────────────────────────────────────────────────────────────
 
   const generate = async () => {
-    if (!validate()) return;
     setGenerating(true);
-    setCarouselId(null);
-    setTotalSlides(form.slide_count);
-    setSlideStatuses(Array(form.slide_count).fill("waiting"));
-    setSlideImages(Array(form.slide_count).fill(null));
-    setSlideRoles(Array(form.slide_count).fill(""));
-    setCaptions(null);
-    setValidationWarnings([]);
-    setSelectedSlide(0);
-    setGenPhase("Menyiapkan Creative Brief...");
-
-    const token = localStorage.getItem("feedify_token");
-    const backendUrl = process.env.REACT_APP_BACKEND_URL;
-
+    setPromptResult(null);
     try {
-      const response = await fetch(`${backendUrl}/api/prompt/generate-carousel-stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify(buildPayload()),
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        if (response.status === 402) { setNoCredits(true); return; }
-        throw new Error(err.detail || "Gagal generate");
+      const payload = {
+        topic:        topic.trim() || activeIntent.desc,
+        content_goal: activeIntent.goal,
+        campaign_goal:activeIntent.goal,
+        template:     activeIntent.flow,
+        story_flow:   storyFlow === "auto" ? activeIntent.flow : storyFlow,
+        slide_count:  slideCount,
+        aspect_ratio: aspectRatio,
+        visual_type:  "product_only",
+        ai_director_mode: "smart",
+        style_preset: "Minimal Clean",
+        mood_override: "",
+        save: true,
+      };
+      if (selectedProduct) {
+        payload.product_name = selectedProduct.name || "";
+        payload.brand_name   = selectedProduct.brand_name || "";
+        if (selectedProduct.photo_base64)
+          payload.product_photo_base64 = selectedProduct.photo_base64.split(",")[1] || selectedProduct.photo_base64;
+        if (selectedProduct.benefits?.length)
+          payload.final_cta = selectedProduct.usp || "";
+        payload.product_id = selectedProduct.id;
       }
-
-      const reader = response.body.getReader();
-      readerRef.current = reader;
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop();
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          let evt;
-          try { evt = JSON.parse(line.slice(6)); } catch { continue; }
-
-          switch (evt.type) {
-            case "brief_ready":
-              setCarouselId(evt.carousel_id);
-              setTotalSlides(evt.total_slides);
-              setGenPhase("Merancang Story Structure...");
-              break;
-            case "planning":
-              setSlideRoles(evt.roles || []);
-              setSlideStatuses(Array(evt.roles?.length || form.slide_count).fill("waiting"));
-              setSlideImages(Array(evt.roles?.length || form.slide_count).fill(null));
-              setGenPhase("Memulai generasi slide...");
-              setTimeout(() => document.getElementById("carousel-result")?.scrollIntoView({ behavior: "smooth" }), 200);
-              break;
-            case "slide_start":
-              setGenPhase(`Generating Slide ${evt.index + 1} of ${evt.total}...`);
-              setSlideStatuses(prev => { const n = [...prev]; n[evt.index] = "generating"; return n; });
-              break;
-            case "slide_retry":
-              setGenPhase(`Slide ${evt.index + 1}: retry ${evt.attempt}...`);
-              break;
-            case "slide_complete":
-              setSlideImages(prev => { const n = [...prev]; n[evt.index] = evt.image_base64; return n; });
-              setSlideStatuses(prev => { const n = [...prev]; n[evt.index] = "completed"; return n; });
-              setSelectedSlide(s => (s === 0 && evt.index === 0) ? 0 : s === evt.index - 1 ? evt.index : s);
-              setGenPhase(`Slide ${evt.index + 1} selesai ✓`);
-              break;
-            case "slide_failed":
-              setSlideStatuses(prev => { const n = [...prev]; n[evt.index] = "failed"; return n; });
-              toast.error(`Slide ${evt.index + 1} gagal — kredit di-refund`);
-              break;
-            case "carousel_complete": {
-              const warns = evt.validation_warnings || [];
-              if (warns.length) setValidationWarnings(warns);
-              if (evt.credits) notifyCreditsUpdate(evt.credits);
-              setGenPhase("");
-              setGenerating(false);
-              if (evt.success > 0) {
-                toast.success(`${evt.success} slide siap!${evt.failed > 0 ? ` (${evt.failed} gagal, kredit dikembalikan)` : ""}`);
-                generateCaptions();
-              } else {
-                toast.error("Semua slide gagal. Kredit sudah dikembalikan.");
-              }
-              break;
-            }
-            default: break;
-          }
+      if (ctaEnabled && ctaText.trim()) {
+        payload.call_to_action = ctaText.trim();
+        payload.final_cta      = ctaText.trim();
+      }
+      if (modelEnabled) {
+        payload.human_enabled  = true;
+        payload.visual_type    = "human_product";
+        payload.talent_gender  = modelGender === "wanita" ? "female" : "male";
+        payload.model_character = modelGender === "wanita" ? "Wanita Indonesia" : "Pria Indonesia";
+        if (modelStyle) {
+          const s = MODEL_STYLES.find(x => x.id === modelStyle);
+          payload.outfit_style   = s?.value || modelStyle;
+          payload.model_fashion  = s?.value || modelStyle;
+          if (modelStyle === "korean") payload.talent_ethnicity = "korean";
+        }
+        if (modelAge) {
+          payload.model_age = modelAge;
+          const ageMap = { "18-22": "teen", "22-27": "young_adult", "27-35": "adult", "35-45": "mature" };
+          payload.talent_age_group = ageMap[modelAge] || "young_adult";
         }
       }
+      const { data } = await api.post("/prompt/preview-carousel", payload);
+      setPromptResult(data);
+      setTimeout(() => promptCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     } catch (err) {
-      if (err?.response?.status === 402) setNoCredits(true);
-      else {
-        const handled = handleGenerateError(err);
-        if (!handled) toast.error(err.message || "Gagal generate. Coba lagi.");
-      }
+      toast.error(err?.response?.data?.detail || "Gagal membuat prompt. Coba lagi.");
     } finally {
       setGenerating(false);
-      setGenPhase("");
-      readerRef.current = null;
     }
   };
 
-  const previewPrompt = async () => {
-    if (!validate()) return;
-    setPreviewing(true);
-    setPromptPreview(null);
-    try {
-      const { data } = await api.post("/prompt/preview-carousel", buildPayload());
-      setPromptPreview(data);
-      setTimeout(() => document.getElementById("carousel-preview-panel")?.scrollIntoView({ behavior: "smooth" }), 100);
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Gagal memuat preview");
-    } finally { setPreviewing(false); }
-  };
+  // ── Reference photo handlers ──────────────────────────────────────────────────
 
-  const regenerateSlide = async (idx) => {
-    if (!carouselId) return;
-    setRegeneratingSlide(idx);
-    setSlideStatuses(prev => { const n = [...prev]; n[idx] = "generating"; return n; });
-    try {
-      const { data } = await api.post("/prompt/regenerate-slide", { prompt_id: carouselId, slide_index: idx });
-      setSlideImages(prev => { const n = [...prev]; n[idx] = data.image_base64; return n; });
-      setSlideStatuses(prev => { const n = [...prev]; n[idx] = "completed"; return n; });
-      if (data.credits) notifyCreditsUpdate(data.credits);
-      toast.success(`Slide ${idx + 1} regenerated!`);
-    } catch (err) {
-      setSlideStatuses(prev => { const n = [...prev]; n[idx] = "failed"; return n; });
-      if (err?.response?.status === 402) setNoCredits(true);
-      else toast.error("Gagal regenerate");
-    } finally { setRegeneratingSlide(null); }
-  };
-
-  const downloadAll = () => {
-    const done = slideImages.filter(Boolean);
-    if (!done.length) return;
-    slideImages.forEach((img, i) => {
-      if (!img) return;
-      const a = document.createElement("a");
-      a.href = `data:image/png;base64,${img}`;
-      a.download = `feedify-carousel-slide-${i + 1}.png`;
-      a.click();
-    });
-    toast.success(`${done.length} slide diunduh`);
-  };
-
-  const downloadSlide = (idx) => {
-    const img = slideImages[idx];
-    if (!img) return;
-    const a = document.createElement("a");
-    a.href = `data:image/png;base64,${img}`;
-    a.download = `feedify-slide-${idx + 1}.png`;
-    a.click();
-  };
-
-  const hasAnySlide = slideImages.some(Boolean) || generating;
-
-  // Key changes when user updates slide count / ratio / intent → re-animates storyboard
-  const handleProductPhoto = (e) => {
-    const file = e.target.files?.[0];
+  const handleRefFile = async (file) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast.error("Foto max 5MB"); return; }
-    const reader = new FileReader();
-    reader.onload = () => setProductPhoto(reader.result);
-    reader.readAsDataURL(file);
+    if (file.size > 8 * 1024 * 1024) { toast.error("Foto max 8MB"); return; }
+    setReferenceImg(await toBase64(file));
   };
 
-  const storyboardKey = `${form.slide_count}-${form.aspect_ratio}-${form.content_intent}`;
+  // ── Slide storyboard preview ──────────────────────────────────────────────────
 
-  const toggleMoodChip = (chip) => {
-    const cur = form.mood_chips;
-    upd("mood_chips", cur.includes(chip) ? cur.filter(c => c !== chip) : [...cur, chip]);
-  };
+  // Use the active flow key — if "auto", fall back to the intent's default flow
+  const activeFlowKey = storyFlow === "auto" ? activeIntent.flow : storyFlow;
+  const slideRoles = (FLOW_ROLES[activeFlowKey] || FLOW_ROLES.auto)[slideCount]
+    || (FLOW_ROLES[activeFlowKey] || FLOW_ROLES.auto)[3];
+  const ar = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[1];
+  const maxH = 44;
+  const scale = maxH / ar.h;
+  const fw = Math.round(ar.w * scale);
 
   return (
     <div className="space-y-4 pb-20" data-testid="carousel-generator-page">
       {/* Header */}
       <div className="animate-fade-up">
-        <h1 className="font-heading text-2xl sm:text-3xl font-bold text-brand tracking-tight">Carousel Builder</h1>
-        <p className="text-stone-400 mt-1 text-sm max-w-2xl">Ceritakan idemu. Feedify menjadi Creative Director yang menyusun storyline, copywriting, visual direction, dan seluruh slide secara otomatis.</p>
+        <h1 className="font-heading text-3xl sm:text-4xl font-bold text-brand tracking-tight">Carousel</h1>
+        <p className="text-stone-400 mt-1 text-sm">Pilih produk, pilih tujuan konten, AI generate seluruh slide.</p>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-5">
-        {/* ── Left: Form ──────────────────────────────────────────────────────── */}
+      <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4 animate-fade-up">
 
-          {/* ① HERO PROMPT */}
+          {/* ① BRAND DNA */}
+          <div className="feedify-card p-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Brand DNA</p>
+              <p className="text-sm text-stone-700 font-medium truncate">Otomatis dibaca dari profil brand kamu</p>
+            </div>
+            <CheckCircle size={18} weight="fill" className="text-brand flex-shrink-0" />
+          </div>
+
+          {/* ② PRODUCT KNOWLEDGE */}
+          <div className={`feedify-card p-5 space-y-3 ${!selectedProductId ? "border-2 border-red-200" : ""}`}>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-heading text-base font-bold text-brand">Product Knowledge</h3>
+                  <span className="text-[9px] font-bold text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">★ Wajib</span>
+                </div>
+                <p className="text-xs text-stone-500">Pilih produk dari library</p>
+              </div>
+            </div>
+
+            {!productsLoading && products.length === 0 ? (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 border border-stone-200">
+                <Package size={20} weight="duotone" className="text-stone-400 flex-shrink-0" />
+                <div>
+                  <p className="text-xs text-stone-500">Belum ada produk tersimpan.</p>
+                  <a href="/products" className="text-xs font-semibold text-brand hover:underline">+ Tambah produk ke library →</a>
+                </div>
+              </div>
+            ) : (
+              <div className="relative">
+                <button
+                  onClick={() => setProductDropdownOpen(v => !v)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-stone-200 hover:border-brand/50 transition-all text-left bg-white"
+                  data-testid="product-selector-btn"
+                >
+                  {selectedProduct ? (
+                    <>
+                      {selectedProduct.photo_base64
+                        ? <img src={selectedProduct.photo_base64} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                        : <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0"><Package size={18} weight="duotone" className="text-brand" /></div>
+                      }
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-stone-800 truncate">{selectedProduct.name}</p>
+                        {selectedProduct.category && <p className="text-xs text-stone-500">{selectedProduct.category}</p>}
+                      </div>
+                      <button onClick={e => { e.stopPropagation(); setSelectedProductId(null); }}
+                        className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-all">
+                        <X size={13} weight="bold" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Package size={18} weight="duotone" className="text-stone-400 flex-shrink-0" />
+                      <span className="flex-1 text-sm text-stone-400">Pilih produk dari library...</span>
+                      <CaretDown size={14} className="text-stone-400 flex-shrink-0" />
+                    </>
+                  )}
+                </button>
+                {productDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-white rounded-xl border border-stone-200 shadow-lg max-h-56 overflow-y-auto">
+                    {products.map(p => (
+                      <button key={p.id} onClick={() => { setSelectedProductId(p.id); setProductDropdownOpen(false); }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 hover:bg-brand/5 transition-all text-left ${p.id === selectedProductId ? "bg-brand/8" : ""}`}
+                        data-testid={`product-option-${p.id}`}>
+                        {p.photo_base64
+                          ? <img src={p.photo_base64} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+                          : <div className="w-9 h-9 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0"><Package size={15} weight="duotone" className="text-brand" /></div>
+                        }
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-stone-800 truncate">{p.name}</p>
+                          {p.category && <p className="text-xs text-stone-400">{p.category}</p>}
+                        </div>
+                        {p.id === selectedProductId && <CheckCircle size={14} weight="fill" className="text-brand flex-shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ③ FOTO INSPIRASI */}
+          {(() => {
+            const hasRef = !!referenceImg || referenceSlides.length > 0;
+            return (
+              <div className={`feedify-card p-5 space-y-3 ${!hasRef ? "border-2 border-red-200" : ""}`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-heading text-base font-bold text-brand">Foto Inspirasi</h3>
+                      <span className="text-[9px] font-bold text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">★ Wajib</span>
+                    </div>
+                    <p className="text-xs text-stone-500">
+                      {referenceSlides.length > 0
+                        ? `${referenceSlides.length} slide referensi dipilih — AI akan tiru komposisi & mood tiap slide`
+                        : "ChatGPT akan tiru komposisi & mood — warna dan produk kamu tidak diubah"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Multi-slide gallery references */}
+                {referenceSlides.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {referenceSlides.map((photo, i) => (
+                        <div key={photo.id} className="relative flex-shrink-0">
+                          <img src={photo.url} alt={photo.description} className="h-20 w-20 rounded-xl object-cover border-2 border-brand/30" />
+                          <div className="absolute top-1 left-1 h-4 w-4 rounded-full bg-brand text-white text-[8px] font-bold flex items-center justify-center shadow">{i + 1}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 rounded-full px-3 py-1.5">
+                        <CheckCircle size={12} weight="fill" /> {referenceSlides.length}/{slideCount} slide referensi
+                      </div>
+                      <button onClick={() => setReferenceSlides([])}
+                        className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded-full hover:bg-red-50 transition-colors">
+                        <X size={11} weight="bold" className="inline mr-0.5" />Hapus
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-stone-400 px-1">💡 Upload semua slide ini ke ChatGPT bersama foto produk kamu</p>
+                  </div>
+                )}
+
+                {/* Single manual upload reference */}
+                {!referenceSlides.length && referenceImg && (
+                  <div className="space-y-2">
+                    <div className="relative rounded-xl overflow-hidden border-2 border-brand/20">
+                      <img src={referenceImg} alt="referensi" className="w-full max-h-48 object-contain" />
+                      <button onClick={() => setReferenceImg(null)}
+                        className="absolute top-2 right-2 bg-white/90 rounded-full p-1.5 shadow hover:bg-red-50 transition-colors">
+                        <X size={13} weight="bold" className="text-stone-500" />
+                      </button>
+                      <a href={referenceImg} download="foto-inspirasi.jpg"
+                        className="absolute top-2 left-2 bg-white/90 rounded-full p-1.5 shadow hover:bg-brand/10 transition-colors"
+                        title="Download untuk upload ke ChatGPT">
+                        <DownloadSimple size={13} weight="bold" className="text-stone-600" />
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 rounded-full px-3 py-1.5 w-fit">
+                      <CheckCircle size={12} weight="fill" /> Foto inspirasi terpilih
+                    </div>
+                    <p className="text-[11px] text-stone-400 px-1">💡 Upload juga foto ini ke ChatGPT — tombol download di pojok kiri foto</p>
+                  </div>
+                )}
+
+                {/* Upload zone (shown when no ref at all) */}
+                {!referenceSlides.length && !referenceImg && (
+                  <label htmlFor="carousel-ref-input"
+                    className="block cursor-pointer border-2 border-dashed border-brand-gold/60 bg-brand-gold/5 rounded-xl p-5 text-center hover:border-brand-gold hover:bg-brand-gold/8 transition-colors">
+                    <Images size={26} className="mx-auto text-brand-gold mb-2" weight="duotone" />
+                    <div className="font-semibold text-brand text-sm">Upload foto inspirasi</div>
+                    <div className="text-xs text-stone-400 mt-1">AI analisa komposisi, mood, dan pencahayaan</div>
+                  </label>
+                )}
+                <input id="carousel-ref-input" type="file" accept="image/png,image/jpeg,image/webp"
+                  className="hidden" onChange={e => { handleRefFile(e.target.files?.[0]); setReferenceSlides([]); }} />
+
+                <div className="relative flex items-center gap-3">
+                  <div className="flex-1 border-t border-stone-200" />
+                  <span className="text-xs text-stone-400 font-medium flex-shrink-0">
+                    {referenceSlides.length > 0 ? "atau ganti dari gallery" : "atau dari gallery"}
+                  </span>
+                  <div className="flex-1 border-t border-stone-200" />
+                </div>
+                <button type="button" onClick={() => setGalleryOpen(true)}
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed rounded-xl text-sm font-semibold transition-all ${
+                    referenceSlides.length > 0
+                      ? "border-brand bg-brand-sand/40 text-brand"
+                      : hasRef
+                        ? "border-brand-sand text-brand-light hover:border-brand hover:text-brand hover:bg-brand-sand/40"
+                        : "border-red-200 text-red-400 hover:border-brand hover:text-brand hover:bg-brand-sand/40"
+                  }`}>
+                  <Images size={16} weight="duotone" />
+                  {referenceSlides.length > 0
+                    ? `Ganti Referensi (${referenceSlides.length}/${slideCount} slide)`
+                    : `Pilih ${slideCount} Referensi Slide dari Gallery`}
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* ④ TUJUAN KONTEN */}
           <div className="feedify-card p-5 space-y-4">
             <div className="flex items-center gap-2">
-              <Sparkle size={14} weight="fill" className="text-brand-gold" />
-              <span className="font-heading font-bold text-brand text-sm">Ceritakan Carousel Kamu</span>
-              <span className="text-[10px] text-stone-400">Semakin lengkap idemu, semakin baik hasilnya.</span>
+              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">4</div>
+              <div>
+                <h3 className="font-heading text-base font-bold text-brand">Tujuan Konten</h3>
+                <p className="text-xs text-stone-500">Carousel ini dibuat untuk apa?</p>
+              </div>
             </div>
-            <textarea
-              data-testid="carousel-describe"
-              value={form.describe}
-              onChange={(e) => upd("describe", e.target.value)}
-              placeholder={"Buat carousel Myth vs Fact tentang sunscreen.\nTargetnya wanita usia 20–30 tahun.\nBahas 5 mitos yang paling sering dipercaya.\nVisual clean premium.\nCTA follow Instagram."}
-              rows={5}
-              className="input resize-none text-sm leading-relaxed w-full"
-            />
+
+            <div className="grid grid-cols-3 gap-2">
+              {INTENTS.map(item => (
+                <button key={item.id} type="button" onClick={() => { setIntent(item.id); if (storyFlow === "auto") {} }}
+                  className={`flex flex-col items-center gap-1.5 p-3.5 rounded-xl border-2 transition-colors text-center ${
+                    intent === item.id ? "border-brand bg-brand-sand" : "border-stone-100 bg-white hover:border-brand/30"
+                  }`} data-testid={`intent-${item.id}`}>
+                  <span className="text-xl">{item.emoji}</span>
+                  <span className={`text-xs font-bold ${intent === item.id ? "text-brand" : "text-stone-700"}`}>{item.label}</span>
+                  <span className="text-[9px] text-stone-400 leading-tight">{item.desc}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Optional topic */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest font-bold text-stone-400 block mb-1.5">
+                Spesifikasi tambahan <span className="normal-case font-normal">(opsional)</span>
+              </label>
+              <textarea
+                value={topic}
+                onChange={e => setTopic(e.target.value)}
+                rows={2}
+                placeholder={`Contoh: bahas 5 mitos skincare yang sering dipercaya target wanita 20–30 tahun`}
+                className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm resize-none focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
+                data-testid="carousel-topic"
+              />
+            </div>
+          </div>
+
+          {/* ⑤ STORY FLOW */}
+          <div className="feedify-card p-4 space-y-3">
+            <h3 className="font-heading text-sm font-bold text-brand">Story Flow</h3>
             <div className="flex flex-wrap gap-1.5">
-              {QUICK_CHIPS.map((chip) => (
-                <button key={chip.label} type="button"
-                  data-testid={`chip-${chip.label.toLowerCase().replace(/\s+/g,"-")}`}
-                  onClick={() => {
-                    upd("describe", chip.text);
-                    if (chip.flow) upd("story_flow", chip.flow);
-                  }}
-                  className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors ${
-                    form.story_flow === chip.flow && form.describe === chip.text
-                      ? "border-brand bg-brand-sand text-brand"
-                      : "border-stone-200 bg-white text-stone-500 hover:border-brand/40 hover:bg-brand-sand hover:text-brand"
-                  }`}>
-                  {chip.label}
+              {STORY_FLOWS.map(sf => (
+                <button key={sf.id} type="button" onClick={() => setStoryFlow(sf.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                    storyFlow === sf.id
+                      ? "bg-brand text-white border-brand"
+                      : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
+                  }`} data-testid={`flow-${sf.id}`}>
+                  <span>{sf.emoji}</span> {sf.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* ② BRAND & PRODUK */}
-          <div className="feedify-card p-4">
-            <p className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-3">Brand & Produk</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] text-stone-400 font-medium block mb-1">Brand <span className="text-stone-300">(auto)</span></label>
-                <input type="text" data-testid="carousel-brand-name" value={form.brand_name}
-                  onChange={(e) => upd("brand_name", e.target.value)}
-                  className="input" placeholder={brand?.brand_name || "Nama brand"} />
-              </div>
-              <div>
-                <label className="text-[10px] text-stone-400 font-medium block mb-1">Produk <span className="text-stone-300">(opsional)</span></label>
-                <input type="text" data-testid="carousel-product" value={form.product_name}
-                  onChange={(e) => upd("product_name", e.target.value)}
-                  className="input" placeholder="Nama produk" />
-              </div>
-            </div>
-          </div>
+          {/* ⑥ FORMAT & SLIDE */}
+          <div className="feedify-card p-4 space-y-4">
+            <h3 className="font-heading text-sm font-bold text-brand">Format & Jumlah Slide</h3>
 
-          {/* ③ FOTO PRODUK */}
-          <div className="feedify-card p-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <h3 className="font-heading text-base font-bold text-brand">Foto Produk</h3>
-              <span className="text-[10px] uppercase tracking-widest font-bold text-red-500 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Wajib</span>
-            </div>
-            <label htmlFor="carousel-product-photo" data-testid="carousel-photo-label"
-              className={`block cursor-pointer border-2 border-dashed rounded-xl p-6 hover:border-brand-light text-center transition-colors ${productPhoto ? "border-brand-light" : "border-red-300 bg-red-50/30"}`}>
-              {productPhoto
-                ? <div><img src={productPhoto} alt="produk" className="max-h-48 mx-auto rounded-lg" /><div className="text-xs text-stone-500 mt-2">Klik untuk ganti</div></div>
-                : <div className="py-4"><Camera size={32} className="mx-auto text-red-400 mb-2" weight="duotone" /><div className="font-medium text-brand">Upload foto produk</div><div className="text-xs text-stone-500 mt-1">Feedify butuh foto produk asli untuk generate visual</div></div>
-              }
-            </label>
-            <input id="carousel-product-photo" type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={handleProductPhoto} data-testid="carousel-photo-input" />
-            <ReferenceUpload value={referenceImg} onChange={setReferenceImg} testid="carousel-reference" />
-            <button type="button" onClick={() => setGalleryOpen(true)} data-testid="carousel-gallery-btn"
-              className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-brand-sand rounded-xl text-sm font-semibold text-brand-light hover:border-brand hover:text-brand hover:bg-brand-sand/40 transition-all">
-              <Images size={16} weight="duotone" /> Pilih dari Gallery Inspirasi
-            </button>
-          </div>
-
-          {/* ④ FORMAT */}
-          <div className="feedify-card p-4 space-y-3">
-            <h3 className="font-heading text-sm font-bold text-brand">Format</h3>
+            {/* Aspect ratio */}
             <div className="grid grid-cols-3 gap-2">
-              {ASPECT_RATIOS.map((r) => {
-                const active = form.aspect_ratio === r.value;
-                const dims = r.key === "1:1" ? { w: 1, h: 1 } : r.key === "4:5" ? { w: 4, h: 5 } : { w: 9, h: 16 };
-                const maxW = 32, maxH = 36;
-                const scale = Math.min(maxW / dims.w, maxH / dims.h);
-                const fw = Math.round(dims.w * scale);
-                const fh = Math.round(dims.h * scale);
+              {ASPECT_RATIOS.map(r => {
+                const active = aspectRatio === r.value;
+                const max = 34;
+                const dw = r.w >= r.h ? max : Math.round((r.w / r.h) * max);
+                const dh = r.w >= r.h ? Math.round((r.h / r.w) * max) : max;
                 return (
-                  <button key={r.key} type="button" data-testid={`carousel-ratio-${r.key}`}
-                    onClick={() => upd("aspect_ratio", r.value)}
+                  <button key={r.key} type="button" onClick={() => setAspectRatio(r.value)}
                     className={`relative flex flex-col items-center gap-2 py-4 px-2 rounded-xl border-2 transition-colors ${
                       active ? "border-brand bg-brand-sand" : "border-stone-100 bg-white hover:border-brand/30"
-                    }`}>
+                    }`} data-testid={`ratio-${r.key}`}>
                     {r.recommended && (
                       <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">Rekomen</span>
                     )}
-                    <div className="flex items-center justify-center" style={{ width: 40, height: 40 }}>
-                      <div className={`relative rounded-[3px] border-2 overflow-hidden transition-colors ${active ? "border-brand" : "border-stone-300"}`}
-                        style={{ width: fw, height: fh, background: active ? "rgba(11,61,46,0.1)" : "#f5f5f4" }}>
-                        <div className="absolute inset-0 flex flex-col justify-end p-[3px] gap-[2px]">
-                          <div className={`rounded-full ${active ? "bg-brand/30" : "bg-stone-300"}`} style={{ height: 2 }} />
-                          <div className={`rounded-full w-3/4 ${active ? "bg-brand/20" : "bg-stone-200"}`} style={{ height: 1.5 }} />
-                        </div>
-                      </div>
-                    </div>
+                    <div className={`rounded border-2 transition-colors ${active ? "border-brand bg-brand/10" : "border-stone-300 bg-stone-50"}`}
+                      style={{ width: dw, height: dh }} />
                     <div className="text-center">
                       <div className={`text-[11px] font-bold ${active ? "text-brand" : "text-stone-600"}`}>{r.label}</div>
                       <div className={`text-[9px] mt-0.5 ${active ? "text-brand/60" : "text-stone-400"}`}>{r.sub}</div>
@@ -577,705 +529,301 @@ export default function CarouselGeneratorPage() {
                 );
               })}
             </div>
-          </div>
 
-          {/* ⑤ JUMLAH SLIDE */}
-          <div className="feedify-card p-4 space-y-3">
-            <h3 className="font-heading text-sm font-bold text-brand">Jumlah Slide</h3>
-            <div className="flex gap-1.5">
-              {[3, 4, 5, 6, 7].map((n) => (
-                <button key={n} type="button" data-testid={`slide-count-${n}`}
-                  onClick={() => upd("slide_count", n)}
-                  className={`relative flex-1 py-2.5 rounded-xl border-2 font-heading font-bold text-sm transition-colors ${
-                    form.slide_count === n ? "border-brand bg-brand text-brand-cream" : "border-stone-100 text-stone-600 hover:border-brand/30"
-                  }`}>
-                  {n === 3 && form.slide_count !== 3 && (
-                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">Rekomen</span>
-                  )}
-                  {n}
-                </button>
-              ))}
+            {/* Slide count */}
+            <div className="space-y-2">
+              <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Jumlah Slide</p>
+              <div className="flex gap-1.5">
+                {[3, 4, 5, 6, 7].map(n => (
+                  <button key={n} type="button" onClick={() => setSlideCount(n)}
+                    className={`relative flex-1 py-2.5 rounded-xl border-2 font-heading font-bold text-sm transition-colors ${
+                      slideCount === n ? "border-brand bg-brand text-white" : "border-stone-100 text-stone-600 hover:border-brand/30"
+                    }`} data-testid={`slide-count-${n}`}>
+                    {n === 3 && slideCount !== 3 && (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap">Rekomen</span>
+                    )}
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-[10px] text-stone-400">{form.slide_count} kredit akan digunakan</p>
+
+            {/* Storyboard preview */}
+            <div className="border-t border-stone-100 pt-3">
+              <div className="flex items-center gap-2 mb-2.5">
+                <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Alur slide yang akan dibuat</p>
+                {storyFlow === "auto" && (
+                  <span className="text-[9px] bg-brand/10 text-brand font-semibold px-2 py-0.5 rounded-full">
+                    {STORY_FLOWS.find(f => f.id === activeFlowKey)?.label || activeFlowKey}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-end gap-2 overflow-x-auto pb-1">
+                {slideRoles.map((name, i) => {
+                  const isFirst = i === 0;
+                  const isLast  = i === slideRoles.length - 1;
+                  return (
+                    <div key={i} className="flex items-end gap-2 flex-shrink-0">
+                      <div className="flex flex-col items-center gap-1.5">
+                        <div className="rounded-[3px] border overflow-hidden relative"
+                          style={{
+                            width: fw, height: maxH,
+                            background: isFirst ? "rgba(11,61,46,0.08)" : isLast ? "rgba(229,193,88,0.15)" : "rgba(11,61,46,0.03)",
+                            borderColor: isFirst ? "rgba(11,61,46,0.3)" : isLast ? "rgba(229,193,88,0.5)" : "rgba(11,61,46,0.12)",
+                          }}>
+                          <div className="absolute inset-0 flex flex-col justify-end p-[3px] gap-[2px]">
+                            {isLast
+                              ? <div className="rounded-full mx-auto" style={{ width: "65%", height: 4, background: "rgba(229,193,88,0.7)" }} />
+                              : <>
+                                  <div className="rounded-full bg-brand/25 w-full" style={{ height: 2.5 }} />
+                                  <div className="rounded-full bg-brand/15 w-3/4" style={{ height: 1.5 }} />
+                                </>
+                            }
+                          </div>
+                          <div className="absolute top-1 left-1 text-[7px] font-bold text-stone-400">{i + 1}</div>
+                        </div>
+                        <span className="text-[8px] font-semibold text-stone-500 text-center leading-tight" style={{ maxWidth: fw + 8 }}>{name}</span>
+                      </div>
+                      {!isLast && <div className="text-stone-300 text-xs mb-5 flex-shrink-0">›</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {/* ⑥ ORANG DALAM VISUAL */}
-          <div className="feedify-card p-5 space-y-4">
-            <h3 className="font-heading text-base font-bold text-brand">Orang dalam Visual</h3>
-            <button type="button" data-testid="carousel-toggle-people"
-              onClick={() => upd("include_people", !form.include_people)}
-              className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
-                form.include_people ? "border-brand bg-brand-sand" : "border-stone-100 bg-stone-50"
-              }`}>
-              <div className="text-left">
-                <p className={`font-semibold text-sm ${form.include_people ? "text-brand" : "text-stone-600"}`}>
-                  {form.include_people ? "Product + People" : "Product Only"}
-                </p>
-                <p className="text-[11px] text-stone-400 mt-0.5">
-                  {form.include_people ? "Sertakan model atau orang dalam visual" : "Feedify fokus pada produk tanpa model"}
-                </p>
+          {/* ⑦ MODEL */}
+          <div className="feedify-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-heading text-sm font-bold text-brand">Model / Talent</h3>
+                <p className="text-xs text-stone-500 mt-0.5">Tampilkan orang dalam carousel? (opsional)</p>
               </div>
-              <div className={`w-12 h-6 rounded-full relative flex-shrink-0 transition-colors ${form.include_people ? "bg-brand" : "bg-stone-300"}`}>
-                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all ${form.include_people ? "left-6" : "left-0.5"}`} />
-              </div>
-            </button>
-            {form.include_people && (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={modelEnabled}
+                onClick={() => setModelEnabled(v => !v)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${modelEnabled ? "bg-brand" : "bg-stone-200"}`}
+                data-testid="model-toggle"
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${modelEnabled ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
+            </div>
+
+            {modelEnabled && (
               <div className="space-y-4 animate-fade-up">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-2">Gender</p>
-                  <div className="flex flex-wrap gap-2">
-                    {PEOPLE_GENDERS.map(({ id, name }) => (
-                      <button key={id} type="button" data-testid={`carousel-gender-${id}`}
-                        onClick={() => upd("people_gender", id)}
-                        className={`px-3.5 py-2 rounded-full text-xs font-semibold border transition-all ${
-                          form.people_gender === id ? "bg-brand text-brand-cream border-brand" : "bg-white border-stone-200 text-stone-600 hover:border-brand/30"
-                        }`}>{name}</button>
+                {/* Gender */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Gender</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: "wanita", label: "Cewek", emoji: "👩" },
+                      { id: "pria",   label: "Cowok", emoji: "👨" },
+                    ].map(g => (
+                      <button key={g.id} type="button" onClick={() => setModelGender(g.id)}
+                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
+                          modelGender === g.id ? "border-brand bg-brand-sand text-brand" : "border-stone-100 text-stone-600 hover:border-brand/30"
+                        }`} data-testid={`model-gender-${g.id}`}>
+                        <span className="text-base">{g.emoji}</span> {g.label}
+                      </button>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-2">Usia</p>
-                  <div className="flex gap-2">
-                    {PEOPLE_AGES.map(({ id, name }) => (
-                      <button key={id} type="button" data-testid={`carousel-age-${id}`}
-                        onClick={() => upd("people_age", id)}
-                        className={`flex-1 py-2.5 rounded-xl border-2 text-xs font-semibold text-center transition-all ${
-                          form.people_age === id ? "border-brand bg-brand-sand text-brand" : "border-stone-100 text-stone-600 hover:border-brand/30"
-                        }`}>{name}</button>
+
+                {/* Style / Penampilan */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Penampilan</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MODEL_STYLES.filter(s => modelGender === "pria"
+                      ? !["hijab", "hijab-modern"].includes(s.id)
+                      : true
+                    ).map(s => (
+                      <button key={s.id} type="button"
+                        onClick={() => setModelStyle(v => v === s.id ? null : s.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                          modelStyle === s.id
+                            ? "bg-brand text-white border-brand"
+                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
+                        }`} data-testid={`model-style-${s.id}`}>
+                        {s.emoji} {s.label}
+                      </button>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-2">Appearance</p>
-                  <input type="text" value={form.people_appearance}
-                    onChange={(e) => upd("people_appearance", e.target.value)}
-                    className="input" placeholder="mis. Natural beauty · Professional · Hijab · Chef" />
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-2">Scene Focus</p>
-                  <div className="flex gap-2">
-                    {SCENE_FOCUS.map(({ id, name }) => (
-                      <button key={id} type="button" data-testid={`carousel-scene-${id}`}
-                        onClick={() => upd("scene_focus", id)}
-                        className={`flex-1 py-2.5 rounded-xl border-2 text-[11px] font-semibold text-center transition-all ${
-                          form.scene_focus === id ? "border-brand bg-brand-sand text-brand" : "border-stone-100 text-stone-600 hover:border-brand/30"
-                        }`}>{name}</button>
+
+                {/* Age range */}
+                <div className="space-y-1.5">
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Kisaran Usia</p>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {MODEL_AGES.map(a => (
+                      <button key={a.id} type="button"
+                        onClick={() => setModelAge(v => v === a.id ? null : a.id)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                          modelAge === a.id
+                            ? "bg-brand text-white border-brand"
+                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
+                        }`} data-testid={`model-age-${a.id}`}>
+                        {a.label}
+                      </button>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.15em] text-stone-400 font-semibold mb-2">Wardrobe Notes <span className="normal-case font-normal">(opsional)</span></p>
-                  <input type="text" value={form.wardrobe_notes}
-                    onChange={(e) => upd("wardrobe_notes", e.target.value)}
-                    className="input" placeholder="mis. Luxury black suit · White minimal · Hijab formal" />
-                </div>
+
+                {!modelStyle && !modelAge && (
+                  <p className="text-[11px] text-stone-400 bg-stone-50 rounded-lg px-3 py-2">
+                    <User size={11} weight="bold" className="inline mr-1" />
+                    Tanpa pilihan spesifik, AI otomatis pilih model sesuai Brand DNA kamu.
+                  </p>
+                )}
               </div>
             )}
           </div>
 
-          {/* ⑦ AI STORY FLOW */}
-          <div className="feedify-card p-5 space-y-5">
-            <div>
-              <h3 className="font-heading text-sm font-bold text-brand">Story Flow</h3>
-              <p className="text-xs text-stone-400 mt-0.5">Feedify otomatis menyusun alur slide terbaik.</p>
+          {/* ⑧ CTA */}
+          <div className="feedify-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-heading text-sm font-bold text-brand">Tombol CTA</h3>
+                <p className="text-xs text-stone-500 mt-0.5">Tambahkan ajakan bertindak? (opsional)</p>
+              </div>
+              <button type="button" role="switch" aria-checked={ctaEnabled}
+                onClick={() => { setCtaEnabled(v => !v); if (ctaEnabled) setCtaText(""); }}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${ctaEnabled ? "bg-brand" : "bg-stone-200"}`}
+                data-testid="cta-toggle">
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${ctaEnabled ? "translate-x-6" : "translate-x-1"}`} />
+              </button>
             </div>
-            <div className="grid grid-cols-2 gap-2.5">
-              {STORY_FLOWS.map((sf) => (
-                <button key={sf.id} type="button" data-testid={`story-flow-${sf.id}`}
-                  onClick={() => upd("story_flow", sf.id)}
-                  className={`relative text-left p-3.5 rounded-xl border-2 transition-colors ${
-                    form.story_flow === sf.id ? "border-brand bg-brand-sand" : "border-stone-100 bg-white hover:border-brand/30"
-                  }`}>
-                  {sf.recommended && (
-                    <span className="absolute -top-2 left-3 text-[7px] bg-brand-gold text-brand font-bold px-1.5 py-0.5 rounded-full">Rekomen</span>
-                  )}
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-base leading-none">{sf.emoji}</span>
-                    <span className={`text-xs font-bold leading-tight ${form.story_flow === sf.id ? "text-brand" : "text-stone-700"}`}>{sf.name}</span>
-                  </div>
-                  <span className="text-[10px] text-stone-400 leading-tight">{sf.desc}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Dynamic slide flow preview — mini slide frames */}
-            <div className="border-t border-stone-100 pt-4">
-              <p className="text-[10px] uppercase tracking-[0.12em] text-stone-400 font-semibold mb-3">Alur slide yang akan dibuat</p>
-              {(() => {
-                const slides = (FLOW_TEMPLATES[form.story_flow] || FLOW_TEMPLATES.auto).slice(0, form.slide_count);
-                const ar = form.aspect_ratio;
-                const dims = ar.includes("9:16") ? { w: 18, h: 32 }
-                           : ar.includes("4:5")  ? { w: 22, h: 28 }
-                           :                       { w: 26, h: 26 };
-                return (
-                  <div className="flex items-end gap-1.5 overflow-x-auto pb-1">
-                    {slides.map((name, i) => {
-                      const isFirst = i === 0;
-                      const isLast  = i === slides.length - 1;
-                      const bg = isFirst ? "rgba(11,61,46,0.07)" : isLast ? "rgba(229,193,88,0.15)" : "rgba(11,61,46,0.03)";
-                      const borderCol = isFirst ? "rgba(11,61,46,0.3)" : isLast ? "rgba(229,193,88,0.5)" : "rgba(11,61,46,0.12)";
-                      return (
-                        <div key={i} className="flex items-end gap-1.5 flex-shrink-0">
-                          <div className="flex flex-col items-center gap-1.5">
-                            <div className="relative rounded-[3px] overflow-hidden border"
-                              style={{ width: dims.w, height: dims.h, background: bg, borderColor: borderCol }}>
-                              <div className="absolute inset-0 flex flex-col justify-end p-[3px] gap-[2px]">
-                                {isFirst ? (
-                                  <>
-                                    <div className="rounded-full bg-brand/25 w-full" style={{ height: 3 }} />
-                                    <div className="rounded-full bg-brand/15 w-3/4" style={{ height: 1.5 }} />
-                                  </>
-                                ) : isLast ? (
-                                  <div className="rounded-full mx-auto" style={{ width: "70%", height: 4, background: "rgba(229,193,88,0.6)" }} />
-                                ) : (
-                                  <>
-                                    <div className="rounded-full bg-stone-300 w-full" style={{ height: 2 }} />
-                                    <div className="rounded-full bg-stone-200 w-3/4" style={{ height: 1.5 }} />
-                                    <div className="rounded-full bg-stone-100 w-1/2" style={{ height: 1.5 }} />
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <span className="text-[8.5px] font-semibold text-stone-500 text-center leading-tight" style={{ maxWidth: dims.w + 10 }}>{name}</span>
-                          </div>
-                          {!isLast && (
-                            <div className="text-stone-300 text-xs mb-5 flex-shrink-0">›</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
+            {ctaEnabled && (
+              <div className="space-y-3 animate-fade-up">
+                <div className="flex flex-wrap gap-1.5">
+                  {CTA_SUGGESTIONS.map(s => (
+                    <button key={s} type="button" onClick={() => setCtaText(s)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        ctaText === s ? "bg-brand text-white border-brand" : "bg-white text-stone-600 border-stone-200 hover:border-brand/50 hover:text-brand"
+                      }`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <input type="text" value={ctaText} onChange={e => setCtaText(e.target.value)}
+                  placeholder="Atau ketik CTA sendiri..."
+                  className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
+                  maxLength={40} data-testid="cta-input" />
+              </div>
+            )}
           </div>
 
-          {/* Validation warnings */}
-          {validationWarnings.length > 0 && (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-1 animate-fade-up">
-              {validationWarnings.map((w, i) => (
-                <p key={i} className="text-xs text-amber-600 flex gap-1.5"><span>⚡</span>{w}</p>
-              ))}
-            </div>
-          )}
-
-          {/* ⑦ FEEDIFY AKAN OTOMATIS */}
-          <div className="rounded-2xl border border-green-100 p-5 bg-gradient-to-br from-green-50/60 to-white animate-fade-up" data-testid="carousel-ai-card">
+          {/* ChatGPT akan otomatis card */}
+          <div className="rounded-2xl border border-green-100 p-4 bg-gradient-to-br from-green-50/60 to-white">
             <div className="flex items-center gap-2 mb-3">
-              <Sparkle size={14} weight="fill" className="text-brand-gold" />
-              <p className="text-sm font-semibold text-brand">Feedify akan otomatis</p>
+              <Sparkle size={13} weight="fill" className="text-brand-gold" />
+              <p className="text-sm font-semibold text-brand">Dengan prompt ini, ChatGPT akan otomatis</p>
             </div>
             <div className="space-y-2">
               {[
-                "Menyusun storyline carousel",
-                "Menulis copywriting setiap slide",
-                "Menentukan visual direction",
-                "Menyesuaikan desain dengan Brand DNA",
-                "Menghasilkan carousel siap upload",
-              ].map((item) => (
-                <div key={item} className="flex items-center gap-2.5">
-                  <CheckCircle size={14} weight="fill" className="text-green-500 flex-shrink-0" />
+                "Membaca foto inspirasi untuk meniru komposisi, layout, dan suasana tiap slide",
+                "Menyesuaikan identitas brand kamu — warna dan elemen visual tetap milik kamu",
+                "Mengatur alur cerita sesuai story flow yang kamu pilih, slide per slide",
+                "Menampilkan foto produk persis seperti yang kamu upload, tanpa diubah",
+                "Menghasilkan teks headline dan subheadline yang relevan per slide",
+              ].map(item => (
+                <div key={item} className="flex items-start gap-2">
+                  <CheckCircle size={13} weight="fill" className="text-green-500 flex-shrink-0 mt-0.5" />
                   <span className="text-xs text-stone-600">{item}</span>
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-stone-400 mt-4">⏱ Estimasi proses ±40–70 detik.</p>
-          </div>
+            <p className="text-[10px] text-stone-400 mt-3 border-t border-stone-100 pt-2">
+              💡 Setelah klik GENERATE — salin prompt tiap slide, buka ChatGPT, upload foto, dan paste.
+            </p>
 
-          {/* Desktop inline buttons */}
-          <div className="hidden lg:block space-y-2 pt-1">
-            {isAdmin && (
-              <button onClick={previewPrompt} disabled={previewing || generating}
-                data-testid="preview-carousel-btn"
-                className="w-full h-10 border-2 border-brand text-brand rounded-full font-bold text-sm hover:bg-brand-sand transition-colors disabled:opacity-60 inline-flex items-center justify-center gap-1.5">
-                {previewing ? <CircleNotch size={13} className="animate-spin" /> : <CheckCircle size={13} weight="duotone" />}
-                Preview
-              </button>
-            )}
-            <button type="button" onClick={generate} disabled={generating} data-testid="generate-carousel-btn"
-              className="w-full py-3.5 bg-brand text-brand-cream rounded-full font-bold text-base hover:bg-brand-light btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg shadow-brand/20 transition-colors">
+            {/* Generate — nempel dengan card ini (semua viewport) */}
+            <button onClick={generate} disabled={generating || (!referenceImg && referenceSlides.length === 0)}
+              className="mt-3 w-full h-12 bg-brand hover:bg-brand/90 text-brand-cream rounded-full font-heading font-bold text-sm btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-md transition-colors tracking-wide"
+              data-testid="generate-carousel-btn">
               {generating
-                ? <><CircleNotch size={18} className="animate-spin" /> {genPhase || "Menyiapkan..."}</>
-                : <><Sparkle size={18} weight="fill" /> Generate Carousel</>}
+                ? <><CircleNotch size={15} className="animate-spin" /> Menyusun...</>
+                : <><Sparkle size={15} weight="fill" /> GENERATE</>}
             </button>
           </div>
 
-          {isAdmin && promptPreview && (
-            <div id="carousel-preview-panel" className="animate-fade-up space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Stack size={16} weight="duotone" className="text-brand" />
-                  <span className="font-heading font-bold text-brand text-sm">Preview Prompt</span>
-                </div>
-                <span className="text-[10px] bg-brand-sand text-brand font-bold px-2.5 py-1 rounded-full">
-                  {(promptPreview.prompt_json?.slides || []).length} prompt untuk {form.slide_count} slide
-                </span>
-              </div>
-              {(promptPreview.prompt_json?.slides || []).map((slide, i) => (
-                <SlidePromptCard key={i} index={i} slide={slide} />
-              ))}
+          {/* Prompt result */}
+          {promptResult && (
+            <div ref={promptCardRef}>
+              <PromptSuccessCard
+                promptData={promptResult}
+                hasReferenceImage={!!referenceImg || referenceSlides.length > 0}
+                referenceImg={referenceImg || referenceSlides[0]?.url || null}
+                productPhoto={selectedProduct?.photo_base64 || null}
+                onReset={() => setPromptResult(null)}
+                dashboardType="carousel"
+                title={promptResult?.prompt_json?.carousel_meta?.topic || selectedProduct?.name || "Carousel"}
+              />
             </div>
           )}
+
         </div>
 
-        {/* ── Right: Sidebar ───────────────────────────────────────────────────── */}
+        {/* Sidebar */}
         <div className="lg:sticky lg:top-6 lg:self-start space-y-4">
-          {/* Creative Brief */}
-          <div className="feedify-card p-4 space-y-2.5">
-            <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold">Creative Brief</div>
-            <CarouselBriefRow label="Brand"  value={form.brand_name || brand?.brand_name || "—"} />
-            <CarouselBriefRow label="Produk" value={form.product_name || "—"} />
-            <CarouselBriefRow label="Slide"  value={`${form.slide_count} slide`} />
-            <CarouselBriefRow label="Format" value={form.aspect_ratio.split(" ")[0]} />
-            <CarouselBriefRow label="Visual" value={form.include_people ? "Product + People" : "Product Only"} />
-            <CarouselBriefRow label="Flow"   value={STORY_FLOWS.find(s => s.id === form.story_flow)?.name || "Auto"} />
-            {form.describe && <CarouselBriefRow label="Ide" value={form.describe.slice(0, 40) + (form.describe.length > 40 ? "…" : "")} truncate />}
-          </div>
-
           <BrandDnaCard />
 
-          {/* Live Preview */}
-          <div className="feedify-card p-4 space-y-3">
-            <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold flex items-center gap-1.5">
-              <Lightning size={14} weight="fill" /> Live Preview
-            </div>
-            {hasAnySlide ? (
-              <>
-                {(() => {
-                  const ar = form.aspect_ratio;
-                  const aspectCls = ar.includes("9:16") ? "aspect-[9/16]"
-                                  : ar.includes("4:5")  ? "aspect-[4/5]"
-                                  : "aspect-square";
-                  return (
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {Array.from({ length: totalSlides }).map((_, i) => {
-                        const img = slideImages[i];
-                        const isSelected = selectedSlide === i;
-                        const status = slideStatuses[i] || "waiting";
-                        return (
-                          <button key={i} type="button" onClick={() => img && setSelectedSlide(i)} disabled={!img}
-                            className={`relative ${aspectCls} rounded-lg overflow-hidden border-2 transition-all
-                              ${img ? (isSelected ? "border-brand ring-1 ring-brand/30" : "border-stone-200 hover:border-brand/40") : "border-dashed border-stone-200 cursor-default"}`}>
-                            {img
-                              ? <img src={`data:image/png;base64,${img}`} alt={`slide ${i+1}`} className="w-full h-full object-cover" />
-                              : <div className="w-full h-full bg-stone-50 flex items-center justify-center">
-                                  {generating && status === "generating"
-                                    ? <CircleNotch size={12} className="animate-spin text-brand" />
-                                    : <span className="text-[9px] text-stone-300 font-bold">{i+1}</span>
-                                  }
-                                </div>
-                            }
-                          </button>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-                <p className="text-[10px] text-stone-400">
-                  {generating
-                    ? `${slideImages.filter(Boolean).length} dari ${totalSlides} selesai...`
-                    : `${slideImages.filter(Boolean).length} slide selesai`}
-                </p>
-                {!generating && slideImages.some(Boolean) && (
-                  <button onClick={downloadAll}
-                    className="w-full inline-flex items-center justify-center gap-1.5 py-2 bg-brand text-brand-cream rounded-full text-xs font-bold hover:bg-brand-light transition-colors">
-                    <DownloadSimple size={13} weight="bold" /> Download Semua Slide
-                  </button>
-                )}
-              </>
-            ) : (
-              <div className="py-2 space-y-3">
-                {(() => {
-                  const ar = form.aspect_ratio;
-                  const dims = ar.includes("9:16") ? { w: 9, h: 16 }
-                             : ar.includes("4:5")  ? { w: 4, h: 5  }
-                             :                       { w: 1, h: 1  };
-                  const maxH = 52;
-                  const scale = maxH / dims.h;
-                  const fw = Math.round(dims.w * scale);
-                  const fh = maxH;
-                  const count = form.slide_count;
-                  return (
-                    <div className="flex items-end justify-center gap-1.5 overflow-hidden">
-                      {Array.from({ length: Math.min(count, 6) }).map((_, i) => {
-                        const isFirst = i === 0;
-                        const w = isFirst ? fw + 8 : fw;
-                        const h = isFirst ? fh : Math.round(fh * 0.85);
-                        return (
-                          <div key={i} className="flex-shrink-0 rounded-md overflow-hidden border border-stone-200 relative"
-                            style={{ width: w, height: h, background: isFirst ? "linear-gradient(160deg,#eef5f1,#f8fdf9)" : "linear-gradient(160deg,#f7f7f5,#fafaf8)" }}>
-                            <div className="absolute inset-0 flex flex-col justify-end p-[4px] gap-[2.5px]">
-                              {isFirst && <div className="w-4/5 rounded-full bg-brand/15" style={{ height: 3 }} />}
-                              <div className="w-full rounded-full bg-stone-200/80" style={{ height: 2 }} />
-                              <div className="w-2/3 rounded-full bg-stone-200/50" style={{ height: 1.5 }} />
-                            </div>
-                            <div className="absolute top-1 left-1 text-[7px] font-bold text-stone-300">{i + 1}</div>
-                          </div>
-                        );
-                      })}
-                      {count > 6 && (
-                        <div className="text-[9px] text-stone-300 font-bold self-end mb-1">+{count - 6}</div>
-                      )}
-                    </div>
-                  );
-                })()}
-                <p className="text-center text-[10px] text-stone-400">
-                  {form.slide_count} slide akan dibuat · klik Generate
-                </p>
-              </div>
-            )}
-          </div>
-
-        </div>
-      </div>
-
-      {/* ── Progressive Result Section ──────────────────────────────────────────── */}
-      {hasAnySlide && (
-        <div id="carousel-result" className="space-y-4 animate-fade-up">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 mt-0.5">
-              {generating
-                ? <CircleNotch size={22} className="animate-spin text-brand" />
-                : <CheckCircle size={22} weight="fill" className="text-green-600" />}
-            </div>
-            <div>
-              <h2 className="font-heading text-lg font-bold text-brand">
-                {generating ? genPhase || "Generating..." : `${slideImages.filter(Boolean).length} dari ${totalSlides} Slide Selesai`}
-              </h2>
-              {generating && <p className="text-xs text-stone-400 mt-0.5">Slide berikutnya muncul otomatis saat selesai</p>}
-            </div>
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1" data-testid="slide-tabs">
-            {Array.from({ length: totalSlides }).map((_, i) => {
-              const status   = slideStatuses[i] || "waiting";
-              const img      = slideImages[i];
-              const isActive = selectedSlide === i;
-              return (
-                <button key={i} onClick={() => img && setSelectedSlide(i)}
-                  data-testid={`slide-tab-${i}`} disabled={!img}
-                  className={`flex-shrink-0 w-20 h-20 rounded-xl border-2 overflow-hidden transition-all relative
-                    ${isActive && img ? "border-brand scale-105 ring-2 ring-brand-gold" : "border-stone-200"}
-                    ${!img ? "cursor-default" : "cursor-pointer"}`}>
-                  {img ? (
-                    <img src={`data:image/png;base64,${img}`} alt={`slide ${i+1}`} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="h-full w-full flex flex-col items-center justify-center bg-stone-50 gap-1">
-                      <SlideStatusIcon status={status} />
-                      <span className="text-[9px] text-stone-400 font-medium">{status}</span>
-                    </div>
-                  )}
-                  <div className="absolute top-1 left-1 bg-brand/80 text-white text-[9px] font-bold px-1 rounded">{i + 1}</div>
-                </button>
-              );
-            })}
-          </div>
-
-          {slideImages[selectedSlide] && (
-            <div className="feedify-card p-4 sm:p-5" data-testid="active-slide-preview">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                <div className="font-heading font-bold text-brand capitalize">
-                  Slide {selectedSlide + 1}
-                  {slideRoles[selectedSlide] && <span className="text-stone-400 font-normal"> · {slideRoles[selectedSlide]}</span>}
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => downloadSlide(selectedSlide)} data-testid={`download-slide-${selectedSlide}`}
-                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-brand text-brand-cream rounded-full text-xs font-semibold hover:bg-brand-light">
-                    <DownloadSimple size={12} weight="bold" /> Download
-                  </button>
-                  <button onClick={() => regenerateSlide(selectedSlide)}
-                    disabled={regeneratingSlide === selectedSlide || generating}
-                    data-testid={`regenerate-slide-${selectedSlide}`}
-                    className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-brand-gold text-brand rounded-full text-xs font-semibold hover:opacity-80 disabled:opacity-50">
-                    {regeneratingSlide === selectedSlide
-                      ? <CircleNotch size={12} className="animate-spin" />
-                      : <ArrowsClockwise size={12} weight="bold" />}
-                    Regenerate (1 kredit)
-                  </button>
+          {selectedProduct && (
+            <div className="feedify-card p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">Produk Dipilih</p>
+              <div className="flex items-center gap-3">
+                {selectedProduct.photo_base64
+                  ? <img src={selectedProduct.photo_base64} alt="" className="w-14 h-14 rounded-xl object-cover" />
+                  : <div className="w-14 h-14 rounded-xl bg-brand/10 flex items-center justify-center"><Package size={22} weight="duotone" className="text-brand" /></div>
+                }
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm text-stone-800 truncate">{selectedProduct.name}</p>
+                  {selectedProduct.category && <p className="text-xs text-stone-500">{selectedProduct.category}</p>}
                 </div>
               </div>
-              <div className="aspect-square sm:aspect-[4/5] max-w-md mx-auto rounded-2xl overflow-hidden border-2 border-brand">
-                <img src={`data:image/png;base64,${slideImages[selectedSlide]}`} alt=""
-                  className="h-full w-full object-cover" data-testid="active-slide-image" />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Caption Bundle */}
-      {(generatingCaptions || captions) && (
-        <div className="animate-fade-up space-y-4" data-testid="carousel-caption-bundle">
-          <div className="flex items-center gap-2">
-            <ChatCircle size={22} weight="duotone" className="text-brand" />
-            <h2 className="font-heading text-xl font-bold text-brand">Caption Bundle</h2>
-            {generatingCaptions && <CircleNotch size={16} className="animate-spin text-brand-light" />}
-          </div>
-          {captions && (
-            <>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {(captions.captions || []).map((c, i) => (
-                  <div key={i} className="feedify-card p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <div className="font-heading text-sm font-bold text-brand">{c.style}</div>
-                        <div className="text-[10px] text-stone-500">{c.label}</div>
-                      </div>
-                      <CopyBtn text={c.text} />
-                    </div>
-                    <p className="text-sm text-stone-700 leading-relaxed">{c.text}</p>
-                  </div>
-                ))}
-              </div>
-              {captions.hashtags?.length > 0 && (
-                <div className="feedify-card p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-1.5">
-                      <Hash size={14} weight="bold" className="text-brand-light" />
-                      <span className="text-xs uppercase tracking-[0.15em] text-brand-light font-semibold">Hashtags</span>
-                    </div>
-                    <CopyBtn text={captions.hashtags.join(" ")} label="Copy semua" />
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {captions.hashtags.map((h, i) => (
-                      <span key={i} className="px-2.5 py-1 bg-brand-sand rounded-full text-xs font-medium text-brand">{h}</span>
-                    ))}
-                  </div>
+              {selectedProduct.benefits?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedProduct.benefits.slice(0, 4).map(b => (
+                    <span key={b} className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full font-medium">{b}</span>
+                  ))}
                 </div>
               )}
-            </>
+            </div>
           )}
+
+          {/* Mini creative brief */}
+          <div className="feedify-card p-4 space-y-2">
+            <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Creative Brief</p>
+            {[
+              ["Tujuan", activeIntent.label],
+              ["Flow", STORY_FLOWS.find(f => f.id === storyFlow)?.label || "Auto"],
+              ["Slide", `${slideCount} slide`],
+              ["Format", ar.label],
+              ctaEnabled && ctaText ? ["CTA", ctaText] : null,
+              modelEnabled ? ["Model", `${modelGender === "wanita" ? "Cewek" : "Cowok"}${modelAge ? ` · ${modelAge} th` : ""}${modelStyle ? ` · ${MODEL_STYLES.find(s=>s.id===modelStyle)?.label||""}` : ""}`] : null,
+            ].filter(Boolean).map(([label, value]) => (
+              <div key={label} className="flex items-center justify-between text-xs gap-2">
+                <span className="text-stone-400 flex-shrink-0">{label}</span>
+                <span className="font-semibold text-stone-700 text-right truncate max-w-[65%]">{value}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+      </div>
 
       <InspirationGallery
         open={galleryOpen}
         onClose={() => setGalleryOpen(false)}
         context="carousel"
-        onSelect={(photo) => {
-          fetch(`/gallery/${photo.category}/${photo.filename}`)
-            .then((r) => r.blob())
-            .then((blob) => {
-              const reader = new FileReader();
-              reader.onload = () => setProductPhoto(reader.result);
-              reader.readAsDataURL(blob);
-            });
+        requiredCount={slideCount}
+        onSelect={(photos) => {
+          // photos is an array of N selected slides (multi-select)
+          setReferenceSlides(photos);
+          setReferenceImg(null);
+          setGalleryOpen(false);
         }}
       />
-
-      {/* ── Sticky Generate Bar (mobile only) ───────────────────────────────── */}
-      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-50 backdrop-blur-md border-t border-stone-200"
-        style={{ background: "rgba(242,246,244,0.94)" }}>
-        <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center gap-2.5">
-          <div className="hidden sm:block flex-1" />
-          {isAdmin && (
-            <button onClick={previewPrompt} disabled={previewing || generating}
-              data-testid="preview-carousel-btn"
-              className="h-10 px-5 shrink-0 border-2 border-brand text-brand rounded-full font-bold text-sm hover:bg-brand-sand transition-colors disabled:opacity-60 inline-flex items-center gap-1.5">
-              {previewing ? <CircleNotch size={13} className="animate-spin" /> : <CheckCircle size={13} weight="duotone" />}
-              Preview
-            </button>
-          )}
-          <button type="button" onClick={generate} disabled={generating}
-            data-testid="generate-carousel-btn"
-            className="flex-1 sm:flex-none h-10 sm:px-7 sm:shrink-0 bg-brand text-brand-cream rounded-full font-bold text-sm hover:bg-brand-light btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-md shadow-brand/20 transition-colors">
-            {generating
-              ? <><CircleNotch size={15} className="animate-spin" /> {genPhase || "Menyiapkan..."}</>
-              : <><Sparkle size={15} weight="fill" /> Generate Carousel · {form.slide_count} Kredit</>}
-          </button>
-        </div>
-      </div>
     </div>
-  );
-}
-
-function CarouselBriefRow({ label, value, truncate }) {
-  return (
-    <div className="flex items-center justify-between text-xs gap-2">
-      <span className="text-stone-400 flex-shrink-0">{label}</span>
-      <span className={`font-semibold text-stone-700 text-right ${truncate ? "truncate max-w-[65%]" : "max-w-[65%]"}`}>{value}</span>
-    </div>
-  );
-}
-
-// ── Storyboard Card ────────────────────────────────────────────────────────────
-
-function StoryboardCard({ index, total, ratio, brand }) {
-  const primary = brand?.color_primary || "#0B3D2E";
-  const gold    = "#E5C158";
-  const bg      = brand?.color_secondary || "#FDFBF7";
-  const ratioKey = ratio.split(" ")[0];
-  const role     = getSlideRole(index, total);
-  const roleData = SLIDE_ROLE_DATA[role];
-
-  // Card width/aspect per ratio — all cards have same visual height feel
-  const cardW  = ratioKey === "9:16" ? "w-[44px]" : ratioKey === "4:5" ? "w-[60px]" : "w-[72px]";
-  const aspect = ratioKey === "9:16" ? "aspect-[9/16]" : ratioKey === "4:5" ? "aspect-[4/5]" : "aspect-square";
-
-  return (
-    <div className="flex flex-col items-center gap-2 flex-shrink-0 animate-fade-up" style={{ animationDelay: `${index * 50}ms` }}>
-      <div className={`${cardW} ${aspect} relative rounded-lg overflow-hidden border border-stone-200 shadow-sm`} style={{ background: bg }}>
-        {role === "cover"      && <LayoutCover primary={primary} gold={gold} />}
-        {role === "hook"       && <LayoutHook primary={primary} />}
-        {role === "insight"    && <LayoutInsight primary={primary} />}
-        {role === "comparison" && <LayoutComparison primary={primary} gold={gold} />}
-        {role === "tips"       && <LayoutTips primary={primary} gold={gold} />}
-        {role === "cta"        && <LayoutCTA primary={primary} gold={gold} />}
-        {/* Slide number badge */}
-        <div className="absolute top-1 left-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[7px] font-bold text-white"
-          style={{ background: primary }}>
-          {index + 1}
-        </div>
-      </div>
-      <div className="text-center">
-        <div className={`text-[10px] font-bold ${role === "cta" ? "text-brand-gold" : "text-stone-600"}`}>{roleData.name}</div>
-        <div className="text-[8px] text-stone-400 leading-tight" style={{ maxWidth: 72 }}>{roleData.desc}</div>
-      </div>
-    </div>
-  );
-}
-
-function LayoutCover({ primary, gold }) {
-  return (
-    <>
-      <div className="absolute top-0 left-0 right-0" style={{ height: "62%", background: primary, opacity: 0.15 }}>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-5 h-5 rounded opacity-20" style={{ background: primary }} />
-        </div>
-      </div>
-      <div className="absolute left-0 right-0 bottom-0 p-1.5" style={{ height: "38%", background: "white" }}>
-        <div className="h-1 rounded-sm mb-1" style={{ background: primary, opacity: 0.5, width: "88%" }} />
-        <div className="h-0.5 rounded-sm mb-1" style={{ background: primary, opacity: 0.25, width: "68%" }} />
-        <div className="h-2 rounded-full" style={{ background: gold, width: "44%" }} />
-      </div>
-    </>
-  );
-}
-
-function LayoutHook({ primary }) {
-  return (
-    <>
-      <div className="absolute top-0 left-0 right-0" style={{ height: "50%", background: primary, opacity: 0.13 }} />
-      <div className="absolute left-0 right-0 bottom-0 p-1.5" style={{ height: "50%" }}>
-        <div className="h-1.5 rounded-sm mb-0.5" style={{ background: primary, opacity: 0.55, width: "85%" }} />
-        <div className="h-0.5 rounded-sm mb-0.5" style={{ background: primary, opacity: 0.3, width: "75%" }} />
-        <div className="h-0.5 rounded-sm" style={{ background: primary, opacity: 0.2, width: "60%" }} />
-      </div>
-    </>
-  );
-}
-
-function LayoutInsight({ primary }) {
-  return (
-    <>
-      <div className="absolute top-0 left-0 right-0" style={{ height: "42%", background: primary, opacity: 0.11 }} />
-      <div className="absolute left-0 right-0 bottom-0 p-1.5" style={{ height: "58%" }}>
-        <div className="h-1 rounded-sm mb-0.5" style={{ background: primary, opacity: 0.5, width: "80%" }} />
-        <div className="h-0.5 rounded-sm mb-0.5" style={{ background: primary, opacity: 0.25, width: "90%" }} />
-        <div className="h-0.5 rounded-sm mb-0.5" style={{ background: primary, opacity: 0.2, width: "70%" }} />
-        <div className="h-0.5 rounded-sm" style={{ background: primary, opacity: 0.15, width: "55%" }} />
-      </div>
-    </>
-  );
-}
-
-function LayoutComparison({ primary, gold }) {
-  return (
-    <div className="absolute inset-0 flex">
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1" style={{ background: primary, opacity: 0.08 }} />
-        <div className="p-1">
-          <div className="h-0.5 rounded-sm mb-0.5" style={{ background: primary, opacity: 0.3, width: "80%" }} />
-          <div className="h-0.5 rounded-sm" style={{ background: primary, opacity: 0.18, width: "55%" }} />
-        </div>
-      </div>
-      <div className="w-px" style={{ background: primary, opacity: 0.12 }} />
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1" style={{ background: gold, opacity: 0.1 }} />
-        <div className="p-1">
-          <div className="h-0.5 rounded-sm mb-0.5" style={{ background: primary, opacity: 0.3, width: "80%" }} />
-          <div className="h-0.5 rounded-sm" style={{ background: primary, opacity: 0.18, width: "55%" }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LayoutTips({ primary, gold }) {
-  return (
-    <div className="absolute inset-0 p-1.5 flex flex-col">
-      <div className="rounded mb-1" style={{ background: primary, opacity: 0.1, height: "28%" }} />
-      <div className="space-y-0.5 flex-1">
-        {[72, 85, 60, 78].map((w, i) => (
-          <div key={i} className="flex items-center gap-0.5">
-            <div className="w-0.5 h-0.5 rounded-full flex-shrink-0" style={{ background: gold }} />
-            <div className="h-0.5 rounded-full" style={{ background: primary, opacity: 0.2, width: `${w}%` }} />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function LayoutCTA({ primary, gold }) {
-  return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 p-1.5" style={{ background: primary }}>
-      <div className="w-4 h-4 rounded-full mb-0.5 flex items-center justify-center" style={{ background: "rgba(255,255,255,0.15)" }}>
-        <div className="w-2 h-2 rounded-full" style={{ background: gold }} />
-      </div>
-      <div className="h-1 rounded-sm" style={{ background: "white", opacity: 0.4, width: "68%" }} />
-      <div className="h-0.5 rounded-sm" style={{ background: "white", opacity: 0.22, width: "50%" }} />
-      <div className="h-2.5 rounded-full mt-0.5" style={{ background: gold, width: "62%" }} />
-    </div>
-  );
-}
-
-// ── Utility sub-components ─────────────────────────────────────────────────────
-
-function SlidePromptCard({ index, slide }) {
-  const [copied, setCopied] = useState(false);
-  const prompt = slide.natural_prompt || "";
-  const copy = () => {
-    navigator.clipboard.writeText(prompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <div className="feedify-card p-4 space-y-2">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center">{index + 1}</span>
-          <span className="font-semibold text-brand capitalize text-sm">{slide.slide_role || `Slide ${index + 1}`}</span>
-        </div>
-        <button onClick={copy}
-          className="inline-flex items-center gap-1 px-3 py-1 bg-brand-gold text-brand rounded-full text-xs font-semibold hover:opacity-80">
-          {copied ? <><Check size={12} weight="bold" /> Copied!</> : <><Copy size={12} weight="bold" /> Copy</>}
-        </button>
-      </div>
-      <p className="text-xs text-stone-600 leading-relaxed bg-stone-50 rounded-xl p-3 font-mono whitespace-pre-wrap">{prompt}</p>
-    </div>
-  );
-}
-
-function SlideStatusIcon({ status }) {
-  switch (status) {
-    case "generating": return <CircleNotch size={20} className="animate-spin text-brand" />;
-    case "completed":  return <CheckCircle size={20} weight="fill" className="text-green-500" />;
-    case "failed":     return <WarningCircle size={20} weight="fill" className="text-red-400" />;
-    default:           return <HourglassMedium size={20} className="text-stone-300" />;
-  }
-}
-
-function CopyBtn({ text, label }) {
-  const [copied, setCopied] = useState(false);
-  const handle = async () => {
-    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
-  };
-  return (
-    <button onClick={handle}
-      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand hover:bg-brand-sand rounded-full flex-shrink-0">
-      {copied ? <Check size={12} weight="bold" /> : <Copy size={12} weight="bold" />}
-      {label || (copied ? "OK" : "Copy")}
-    </button>
   );
 }

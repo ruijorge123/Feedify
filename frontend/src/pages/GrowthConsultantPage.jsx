@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { toast } from "react-toastify";
 import {
-  TrendUp, Storefront, InstagramLogo, FilmSlate, PenNib,
+  TrendUp, Storefront, InstagramLogo, PenNib,
   RocketLaunch, ChartBar, Lightbulb, ArrowLeft, ArrowRight,
   Sparkle, CircleNotch, CheckCircle, ImageSquare, Stack,
   Brain, CalendarBlank, Check,
@@ -12,9 +12,9 @@ import {
 // ─── Tool icon map ─────────────────────────────────────────────────────────────
 
 const TOOL_ICON_MAP = {
-  "Feed Post":           ImageSquare,
+  "Feed & Banner":       ImageSquare,
   "Carousel":            Stack,
-  "Reels":               FilmSlate,
+
   "Copywriting":         PenNib,
   "Marketplace":         Storefront,
   "Calendar":            CalendarBlank,
@@ -67,21 +67,6 @@ const MODES = [
       { key: "masalah",    label: "Masalah branding terbesar?",         type: "chips", options: ["Feed gak konsisten", "Gak ada identity jelas", "Engagement rendah", "Bingung mau posting apa", "Kalah estetik sama kompetitor"] },
       { key: "frekuensi",  label: "Seberapa sering posting?",          type: "chips", options: ["Hampir gak pernah", "Seminggu sekali", "2-3x seminggu", "Tiap hari"] },
       { key: "target",     label: "Mau brand kamu dikenal sebagai apa?",type: "text", placeholder: "mis. Brand skincare halal terpercaya untuk ibu muda..." },
-    ],
-  },
-  {
-    id: "reels",
-    emoji: "🎬",
-    Icon: FilmSlate,
-    title: "Reels & Video Marketing",
-    desc: "Hook kuat, storytelling, dan video yang mengkonversi",
-    color: { ring: "border-violet-200", bg: "bg-violet-50", icon: "text-violet-600", badge: "bg-violet-100 text-violet-700" },
-    questions: [
-      { key: "produk",      label: "Produk yang mau di-video-kan?",   type: "text",  placeholder: "mis. Serum wajah, tas kulit, kue kering..." },
-      { key: "pengalaman",  label: "Sudah pernah bikin Reels?",       type: "chips", options: ["Belum pernah", "Pernah tapi gak nonton", "Lumayan ada yang nonton"] },
-      { key: "kendala",     label: "Kendala bikin video?",            type: "chips", options: ["Gak bisa edit", "Gak ada ide", "Malu di depan kamera", "Gak tau hook yang bagus", "Gak ada waktu"] },
-      { key: "gaya",        label: "Gaya konten yang diinginkan?",    type: "chips", options: ["Estetik/cinematic", "Lucu/relatable", "Edukasi", "Behind the scenes", "Hard selling"] },
-      { key: "target",      label: "Target dari video?",             type: "text",  placeholder: "mis. Viral di TikTok, dapat 100 order dari Reels..." },
     ],
   },
   {
@@ -372,17 +357,7 @@ export default function GrowthConsultantPage() {
       setView("followup");
       scrollTop();
     } catch (err) {
-      const status = err?.response?.status;
-      if (status === 402) {
-        toast.error(
-          <span className="text-sm">
-            Konsultasi gratis sudah habis.{" "}
-            <a href="/credits" className="underline font-bold">Top Up kredit →</a>
-          </span>
-        );
-      } else {
-        toast.error(err?.response?.data?.detail || "Gagal memulai konsultasi. Coba lagi.");
-      }
+      toast.error(err?.response?.data?.detail || "Gagal memulai konsultasi. Coba lagi.");
       setView("questions");
     } finally {
       setSubmitting(false);
@@ -412,9 +387,7 @@ export default function GrowthConsultantPage() {
       });
       enterResult(data);
     } catch (err) {
-      const status = err?.response?.status;
-      if (status === 402) toast.error("Kredit tidak cukup.");
-      else toast.error(err?.response?.data?.detail || "Gagal membuat action plan. Coba lagi.");
+      toast.error(err?.response?.data?.detail || "Gagal membuat action plan. Coba lagi.");
       setView("followup");
     } finally {
       setSubmitting(false);
@@ -483,21 +456,6 @@ export default function GrowthConsultantPage() {
           <p className="text-stone-500 mt-2 max-w-xl text-sm leading-relaxed">
             Bukan saran generik — konsultasi nyata dengan action plan 7 hari yang bisa langsung kamu kerjakan.
           </p>
-          {tierStatus && (
-            <div className="mt-3">
-              {tierStatus.is_free ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
-                  <CheckCircle size={12} weight="fill" />
-                  Konsultasi gratis: {tierStatus.free_remaining}/3 tersisa
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
-                  <Sparkle size={12} weight="fill" />
-                  1 kredit per konsultasi
-                </span>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Resume banner */}
@@ -714,9 +672,7 @@ export default function GrowthConsultantPage() {
           {submitting ? <CircleNotch size={18} className="animate-spin" /> : <RocketLaunch size={18} weight="fill" />}
           {submitting ? "Menyusun action plan..." : "Buat Action Plan →"}
         </button>
-        <p className="text-center text-xs text-stone-400">
-          {tierStatus?.is_free ? "✨ Konsultasi ini gratis" : "Konsultasi ini menggunakan 1 kredit"}
-        </p>
+        <p className="text-center text-xs text-stone-400">✨ AI akan menyusun action plan personal untuk situasimu</p>
       </div>
     );
   }

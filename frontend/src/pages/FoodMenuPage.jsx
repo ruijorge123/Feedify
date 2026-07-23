@@ -1,19 +1,15 @@
 import { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { toast } from 'react-toastify';
-import { handleGenerateError } from "@/lib/moderation";
 import { useAuth } from "@/context/AuthContext";
-import JsonOutput from "@/components/JsonOutput";
 import {
   ForkKnife, Plus, X, Sparkle, CircleNotch, CheckCircle,
   Camera, Images, Warning,
 } from "@phosphor-icons/react";
-import GeneratedPreview from "@/components/GeneratedPreview";
 import BrandDnaCard from "@/components/BrandDnaCard";
-import NoCreditsModal from "@/components/NoCreditsModal";
 import ReferenceUpload from "@/components/ReferenceUpload";
 import InspirationGallery from "@/components/InspirationGallery";
-import { notifyCreditsUpdate } from "@/lib/credits";
+import PromptSuccessCard from "@/components/PromptSuccessCard";
 import CampaignGoalSelector from "@/components/CampaignGoalSelector";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -116,19 +112,15 @@ export default function FoodMenuPage() {
   const [form, setForm]         = useState(DEFAULT_FORM);
   const [newItem, setNewItem]   = useState(EMPTY_ITEM);
   const [generating, setGenerating]   = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
-  const [genStep, setGenStep]   = useState(-1);
-  const [result, setResult]     = useState(null);
   const [brand, setBrand]       = useState(null);
   const [referenceImg, setReferenceImg] = useState(null);
-  const [noCredits, setNoCredits]   = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
-  const [promptPreview, setPromptPreview] = useState(null);
-  const [previewing, setPreviewing]   = useState(false);
+  const [promptResult, setPromptResult] = useState(null);
 
   const newItemPhotoRef  = useRef(null);
   const editItemPhotoRef = useRef(null);
   const [editingPhotoIdx, setEditingPhotoIdx] = useState(null);
+  const [genStep, setGenStep] = useState(-1);
 
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -227,41 +219,13 @@ export default function FoodMenuPage() {
 
   const generate = async () => {
     if (!validate()) return;
-    setGenerating(true); setResult(null);
-    try {
-      const { data } = await api.post("/prompt/generate-food-menu", buildPayload());
-      setResult(data);
-      if (data.credits) notifyCreditsUpdate(data.credits);
-      toast.success("Food menu visual siap!");
-    } catch (err) {
-      if (err?.response?.status === 402) setNoCredits(true);
-      else { const handled = handleGenerateError(err); if (!handled) toast.error("Gagal generate. Coba lagi."); }
-    } finally { setGenerating(false); }
-  };
-
-  const previewPrompt = async () => {
-    if (!validate()) return;
-    setPreviewing(true); setPromptPreview(null);
+    setGenerating(true); setPromptResult(null);
     try {
       const { data } = await api.post("/prompt/preview-food-menu", buildPayload());
-      setPromptPreview(data);
-      setTimeout(() => document.getElementById("food-preview-panel")?.scrollIntoView({ behavior: "smooth" }), 100);
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Gagal memuat preview");
-    } finally { setPreviewing(false); }
-  };
-
-  const regenerate = async () => {
-    if (!result?.id) return;
-    setRegenerating(true);
-    try {
-      const { data } = await api.post("/prompt/regenerate", { prompt_id: result.id });
-      setResult({ ...result, image_base64: data.image_base64 });
-      if (data.credits) notifyCreditsUpdate(data.credits);
-    } catch (err) {
-      if (err?.response?.status === 402) setNoCredits(true);
-      else toast.error("Gagal regenerate");
-    } finally { setRegenerating(false); }
+      setPromptResult(data);
+    } catch {
+      toast.error("Gagal membuat prompt. Coba lagi.");
+    } finally { setGenerating(false); }
   };
 
   // ── Derived UI ───────────────────────────────────────────────────────────────
@@ -528,52 +492,17 @@ export default function FoodMenuPage() {
           )}
 
           {/* Generate */}
-          <div className={isAdmin ? "flex flex-col sm:flex-row gap-3" : ""}>
-            {isAdmin && (
-              <button onClick={previewPrompt} disabled={previewing || generating} data-testid="preview-food-btn"
-                className="flex-1 py-4 bg-white border-2 border-brand text-brand rounded-full font-bold text-base hover:bg-brand-sand btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-50">
-                {previewing ? <><CircleNotch size={18} className="animate-spin" /> Memuat...</> : <><CheckCircle size={18} weight="duotone" /> Preview Prompt</>}
-              </button>
-            )}
+          <div>
             <button onClick={generate} disabled={generating} data-testid="generate-food-btn"
-              className={`${isAdmin ? "flex-1" : "w-full"} py-4 bg-brand text-brand-cream rounded-full font-bold text-lg hover:bg-brand-light btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg`}>
+              className="w-full py-4 bg-[#10a37f] hover:bg-[#0d8a6c] text-white rounded-full font-bold text-lg btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg transition-colors">
               {generating
-                ? <><CircleNotch size={20} className="animate-spin" /> Generating...</>
-                : <><Sparkle size={20} weight="fill" /> Generate Visual <span className="opacity-70 text-sm font-medium">(1 kredit)</span></>}
+                ? <><CircleNotch size={20} className="animate-spin" /> Membangun prompt...</>
+                : <><Sparkle size={20} weight="fill" /> Buat Prompt & Buka ChatGPT</>}
             </button>
           </div>
 
-          {/* Fake progress steps */}
-          {generating && genStep >= 0 && (
-            <div className="feedify-card p-5 animate-fade-up">
-              <div className="space-y-3">
-                {GENERATE_STEPS.map((step, i) => (
-                  <div key={i} className={`flex items-center gap-3 text-sm transition-all duration-500 ${i <= genStep ? "opacity-100" : "opacity-25"}`}>
-                    {i < genStep
-                      ? <CheckCircle size={18} weight="fill" className="text-green-500 flex-shrink-0" />
-                      : i === genStep
-                      ? <CircleNotch size={18} className="animate-spin text-brand flex-shrink-0" />
-                      : <div className="w-[18px] h-[18px] rounded-full border-2 border-stone-200 flex-shrink-0" />
-                    }
-                    <span className={i <= genStep ? "text-stone-800 font-medium" : "text-stone-400"}>{step}</span>
-                    {i < genStep && <span className="ml-auto text-green-500 text-xs font-semibold">Done</span>}
-                  </div>
-                ))}
-                {genStep >= GENERATE_STEPS.length - 1 && (
-                  <div className="flex items-center gap-3 text-sm text-brand pt-1 border-t border-stone-100">
-                    <CircleNotch size={18} className="animate-spin flex-shrink-0" />
-                    <span className="font-semibold">Rendering final image...</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {isAdmin && promptPreview && (
-            <div id="food-preview-panel" className="animate-fade-up">
-              <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-semibold mb-2">Prompt JSON</div>
-              <JsonOutput json={promptPreview.prompt_json} title="Food Menu Prompt JSON" testid="food-json-output" />
-            </div>
+          {promptResult && (
+            <PromptSuccessCard promptData={promptResult} onReset={() => setPromptResult(null)} dashboardType="food-menu" title="F&B Menu" />
           )}
         </div>
 
@@ -595,31 +524,18 @@ export default function FoodMenuPage() {
           {/* Layout Wireframe Preview */}
           <div className="feedify-card p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold mb-3">Layout Preview</div>
-            {result?.image_base64 ? (
-              <GeneratedPreview
-                imageBase64={result.image_base64}
-                loading={generating}
-                aspectRatio={ratioLabel}
-                onRegenerate={result?.id ? regenerate : null}
-                regenerating={regenerating}
-                testid="food-preview"
-              />
-            ) : (
-              <LayoutWireframe layout={derivedLayout} count={itemCount} ratio={ratioLabel} />
-            )}
+            <LayoutWireframe layout={derivedLayout} count={itemCount} ratio={ratioLabel} />
           </div>
 
           <BrandDnaCard />
         </div>
       </div>
-
-      <NoCreditsModal open={noCredits} onClose={() => setNoCredits(false)} />
       <InspirationGallery
         open={galleryOpen}
         onClose={() => setGalleryOpen(false)}
         context="food"
         onSelect={(photo) => {
-          fetch(`/gallery/${photo.category}/${photo.filename}`)
+          fetch(photo.url)
             .then(r => r.blob())
             .then(blob => {
               const reader = new FileReader();

@@ -28,6 +28,7 @@ import {
   Package,
   EyeSlash,
   SquaresFour,
+  ChatCircleDots,
 } from "@phosphor-icons/react";
 
 const mobileNav = [
@@ -65,6 +66,7 @@ const sidebarSections = [
     items: [
       { to: "/history", label: "History", icon: ClockCounterClockwise, testid: "nav-history" },
       { to: "/brand-kit", label: "Brand Kit", icon: Palette, testid: "nav-brand-kit" },
+      { to: "/feedback", label: "Feedback", icon: ChatCircleDots, testid: "nav-feedback" },
     ],
   },
 ];

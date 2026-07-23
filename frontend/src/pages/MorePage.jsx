@@ -15,30 +15,38 @@ import {
   Wrench,
   Camera,
   Microphone,
+  SquaresFour,
+  Brain,
+  Storefront,
+  Package,
+  Palette,
+  ChatCircleDots,
+  EyeSlash,
 } from "@phosphor-icons/react";
 
 const sections = [
   {
-    title: "Generators",
+    title: "Toolkit",
     items: [
-      { to: "/generate/banner", label: "Feed Post Generator", desc: "Konten feed Instagram siap posting", icon: ImageSquare, color: "bg-brand text-brand-cream", lockKey: "banner" },
+      { to: "/generate/banner", label: "Feed & Banner", desc: "Konten feed Instagram siap posting", icon: ImageSquare, color: "bg-brand text-brand-cream", lockKey: "banner" },
+      { to: "/generate/feed-generator", label: "Feed Generator", desc: "Banyak prompt foto sekaligus, konsisten & beragam", icon: SquaresFour, color: "bg-brand text-brand-cream", lockKey: "feed-generator" },
       { to: "/studio", label: "Feedify Studio", desc: "Commercial product photography dalam hitungan detik", icon: Camera, color: "bg-stone-900 text-white", lockKey: "studio" },
       { to: "/generate/carousel", label: "Carousel Builder", desc: "3–7 slide storytelling", icon: Stack, color: "bg-brand-gold text-brand", lockKey: "carousel" },
-      { to: "/generate/reels", label: "Reels Generator", desc: "Video iklan pendek dari foto produk", icon: FilmSlate, color: "bg-violet-700 text-violet-50", lockKey: "reels" },
-      { to: "/generate/talking-avatar", label: "Talking Avatar", desc: "Foto produk jadi video avatar berbicara", icon: Microphone, color: "bg-teal-700 text-teal-50", lockKey: "talking-avatar" },
-      { to: "/generate/copywriting", label: "Copywriting", desc: "Headline, caption, hashtag", icon: PenNib, color: "bg-brand-clay text-white", lockKey: "copywriting" },
+      { to: "/generate/marketplace", label: "Marketplace", desc: "Foto listing produk untuk Shopee, Tokopedia, dll", icon: Storefront, color: "bg-brand text-brand-cream", lockKey: "marketplace" },
+      { to: "/generate/copywriting", label: "Copywriting", desc: "Headline, caption, hashtag dari data produkmu", icon: PenNib, color: "bg-brand text-brand-gold", lockKey: "copywriting" },
+      { to: "/growth-consultant", label: "Growth Consultant", desc: "Strategi tumbuh & konsultasi bisnis berbasis AI", icon: Brain, color: "bg-brand text-brand-cream", lockKey: "growth-consultant" },
+      { to: "/calendar", label: "Calendar Planner", desc: "Jadwalkan konten & notif pengingat", icon: CalendarBlank, color: "bg-stone-800 text-stone-50", lockKey: "calendar" },
       { to: "/generate/food", label: "F&B Menu Visual", desc: "Food photography prompt khusus", icon: ForkKnife, color: "bg-amber-700 text-amber-50", adminOnly: true, lockKey: "food" },
-    ],
-  },
-  {
-    title: "Planning & QA",
-    items: [
-      { to: "/calendar", label: "Calendar Planner", desc: "Jadwalkan konten & notif pengingat", icon: CalendarBlank, color: "bg-indigo-700 text-indigo-50", lockKey: "calendar" },
+      { to: "/generate/reels", label: "Reels Generator", desc: "Video iklan pendek dari foto produk", icon: FilmSlate, color: "bg-stone-700 text-stone-50", lockKey: "reels" },
+      { to: "/generate/talking-avatar", label: "Video Presenter", desc: "Foto produk jadi video presenter berbicara", icon: Microphone, color: "bg-stone-600 text-stone-50", lockKey: "talking-avatar" },
     ],
   },
   {
     title: "Library",
     items: [
+      { to: "/products", label: "Product Knowledge", desc: "Simpan & kelola data produk untuk generate konten", icon: Package, color: "bg-brand text-brand-cream" },
+      { to: "/brand-kit", label: "Brand DNA", desc: "DNA merek, warna, logo, dan identitas visualmu", icon: Palette, color: "bg-brand-gold text-brand" },
+      { to: "/feedback", label: "Feedback", desc: "Kirim kritik & saran ke tim Feedify", icon: ChatCircleDots, color: "bg-brand text-brand-cream" },
       { to: "/history", label: "Prompt History", desc: "Semua prompt yang pernah dibuat", icon: ClockCounterClockwise, color: "bg-stone-700 text-stone-50" },
       { to: "/settings", label: "Settings", desc: "Edit brand profile, akun", icon: Gear, color: "bg-stone-500 text-stone-50" },
     ],
@@ -62,36 +70,68 @@ export default function MorePage() {
           <h2 className="font-heading text-xl font-bold text-brand mb-3">{sec.title}</h2>
           <div className="grid sm:grid-cols-2 gap-3">
             {sec.items
-              .filter(item => (!item.adminOnly || user?.role === "admin") && (!item.lockKey || menuMode(lockStatus, item.lockKey) !== "hidden"))
+              .filter(item => {
+                if (item.adminOnly && user?.role !== "admin") return false;
+                if (!item.lockKey) return true;
+                const m = menuMode(lockStatus, item.lockKey);
+                // Non-admin: hide "hidden" items entirely
+                // Admin: always show (so admin can see hidden/maintenance state)
+                return user?.role === "admin" || m !== "hidden";
+              })
               .map((item) => {
                 const mode = item.lockKey ? menuMode(lockStatus, item.lockKey) : "active";
-                const underMaintenance = mode === "maintenance" && user?.role !== "admin";
+                const isAdmin = user?.role === "admin";
+                const underMaintenance = mode === "maintenance";
+                const underHiddenAdmin = isAdmin && mode === "hidden";
                 return (
                   <Link
                     key={item.to}
                     to={item.to}
                     data-testid={`more-link-${item.to.replace(/\//g, '-')}`}
-                    className={`feedify-card p-5 flex items-center gap-4 group transition-all ${underMaintenance ? "opacity-60" : ""}`}
+                    className={`feedify-card p-5 flex items-center gap-4 group transition-all ${
+                      underHiddenAdmin ? "opacity-50" : underMaintenance ? "opacity-60" : ""
+                    }`}
                   >
-                    <div className={`h-12 w-12 rounded-xl ${underMaintenance ? "bg-stone-200 text-stone-400" : item.color} flex items-center justify-center shadow-sm flex-shrink-0 transition-all`}>
-                      {underMaintenance ? <Wrench size={22} weight="duotone" /> : <item.icon size={22} weight="duotone" />}
+                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0 transition-all ${
+                      underHiddenAdmin
+                        ? "bg-red-50 text-red-400"
+                        : underMaintenance
+                          ? "bg-stone-200 text-stone-400"
+                          : item.color
+                    }`}>
+                      {underHiddenAdmin
+                        ? <EyeSlash size={22} weight="duotone" />
+                        : underMaintenance
+                          ? <Wrench size={22} weight="duotone" />
+                          : <item.icon size={22} weight="duotone" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-heading font-semibold text-brand flex items-center gap-2">
+                      <div className="font-heading font-semibold text-brand flex items-center gap-2 flex-wrap">
                         {item.label}
+                        {underHiddenAdmin && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-500 border border-red-200 leading-none">
+                            hidden
+                          </span>
+                        )}
                         {underMaintenance && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 border border-amber-200 leading-none">
-                            Maintenance
+                            {isAdmin ? "maint" : "Maintenance"}
                           </span>
                         )}
                       </div>
                       <div className="text-xs text-stone-500">
-                        {underMaintenance ? "Sedang dalam perbaikan. Coba lagi nanti." : item.desc}
+                        {underHiddenAdmin
+                          ? "Menu disembunyikan dari user."
+                          : underMaintenance && !isAdmin
+                            ? "Sedang dalam perbaikan. Coba lagi nanti."
+                            : item.desc}
                       </div>
                     </div>
-                    {underMaintenance
-                      ? <Wrench size={16} className="text-amber-400 flex-shrink-0" />
-                      : <ArrowRight size={16} className="text-stone-400 group-hover:text-brand group-hover:translate-x-1 transition-all" />
+                    {underHiddenAdmin
+                      ? <EyeSlash size={16} className="text-red-400 flex-shrink-0" />
+                      : underMaintenance && !isAdmin
+                        ? <Wrench size={16} className="text-amber-400 flex-shrink-0" />
+                        : <ArrowRight size={16} className="text-stone-400 group-hover:text-brand group-hover:translate-x-1 transition-all" />
                     }
                   </Link>
                 );

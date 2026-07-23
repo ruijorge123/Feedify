@@ -1,10 +1,11 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import {
   Sparkle, ArrowRight, ArrowUpRight,
-  CaretRight, Lightning,
+  Lightning, Lock, CheckCircle,
+  CircleNotch, XCircle,
 } from "@phosphor-icons/react";
 import SupportChatWidget from "@/components/SupportChatWidget";
 
@@ -23,7 +24,6 @@ export default function LandingPage() {
         <PainAgitation />
         <Transformation />
         <HowItWorks />
-        <Bento />
         <ComparisonTable />
         <Testimonials />
         <Pricing />
@@ -36,7 +36,18 @@ export default function LandingPage() {
 
 /* ============ DARK HERO — full cinematic ============ */
 function DarkHero() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate         = useNavigate();
+  const hasAccess        = user && (user.role === "admin" || user.is_lifetime === true);
+  const [pendingOrder, setPendingOrder] = useState(null);
+
+  useEffect(() => {
+    if (!user || hasAccess) return;
+    api.get("/checkout/manual/active")
+      .then(({ data }) => setPendingOrder(data))
+      .catch(() => {});
+  }, [user, hasAccess]);
+
   return (
     <div className="relative sm:min-h-screen sm:min-h-[100dvh] overflow-x-hidden flex flex-col" data-testid="hero"
       style={{ background: "radial-gradient(ellipse 120% 60% at 20% 30%, #0f3d22 0%, #060d09 55%, #060d09 100%)" }}>
@@ -59,25 +70,60 @@ function DarkHero() {
 
         <div className="hidden md:flex items-center gap-8 text-sm text-white/50 font-medium">
           <a href="#how" className="hover:text-white transition-colors">Cara kerja</a>
-          <a href="#bento" className="hover:text-white transition-colors">Fitur</a>
           <a href="#pricing" className="hover:text-white transition-colors">Harga</a>
           <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <Link to="/login" data-testid="landing-login-btn"
-            className="inline-flex items-center justify-center px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-white border border-white/25 hover:border-white/50 hover:bg-white/10 rounded-full transition-all">
-            Masuk
-          </Link>
-          <a href="#pricing" data-testid="nav-pricing-cta"
-            className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
-            Mulai Sekarang <ArrowRight size={14} weight="bold" />
-          </a>
+          {user ? (
+            <>
+              <button onClick={logout} data-testid="landing-logout-btn"
+                className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-white border border-white/25 hover:border-white/50 hover:bg-white/10 rounded-full transition-all">
+                {user.picture
+                  ? <img src={user.picture} alt="" className="w-5 h-5 rounded-full object-cover" />
+                  : <div className="w-5 h-5 rounded-full bg-brand-gold/40 flex items-center justify-center text-[10px] font-bold text-brand-gold">{(user.name || user.email || "U")[0].toUpperCase()}</div>
+                }
+                Logout
+              </button>
+              {hasAccess ? (
+                <button onClick={() => navigate("/dashboard")} data-testid="nav-dashboard-cta"
+                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
+                  Masuk Dashboard <ArrowRight size={14} weight="bold" />
+                </button>
+              ) : pendingOrder?.status === "menunggu_verifikasi" ? (
+                <button onClick={() => navigate("/checkout?plan=lifetime")} data-testid="nav-pending-badge"
+                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-amber-400/15 text-amber-300 border border-amber-400/40 rounded-full transition-all hover:bg-amber-400/25">
+                  <CircleNotch size={14} weight="bold" className="animate-spin" /> Menunggu Konfirmasi
+                </button>
+              ) : pendingOrder?.status === "ditolak" ? (
+                <button onClick={() => navigate("/checkout?plan=lifetime")} data-testid="nav-rejected-badge"
+                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-red-400/15 text-red-300 border border-red-400/40 rounded-full transition-all hover:bg-red-400/25">
+                  <XCircle size={14} weight="bold" /> Bukti Ditolak
+                </button>
+              ) : (
+                <a href="#pricing" data-testid="nav-pricing-cta"
+                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
+                  Beli Lifetime <ArrowRight size={14} weight="bold" />
+                </a>
+              )}
+            </>
+          ) : (
+            <>
+              <Link to="/login" data-testid="landing-login-btn"
+                className="inline-flex items-center justify-center px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-white border border-white/25 hover:border-white/50 hover:bg-white/10 rounded-full transition-all">
+                Masuk
+              </Link>
+              <a href="#pricing" data-testid="nav-pricing-cta"
+                className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
+                Mulai Sekarang <ArrowRight size={14} weight="bold" />
+              </a>
+            </>
+          )}
         </div>
       </nav>
 
       {/* HERO CONTENT */}
-      <div className="relative z-10 flex-1 flex flex-col justify-center max-w-[1280px] mx-auto w-full px-0 lg:px-0 pt-6 pb-4 lg:pb-24">
+      <div className="relative z-10 flex-1 flex flex-col justify-center max-w-[1280px] mx-auto w-full min-w-0 px-5 lg:px-0 pt-6 pb-4 lg:pb-24">
 
         {/* Eyebrow */}
         <div className="inline-flex items-center gap-2 mb-8 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-brand-gold text-[10px] font-bold uppercase tracking-[0.22em] w-fit" data-testid="hero-eyebrow">
@@ -87,40 +133,85 @@ function DarkHero() {
 
         {/* Main headline — HUGE */}
         <h1
-          className="font-heading font-bold text-white tracking-[-0.04em] leading-[0.92] max-w-[18ch]"
-          style={{ fontSize: "clamp(2.6rem, 8vw, 7.5rem)" }}
+          className="font-heading font-bold text-white tracking-[-0.04em] leading-[0.92] max-w-full sm:max-w-[18ch] break-words"
+          style={{ fontSize: "clamp(2rem, 7.5vw, 7.5rem)", overflowWrap: "anywhere" }}
           data-testid="hero-headline"
         >
-          Capek mikir konten tiap hari,<br />
-          tapi feed tetap{" "}
+          Capek mikir konten tiap hari,<br className="hidden sm:block" />
+          {" "}tapi feed tetap{" "}
           <span className="text-brand-gold italic font-medium">sepi?</span>
         </h1>
 
         {/* Sub + CTA row */}
-        <div className="mt-10 lg:mt-14 flex flex-col lg:flex-row lg:items-end gap-8 lg:gap-16">
-          <div className="max-w-lg">
+        <div className="mt-10 lg:mt-14 flex flex-col lg:flex-row lg:items-end gap-8 lg:gap-16 min-w-0">
+          <div className="max-w-full sm:max-w-lg min-w-0">
             <p className="text-white/60 leading-relaxed text-base lg:text-lg" data-testid="hero-sub">
               Setiap hari mikirin mau posting apa. Foto produk seadanya. Feed berantakan.
               Sementara kompetitor makin rapi dan laku. Feedify ubah itu — konten brand
               profesional, konsisten, siap posting dalam 30 detik.
             </p>
-            <div className="mt-8 flex items-center gap-4 flex-wrap">
-              <a href="#pricing" data-testid="hero-cta"
-                className="inline-flex items-center gap-2 px-7 py-4 bg-brand-gold text-brand hover:bg-brand-amber rounded-full font-bold text-base shadow-2xl shadow-brand-gold/25 btn-lift">
-                Mulai Sekarang <ArrowRight size={18} weight="bold" />
-              </a>
-              <a href="#pain" data-testid="hero-cta-secondary"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/50 hover:text-white transition-colors">
-                Lihat Contoh Hasil ↓
-              </a>
-            </div>
+            {/* Hero CTA — changes based on auth state */}
+            {user ? (
+              <div className="mt-8">
+                {hasAccess ? (
+                  /* Logged in + has access */
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <button
+                      onClick={() => navigate("/dashboard")}
+                      data-testid="hero-dashboard-cta"
+                      className="inline-flex items-center gap-2.5 px-7 py-4 bg-brand-gold text-brand hover:bg-brand-amber rounded-full font-bold text-base shadow-2xl shadow-brand-gold/25 btn-lift">
+                      <CheckCircle size={20} weight="fill" />
+                      Masuk ke Dashboard
+                      <ArrowRight size={18} weight="bold" />
+                    </button>
+                    <p className="text-white/40 text-xs">
+                      Login sebagai <span className="text-white/70 font-semibold">{user.name || user.email}</span>
+                    </p>
+                  </div>
+                ) : (
+                  /* Logged in but hasn't paid */
+                  <div className="flex flex-col gap-4">
+                    <div className="inline-flex items-center gap-3 px-5 py-3.5 rounded-2xl border border-white/10 bg-white/5 w-fit">
+                      <Lock size={16} className="text-white/40 flex-shrink-0" />
+                      <div>
+                        <p className="text-white/80 text-sm font-semibold">Akun terdaftar sebagai <span className="text-brand-gold">{user.name || user.email}</span></p>
+                        <p className="text-white/40 text-xs mt-0.5">Selesaikan pembayaran untuk mengakses dashboard</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <a href="#pricing" data-testid="hero-cta"
+                        className="inline-flex items-center gap-2 px-7 py-4 bg-brand-gold text-brand hover:bg-brand-amber rounded-full font-bold text-base shadow-2xl shadow-brand-gold/25 btn-lift">
+                        Selesaikan Pembayaran <ArrowRight size={18} weight="bold" />
+                      </a>
+                      <button disabled
+                        className="inline-flex items-center gap-2 px-6 py-4 rounded-full font-bold text-sm text-white/30 border border-white/10 cursor-not-allowed">
+                        <Lock size={15} />
+                        Dashboard (Terkunci)
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Not logged in */
+              <div className="mt-8 flex items-center gap-4 flex-wrap">
+                <a href="#pricing" data-testid="hero-cta"
+                  className="inline-flex items-center gap-2 px-7 py-4 bg-brand-gold text-brand hover:bg-brand-amber rounded-full font-bold text-base shadow-2xl shadow-brand-gold/25 btn-lift">
+                  Mulai Sekarang <ArrowRight size={18} weight="bold" />
+                </a>
+                <a href="#pain" data-testid="hero-cta-secondary"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/50 hover:text-white transition-colors">
+                  Lihat Contoh Hasil ↓
+                </a>
+              </div>
+            )}
           </div>
 
           {/* Stats row */}
           <div className="flex items-center gap-8 lg:gap-12 lg:pb-1">
             <HeroStat num="< 30s" label="Per gambar" />
             <div className="h-10 w-px bg-white/10" />
-            <HeroStat num="7" label="Dashboard" />
+            <HeroStat num="∞" label="Tools AI" />
             <div className="h-10 w-px bg-white/10" />
             <HeroStat num="999+" label="Library inspirasi" />
           </div>
@@ -146,15 +237,56 @@ function HeroStat({ num, label }) {
 }
 
 const STRIP_ITEMS = [
-  { img: "/skincare-moisturizer.webp", label: "Skincare", tag: "Moisturizer" },
-  { img: "/cleanser.webp", label: "Skincare", tag: "Cleanser", contain: true },
-  { img: "/minuman-kaleng.webp", label: "Minuman", tag: "Beverage", contain: true },
-  { img: "/minuman-cup.webp", label: "F&B", tag: "Minuman Cup", contain: true },
-  { img: "/minuman-kopi.webp", label: "Café", tag: "Menu Kopi", contain: true },
-  { img: "/fashion-shirt.webp", label: "Fashion", tag: "Pakaian" },
-  { img: "/makanan.webp", label: "Kuliner", tag: "Rice Bowl", contain: true },
-  { img: "/aksesoris.webp", label: "Aksesoris", tag: "Perhiasan", contain: true },
-  { img: "/freese-after.webp", label: "Skincare", tag: "Body Lotion", contain: true },
+  { img: "/skincare-moisturizer.webp",                          label: "Skincare",    tag: "Moisturizer",   contain: false },
+  { img: "/skincare-moisturizer1.webp",                         label: "Skincare",    tag: "Moisturizer",   contain: true },
+  { img: "/studio/skincare-moisturizer birutema.webp",          label: "Skincare",    tag: "Moisturizer",   contain: true },
+  { img: "/perfume1.webp",                                      label: "Parfum",      tag: "Perfume",       contain: true },
+  { img: "/perfume2.webp",                                      label: "Parfum",      tag: "Perfume",       contain: true },
+  { img: "/studio/perfume3.webp",                               label: "Parfum",      tag: "Perfume",       contain: true },
+  { img: "/cleanser1.webp",                                     label: "Skincare",    tag: "Cleanser",      contain: true },
+  { img: "/cleanser2.webp",                                     label: "Skincare",    tag: "Cleanser",      contain: true },
+  { img: "/cleanser3.webp",                                     label: "Skincare",    tag: "Cleanser",      contain: true },
+  { img: "/studio/skincare-facewash.webp",                      label: "Skincare",    tag: "Face Wash",     contain: true },
+  { img: "/skincare-serum5.webp",                               label: "Skincare",    tag: "Serum",         contain: true },
+  { img: "/skincare-serumtestimoni.webp",                       label: "Skincare",    tag: "Serum",         contain: true },
+  { img: "/skincare-serumtestimoni2.webp",                      label: "Skincare",    tag: "Serum",         contain: true },
+  { img: "/studio/skincare-serum.webp",                         label: "Skincare",    tag: "Serum",         contain: true },
+  { img: "/studio/skincare-serum2.webp",                        label: "Skincare",    tag: "Serum",         contain: true },
+  { img: "/studio/skincare-ampoule.webp",                       label: "Skincare",    tag: "Ampoule",       contain: true },
+  { img: "/bodycare-bodywash.webp",                             label: "Bodycare",    tag: "Body Wash",     contain: true },
+  { img: "/bodycare-scrubtestimoni.webp",                       label: "Bodycare",    tag: "Scrub",         contain: true },
+  { img: "/minuman-matcha.webp",                                label: "Café",        tag: "Matcha",        contain: true },
+  { img: "/minuman-bery.webp",                                  label: "Minuman",     tag: "Berry Drink",   contain: true },
+  { img: "/minuman-kalengtea.webp",                             label: "Minuman",     tag: "Tea Kaleng",    contain: true },
+  { img: "/minuman-kaleng.webp",                                label: "Minuman",     tag: "Beverage",      contain: true },
+  { img: "/minuman-cup.webp",                                   label: "F&B",         tag: "Minuman Cup",   contain: true },
+  { img: "/minuman-kopi.webp",                                  label: "Café",        tag: "Menu Kopi",     contain: true },
+  { img: "/makanan-crunch.webp",                                label: "Kuliner",     tag: "Snack",         contain: true },
+  { img: "/makanan-sambal.webp",                                label: "Kuliner",     tag: "Sambal",        contain: true },
+  { img: "/makanan.webp",                                       label: "Kuliner",     tag: "Rice Bowl",     contain: true },
+  { img: "/fashion-baju.webp",                                  label: "Fashion",     tag: "Baju",          contain: true },
+  { img: "/fashion-shirt.webp",                                 label: "Fashion",     tag: "Pakaian",       contain: false },
+  { img: "/headset1.webp",                                      label: "Elektronik",  tag: "Headset",       contain: true },
+  { img: "/jamtangan1.webp",                                    label: "Aksesoris",   tag: "Jam Tangan",    contain: true },
+  { img: "/aksesoris.webp",                                     label: "Aksesoris",   tag: "Perhiasan",     contain: true },
+  { img: "/skincare-toner1.webp",                               label: "Skincare",    tag: "Toner",         contain: true },
+  { img: "/freese-after.webp",                                  label: "Skincare",    tag: "Body Lotion",   contain: true },
+  { img: "/marketplace/skincare-moisturizer.webp",              label: "Marketplace", tag: "Moisturizer",   contain: true },
+  { img: "/marketplace/skincare-toneuplotion.webp",             label: "Marketplace", tag: "Toner Lotion",  contain: true },
+  { img: "/studio/lipstick1.webp",                              label: "Kosmetik",    tag: "Lipstik",       contain: true },
+  { img: "/studio/moisturizer1.webp",                           label: "Skincare",    tag: "Moisturizer",   contain: true },
+  { img: "/studio/serum.webp",                                  label: "Skincare",    tag: "Serum",         contain: true },
+  { img: "/studio/tumbler2.webp",                               label: "Lifestyle",   tag: "Tumbler",       contain: true },
+  { img: "/studio/micellerwater1.webp",                         label: "Skincare",    tag: "Micellar Water",contain: true },
+  { img: "/marketplace/susncreen1.webp",                        label: "Marketplace", tag: "Sunscreen",     contain: true },
+  { img: "/marketplace/toner1.webp",                            label: "Marketplace", tag: "Toner",         contain: true },
+  { img: "/marketplace/shirt1.webp",                            label: "Fashion",     tag: "Kaos",          contain: true },
+  { img: "/marketplace/liptint1.webp",                          label: "Kosmetik",    tag: "Lip Tint",      contain: true },
+  { img: "/marketplace/hairpowder1.webp",                       label: "Haircare",    tag: "Hair Powder",   contain: true },
+  { img: "/marketplace/casing1.webp",                           label: "Gadget",      tag: "Casing HP",     contain: true },
+  { img: "/marketplace/babylotion.webp",                        label: "Baby Care",   tag: "Baby Lotion",   contain: true },
+  { img: "/marketplace/parfume2.webp",                          label: "Parfum",      tag: "Perfume",       contain: true },
+  { img: "/marketplace/makeup1.webp",                           label: "Kosmetik",    tag: "Makeup",        contain: true },
 ];
 
 function ContentStrip() {
@@ -302,20 +434,6 @@ function Transformation() {
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="mt-12 lg:mt-16 pt-10 border-t border-white/10 grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-10">
-          {[
-            { num: "< 30 dtk", label: "Generate satu foto" },
-            { num: "7", label: "Dashboard konten lengkap" },
-            { num: "999+", label: "Library inspirasi" },
-            { num: "1×", label: "Setup Brand DNA selamanya" },
-          ].map(({ num, label }) => (
-            <div key={label}>
-              <div className="font-heading text-2xl lg:text-3xl font-bold text-brand-gold">{num}</div>
-              <div className="text-brand-cream/50 text-xs lg:text-sm mt-1 leading-snug">{label}</div>
-            </div>
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -334,8 +452,8 @@ function Outcome({ num, label }) {
 function HowItWorks() {
   const steps = [
     { n: "01", label: "Brand DNA", title: "Isi Brand Profile, sekali saja.", desc: "Nama brand, palet warna, gaya visual, dan tone. Lima menit. Disimpan permanen sebagai DNA visual yang otomatis dipakai di setiap dashboard." },
-    { n: "02", label: "Generate", title: "Pilih dashboard. Isi pesan inti.", desc: "Banner, carousel, food menu, atau copywriting. Anda hanya menulis apa yang ingin disampaikan — Feedify menyusun spesifikasi visual setara art director." },
-    { n: "03", label: "Hasil", title: "Foto siap posting keluar otomatis.", desc: "Feedify mengolah spesifikasi visual dan langsung menghasilkan gambar — konsisten dengan Brand DNA Anda, siap diunduh dan diposting." },
+    { n: "02", label: "Generate", title: "Pilih dashboard. Isi pesan inti.", desc: "Feed & Banner, Carousel, Studio, Feed Generator, atau Marketplace. Anda hanya menulis apa yang ingin disampaikan — Feedify menyusun spesifikasi visual setara art director." },
+    { n: "03", label: "Hasil", title: "Foto siap posting.", desc: "Feedify menyusun spesifikasi visual lengkap — konsisten dengan Brand DNA Anda, siap diunduh dan diposting." },
   ];
   return (
     <section id="how" className="relative py-24 lg:py-36 bg-white border-y border-brand-sand" data-testid="how-it-works">
@@ -363,74 +481,12 @@ function HowItWorks() {
   );
 }
 
-/* ============ BENTO ============ */
-function Bento() {
-  return (
-    <section id="bento" className="relative py-24 lg:py-36" data-testid="bento">
-      <div className="max-w-[1280px] mx-auto px-5 lg:px-10">
-        <div className="max-w-3xl mb-16 lg:mb-20">
-          <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Yang Anda dapat</div>
-          <h2 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95]" style={{ fontSize: "clamp(2rem, 5.5vw, 4.5rem)" }}>
-            10 dashboard. <br /><span className="italic font-medium text-brand-light">Satu sistem brand yang utuh.</span>
-          </h2>
-        </div>
-        <div className="grid grid-cols-6 gap-4 lg:gap-5 auto-rows-[minmax(180px,auto)]">
-          <div className="col-span-6 lg:col-span-4 lg:row-span-2 rounded-3xl bg-brand text-brand-cream p-8 lg:p-10 relative overflow-hidden" data-testid="bento-brand-dna">
-            <div className="absolute -top-20 -right-20 h-72 w-72 rounded-full bg-brand-gold/20 blur-3xl" />
-            <div className="relative h-full flex flex-col justify-between gap-12">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-gold mb-5">Inti Sistem</div>
-                <h3 className="font-heading font-bold tracking-[-0.02em] leading-[1.0]" style={{ fontSize: "clamp(1.8rem, 3.5vw, 3rem)" }}>Brand Visual DNA.</h3>
-                <p className="mt-5 text-brand-cream/80 leading-relaxed max-w-md text-base">
-                  Palet warna, tipografi, gaya, dan tone — tersimpan permanen. Setiap output di setiap dashboard otomatis konsisten dengan identitas Anda.
-                </p>
-              </div>
-              <div className="bg-brand-cream/10 backdrop-blur border border-brand-cream/15 rounded-2xl p-5 flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl flex items-center justify-center font-heading font-bold text-brand-gold text-lg bg-brand-gold/20 border border-brand-gold/30">F</div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-brand-cream/60 font-bold">Active brand</div>
-                  <div className="font-heading text-lg font-bold">Feedify</div>
-                </div>
-                <div className="flex gap-1">
-                  {["#0B3D2E","#FDFBF7","#E5C158"].map(c => <div key={c} className="h-8 w-8 rounded-lg ring-1 ring-white/20" style={{ background: c }} />)}
-                </div>
-              </div>
-            </div>
-          </div>
-          <BentoTile testid="bento-banner" tag="Generator" title="Feed Post & Banner" desc="5 style preset, 5 placement, 4 aspect ratio. Visual setara brief art director." span="col-span-3 lg:col-span-2" />
-          <BentoTile testid="bento-carousel" tag="Generator" title="Carousel Storytelling" desc="3–7 slide dengan role: hook, problem, solution, CTA — narasi siap pakai." span="col-span-3 lg:col-span-2" />
-          <BentoTile testid="bento-copy" tag="Feedify Text" title="Copywriting Bahasa Indonesia" desc="Headline, 3 gaya caption, CTA, hashtag, hook lines. Natural & persuasif." span="col-span-6 lg:col-span-3" accent />
-          <BentoTile testid="bento-marketplace" tag="E-Commerce" title="Marketplace Product Photo" desc="Foto produk siap upload Tokopedia & Shopee. Background bersih, pencahayaan premium." span="col-span-6 lg:col-span-3" />
-          <BentoTile testid="bento-studio" tag="Commercial AI" title="Studio Commercial" desc="Sesi foto produk virtual bergaya brand besar — tanpa fotografer, tanpa studio fisik." span="col-span-3 lg:col-span-2" />
-          <BentoTile testid="bento-reels" tag="Video AI" title="Reels Video Generator" desc="Ubah foto produk jadi video iklan sinematik. Powered by Kling AI." span="col-span-3 lg:col-span-2" />
-          <BentoTile testid="bento-growth" tag="AI Consultant" title="Growth Consultant AI" desc="Analisis bisnis, strategi konten, dan rekomendasi tindakan dari AI business coach." span="col-span-6 lg:col-span-2" />
-          <BentoTile testid="bento-calendar" tag="Planning" title="Calendar Planner" desc="Jadwalkan konten ke kalender & dapat notifikasi pengingat langsung dari Feedify." span="col-span-3 lg:col-span-2" />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function BentoTile({ testid, tag, title, desc, span, accent }) {
-  return (
-    <div className={`${span} rounded-3xl p-6 lg:p-7 flex flex-col justify-between gap-6 relative overflow-hidden ${accent ? "bg-brand-gold/20 border border-brand-gold/40" : "bg-white border border-brand-sand"}`} data-testid={testid}>
-      <div>
-        <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-brand-light mb-3">{tag}</div>
-        <h3 className="font-heading font-bold text-brand tracking-tight leading-[1.1]" style={{ fontSize: "clamp(1.1rem, 1.8vw, 1.5rem)" }}>{title}</h3>
-        <p className="mt-2.5 text-stone-600 text-sm leading-relaxed">{desc}</p>
-      </div>
-      <CaretRight size={18} weight="bold" className="text-brand-light/40" />
-    </div>
-  );
-}
-
-
 /* ============ TESTIMONIALS ============ */
 const TESTIMONIALS = [
-  { img: "/testimoni-hiljab.jpg",     badge: "Hemat biaya agency",        glow: "rgba(229,193,88,0.15)" },
-  { img: "/testimoni-bodylotion.jpg", badge: "Feeds makin estetik",       glow: "rgba(11,61,46,0.4)" },
-  { img: "/testimoni-skincare.jpg",   badge: "Followers naik terus",      glow: "rgba(229,193,88,0.12)" },
-  { img: "/testimoni-kaos.jpg",       badge: "Customer makin yakin beli", glow: "rgba(11,61,46,0.35)" },
+  { img: "/testimonihalamanawal/testimoni-hiljab.webp",     badge: "Hemat biaya agency",        glow: "rgba(229,193,88,0.15)" },
+  { img: "/testimonihalamanawal/testimoni-bodylotion.webp", badge: "Feeds makin estetik",       glow: "rgba(11,61,46,0.4)" },
+  { img: "/testimonihalamanawal/testimoni-skincare.webp",   badge: "Followers naik terus",      glow: "rgba(229,193,88,0.12)" },
+  { img: "/testimonihalamanawal/testimoni-kaos.webp",       badge: "Customer makin yakin beli", glow: "rgba(11,61,46,0.35)" },
 ];
 
 function Testimonials() {
@@ -539,21 +595,31 @@ function Pricing() {
     <section id="pricing" className="relative py-20 lg:py-28 bg-white border-y border-brand-sand" data-testid="pricing">
       <div className="max-w-[1280px] mx-auto px-5 lg:px-10 text-center">
         <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Harga</div>
+        <div className="flex flex-col items-center gap-1 mb-4">
+          <div className="relative inline-flex items-center gap-3">
+            <span className="font-heading font-bold text-stone-400 relative" style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)" }}>
+              Rp 367.000
+              <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[3px] bg-red-500 rounded-full" />
+            </span>
+            <span className="text-base font-black px-3 py-1.5 rounded-full bg-red-500 text-white shadow-lg tracking-wide">−82%</span>
+          </div>
+          <p className="text-xs text-red-500 font-semibold tracking-wide uppercase">Harga normal agency · kamu bayar jauh lebih murah</p>
+        </div>
         <h2 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95] mb-4" style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}>
-          Mulai dari <span className="text-brand-gold">Rp 1.300</span> per konten.
+          Bayar sekali. <span className="text-brand-gold">Rp 68.000</span> seumur hidup.
         </h2>
         <p className="text-stone-500 text-base lg:text-lg max-w-2xl mx-auto mb-8 leading-relaxed">
-          Konten yang tidak konsisten bikin calon pembeli ragu — bahkan sebelum mereka lihat produknya.
-          Feedify hasilkan visual profesional dalam 30 detik, sesuai brand Anda, mulai Rp 1.300 per foto.
+          Bukan langganan bulanan. Bukan per-foto. Satu kali bayar Rp 68.000 —
+          semua dashboard, semua fitur, selamanya. Konten brand profesional kapan pun kamu mau.
         </p>
 
         {/* Risk reversal badges */}
         <div className="inline-flex flex-col items-start gap-2 mb-10 text-left mx-auto">
           {[
-            "Tanpa langganan bulanan · bayar sesuai pakai",
-            "Kredit tidak pernah expired",
-            "Kalau generate gagal, kredit balik otomatis",
-            "Akses semua fitur sejak kredit pertama",
+            "Bayar sekali Rp 68.000 — akses selamanya, bukan per bulan",
+            "Semua tools AI langsung terbuka penuh sejak hari pertama",
+            "Kalau generate gagal, prompt otomatis bisa dicoba ulang",
+            "Tidak ada biaya tambahan, tidak ada hidden fee",
           ].map((line) => (
             <div key={line} className="flex items-center gap-2.5 text-sm text-stone-600">
               <div className="w-5 h-5 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center flex-shrink-0">
@@ -573,7 +639,7 @@ function Pricing() {
           className="inline-flex items-center gap-2.5 px-10 py-4 bg-brand text-brand-cream hover:bg-brand-light rounded-full font-bold text-lg shadow-xl shadow-brand/20 btn-lift">
           Lihat Paket &amp; Harga <ArrowRight size={20} weight="bold" />
         </Link>
-        <div className="mt-5 text-xs text-stone-400">4 pilihan paket · mulai Rp 15.000 · akses penuh sejak hari pertama</div>
+        <div className="mt-5 text-xs text-stone-400">Satu harga · Rp 68.000 · akses seumur hidup · semua dashboard terbuka</div>
       </div>
     </section>
   );
@@ -679,12 +745,19 @@ function PainAgitation() {
 }
 
 /* ============ COMPARISON TABLE ============ */
-const COMPARISON_ROWS = [
-  { label: "Biaya",        agency: "Rp 500rb–1jt/bln", diy: "Gratis tapi capek",     feedify: "Mulai Rp 1.300/konten" },
-  { label: "Waktu",        agency: "Nunggu revisi",    diy: "Berjam-jam",            feedify: "30 detik" },
-  { label: "Konsistensi",  agency: "Tergantung PIC",   diy: "Susah dijaga",          feedify: "Otomatis on-brand" },
-  { label: "Skill",        agency: "—",                diy: "Harus bisa desain",     feedify: "Nggak perlu" },
-  { label: "Kontrol",      agency: "Terbatas",         diy: "Penuh tapi ribet",      feedify: "Penuh & mudah" },
+const COST_ITEMS = [
+  { label: "Fotografer Produk",          cost: "Rp 300.000",  per: "/ sesi",   monthly: 600000,   note: "~2 sesi/bulan = Rp 600.000" },
+  { label: "Editor Foto Freelance",      cost: "Rp 100.000",  per: "/ foto",   monthly: 2000000,  note: "~20 foto/bulan = Rp 2.000.000" },
+  { label: "Agency Edit Feeds IG",       cost: "Rp 500.000",  per: "/ bulan",  monthly: 500000,   note: "Paket paling murah" },
+  { label: "Canva Pro",                  cost: "Rp 200.000",  per: "/ bulan",  monthly: 200000,   note: "Template doang, tetap kerjain sendiri" },
+];
+
+const FEATURE_ROWS = [
+  { label: "Waktu per konten",  old: "Berjam-jam nunggu revisi",  feedify: "< 30 detik" },
+  { label: "Konsistensi brand", old: "Tergantung mood tim",       feedify: "Otomatis on-brand tiap saat" },
+  { label: "Skill dibutuhkan",  old: "Harus bisa desain / brief", feedify: "Nggak perlu skill apapun" },
+  { label: "Kontrol output",    old: "Terbatas, revisi berbayar", feedify: "Penuh — generate ulang gratis" },
+  { label: "Biaya berikutnya",  old: "Tagihan lagi bulan depan",  feedify: "Rp 0 — sudah bayar selamanya" },
 ];
 
 function ComparisonTable() {
@@ -694,96 +767,110 @@ function ComparisonTable() {
 
         {/* Header */}
         <div className="max-w-2xl mb-12 lg:mb-16">
-          <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Perbandingan</div>
-          <h2
-            className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95]"
-            style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}
-          >
-            Feedify vs{" "}
-            <span className="italic font-medium text-brand-light">Cara Lama</span>
+          <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Perbandingan Biaya</div>
+          <h2 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95]" style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}>
+            Cara lama habiskan{" "}
+            <span className="italic text-red-500">jutaan</span>{" "}
+            per bulan.
           </h2>
+          <p className="text-stone-500 mt-4 text-base lg:text-lg leading-relaxed">
+            Sebelum beli Feedify, coba hitung dulu berapa yang kamu keluarkan sekarang.
+          </p>
         </div>
 
-        {/* Mobile: label + Feedify only, 2 columns, no scroll */}
-        <div className="lg:hidden">
-          {/* Header */}
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div className="rounded-2xl px-4 py-3 bg-white border border-brand-sand text-center">
-              <div className="font-heading font-bold text-sm text-brand">Cara Lama</div>
-              <div className="text-[10px] text-stone-400 mt-0.5">Agency / manual</div>
-            </div>
-            <div className="rounded-2xl px-4 py-3 bg-brand text-center shadow-lg shadow-brand/20">
-              <div className="font-heading font-bold text-sm text-brand-cream">Feedify</div>
-              <div className="text-[10px] text-brand-cream/60 mt-0.5">AI Brand Studio</div>
-              <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-gold/20 text-brand-gold text-[9px] font-bold uppercase tracking-wider">
-                ✦ Terbaik
-              </div>
-            </div>
-          </div>
+        {/* Cost breakdown card */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-10">
 
-          {/* Rows */}
-          {COMPARISON_ROWS.map(({ label, agency, feedify }, i) => (
-            <div key={label} className="grid grid-cols-2 gap-3 mb-2 items-stretch">
-              <div className={`rounded-xl px-4 py-3 ${i % 2 === 0 ? "bg-white border border-brand-sand/60" : "bg-brand-sand/30"}`}>
-                <div className="text-[9px] font-bold uppercase tracking-wider text-stone-400 mb-1">{label}</div>
-                <div className="text-sm text-stone-500">{agency}</div>
-              </div>
-              <div className={`rounded-xl px-4 py-3 ${i % 2 === 0 ? "bg-brand/5 border border-brand/10" : "bg-brand/8 border border-brand/15"}`}>
-                <div className="text-[9px] font-bold uppercase tracking-wider text-brand-gold mb-1">{label}</div>
-                <div className="text-sm font-semibold text-brand">
-                  <span className="text-brand-gold mr-1">✓</span>{feedify}
-                </div>
-              </div>
+          {/* Left: cost breakdown */}
+          <div className="rounded-3xl border border-red-100 bg-white overflow-hidden">
+            <div className="px-6 py-4 bg-red-50 border-b border-red-100">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-500">Pengeluaran cara lama / bulan</p>
             </div>
-          ))}
-        </div>
-
-        {/* Desktop: full 4-column table */}
-        <div className="hidden lg:block">
-          <div className="grid grid-cols-4 gap-3 mb-3">
-            <div />
-            {[
-              { label: "Sewa Agency", sub: "Freelancer / Studio", highlight: false },
-              { label: "Edit Sendiri", sub: "Canva / manual",       highlight: false },
-              { label: "Feedify",     sub: "AI Brand Studio",       highlight: true  },
-            ].map(({ label, sub, highlight }) => (
-              <div
-                key={label}
-                className={`rounded-2xl px-4 py-3 text-center ${
-                  highlight
-                    ? "bg-brand text-brand-cream shadow-lg shadow-brand/20"
-                    : "bg-white border border-brand-sand text-brand"
-                }`}
-              >
-                <div className={`font-heading font-bold text-sm ${highlight ? "text-brand-cream" : "text-brand"}`}>{label}</div>
-                <div className={`text-[10px] mt-0.5 ${highlight ? "text-brand-cream/60" : "text-stone-400"}`}>{sub}</div>
-                {highlight && (
-                  <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-gold/20 text-brand-gold text-[9px] font-bold uppercase tracking-wider">
-                    ✦ Terbaik
+            <div className="divide-y divide-stone-100">
+              {COST_ITEMS.map(({ label, cost, per, note }) => (
+                <div key={label} className="px-6 py-4 flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-700">{label}</p>
+                    <p className="text-[11px] text-stone-400 mt-0.5">{note}</p>
                   </div>
-                )}
-              </div>
-            ))}
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-heading font-bold text-red-500 text-sm">{cost}</p>
+                    <p className="text-[10px] text-stone-400">{per}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 bg-red-500 flex items-center justify-between">
+              <p className="font-heading font-bold text-white text-sm">Total per bulan</p>
+              <p className="font-heading font-bold text-white text-xl">Rp 3.300.000</p>
+            </div>
+            <div className="px-6 py-3 bg-red-600 text-center">
+              <p className="text-xs text-white/80">= <strong className="text-white">Rp 39.600.000 per tahun</strong> hanya untuk konten</p>
+            </div>
           </div>
-          {COMPARISON_ROWS.map(({ label, agency, diy, feedify }, i) => (
-            <div key={label} className="grid grid-cols-4 gap-3 mb-2 items-center">
-              <div className="text-xs font-bold text-stone-500 uppercase tracking-[0.12em] pl-1">{label}</div>
-              <div className={`rounded-xl px-4 py-3 text-sm text-stone-500 ${i % 2 === 0 ? "bg-white border border-brand-sand/60" : "bg-brand-sand/30"}`}>{agency}</div>
-              <div className={`rounded-xl px-4 py-3 text-sm text-stone-500 ${i % 2 === 0 ? "bg-white border border-brand-sand/60" : "bg-brand-sand/30"}`}>{diy}</div>
-              <div className={`rounded-xl px-4 py-3 text-sm font-semibold text-brand ${i % 2 === 0 ? "bg-brand/5 border border-brand/10" : "bg-brand/8 border border-brand/15"} flex items-center gap-1.5`}>
-                <span className="text-brand-gold text-xs">✓</span> {feedify}
+
+          {/* Right: Feedify */}
+          <div className="rounded-3xl overflow-hidden shadow-2xl shadow-brand/15" style={{ background: "linear-gradient(160deg, #0B3D2E, #1a5c3a)" }}>
+            <div className="px-6 py-4 bg-brand-gold text-center">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand">Feedify — bayar sekali, selesai</p>
+            </div>
+            <div className="px-6 py-8 flex flex-col items-center justify-center text-center flex-1 gap-4">
+              <div>
+                <p className="text-white/40 text-sm mb-1">Kamu hemat</p>
+                <p className="font-heading font-bold text-brand-gold leading-none" style={{ fontSize: "clamp(2.5rem, 6vw, 4rem)" }}>
+                  Rp 3.300.000
+                </p>
+                <p className="text-white/50 text-sm mt-1">setiap bulan dibanding cara lama</p>
+              </div>
+              <div className="w-full border-t border-white/10 pt-5">
+                <p className="text-white/40 text-xs mb-2 uppercase tracking-wider">Yang kamu bayar</p>
+                <p className="font-heading font-bold text-white" style={{ fontSize: "clamp(2.2rem, 5vw, 3.5rem)" }}>Rp 68.000</p>
+                <p className="text-brand-gold text-sm font-semibold mt-1">Sekali · Seumur hidup · Tidak ada lagi</p>
+              </div>
+              <div className="w-full space-y-2 pt-2">
+                {["Semua tools langsung aktif", "Generate ulang gratis selamanya", "Update fitur baru otomatis gratis"].map(t => (
+                  <div key={t} className="flex items-center gap-2 text-left">
+                    <div className="w-4 h-4 rounded-full bg-brand-gold/20 border border-brand-gold/40 flex items-center justify-center flex-shrink-0">
+                      <span className="text-brand-gold text-[8px] font-bold">✓</span>
+                    </div>
+                    <span className="text-white/70 text-xs">{t}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <a href="#pricing"
+              className="block w-full py-4 bg-brand-gold text-brand font-heading font-bold text-center text-base hover:bg-brand-amber transition-colors">
+              Ambil Akses Rp 68.000 →
+            </a>
+          </div>
+        </div>
+
+        {/* Feature comparison rows */}
+        <div className="rounded-3xl overflow-hidden border border-brand-sand">
+          <div className="grid grid-cols-3 bg-stone-50 border-b border-brand-sand">
+            <div className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-stone-400">Aspek</div>
+            <div className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-stone-400 border-l border-brand-sand">Cara Lama</div>
+            <div className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-brand-gold border-l border-brand-sand">✦ Feedify</div>
+          </div>
+          {FEATURE_ROWS.map(({ label, old, feedify }, i) => (
+            <div key={label} className={`grid grid-cols-3 border-b border-brand-sand last:border-0 ${i % 2 === 0 ? "bg-white" : "bg-brand-sand/20"}`}>
+              <div className="px-5 py-4 text-xs font-bold text-stone-600">{label}</div>
+              <div className="px-5 py-4 text-xs text-stone-400 border-l border-brand-sand/60 flex items-center gap-1.5">
+                <span className="text-red-400 flex-shrink-0">✗</span> {old}
+              </div>
+              <div className="px-5 py-4 text-xs font-semibold text-brand border-l border-brand-sand/60 flex items-center gap-1.5">
+                <span className="text-brand-gold flex-shrink-0">✓</span> {feedify}
               </div>
             </div>
           ))}
         </div>
 
         <div className="mt-10 text-center">
-          <a
-            href="#pricing"
-            className="inline-flex items-center gap-2 px-7 py-3.5 bg-brand text-brand-cream hover:bg-brand-light rounded-full font-bold text-sm shadow-lg shadow-brand/20 btn-lift"
-          >
-            Coba Feedify Sekarang <ArrowRight size={16} weight="bold" />
+          <a href="#pricing"
+            className="inline-flex items-center gap-2 px-7 py-3.5 bg-brand text-brand-cream hover:bg-brand-light rounded-full font-bold text-sm shadow-lg shadow-brand/20 btn-lift">
+            Mulai Hemat Sekarang <ArrowRight size={16} weight="bold" />
           </a>
+          <p className="mt-3 text-xs text-stone-400">Bayar Rp 68.000 sekali — hemat jutaan tiap bulannya</p>
         </div>
       </div>
     </section>
@@ -806,7 +893,6 @@ function Footer() {
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 text-sm text-stone-600">
           <a href="#how" className="hover:text-brand">Cara kerja</a>
-          <a href="#bento" className="hover:text-brand">Fitur</a>
           <a href="#pricing" className="hover:text-brand">Harga</a>
           <a href="#faq" className="hover:text-brand">FAQ</a>
           <Link to="/login" className="hover:text-brand">Masuk</Link>

@@ -1,101 +1,2084 @@
 {
-  "version": 2,
+  "version": 3,
   "contexts": {
     "banner": {
-      "title": "Inspirasi Feed Post Brand",
-      "description": "Referensi foto postingan feed brand untuk inspirasi Banner",
+      "title": "Inspirasi Feed & Banner",
+      "basePath": "/",
       "categories": [
         {
           "id": "skincare",
-          "name": "Skincare & Kosmetik",
+          "name": "Skincare & Beauty",
           "icon": "Drop",
           "photos": [
             {
-              "id": "skincare-cleanser-01",
-              "filename": "cleanser.png",
-              "description": "Post testimonial cleanser skincare",
-              "tags": ["skincare", "cleanser", "testimonial", "social proof"]
+              "id": "bn-cleanser-01",
+              "filename": "cleanser1.webp",
+              "description": "Post banner cleanser minimalis premium",
+              "tags": [
+                "skincare",
+                "cleanser",
+                "minimal",
+                "premium"
+              ]
             },
             {
-              "id": "skincare-moisturizer-01",
-              "filename": "skincare-moisturizer.png",
-              "description": "Post produk moisturizer premium minimalis",
-              "tags": ["skincare", "moisturizer", "premium", "minimal", "clean"]
+              "id": "bn-cleanser-02",
+              "filename": "cleanser2.webp",
+              "description": "Post promosi cleanser visual bersih",
+              "tags": [
+                "skincare",
+                "cleanser",
+                "promo",
+                "clean"
+              ]
             },
             {
-              "id": "skincare-freese-01",
-              "filename": "freese-after.png",
-              "description": "Post promo body lotion benefit-focused",
-              "tags": ["skincare", "body lotion", "promo", "benefit", "copywriting"]
+              "id": "bn-cleanser-03",
+              "filename": "cleanser3.webp",
+              "description": "Post cleanser editorial close-up",
+              "tags": [
+                "skincare",
+                "cleanser",
+                "editorial"
+              ]
+            },
+            {
+              "id": "bn-cleanser-04",
+              "filename": "cleanser4.webp",
+              "description": "Post promo cleanser lifestyle",
+              "tags": [
+                "skincare",
+                "cleanser",
+                "lifestyle"
+              ]
+            },
+            {
+              "id": "bn-cleanser-05",
+              "filename": "cleanser5.webp",
+              "description": "Post testimonial cleanser sebelum-sesudah",
+              "tags": [
+                "skincare",
+                "cleanser",
+                "testimoni"
+              ]
+            },
+            {
+              "id": "bn-moisturizer-01",
+              "filename": "skincare-moisturizer.webp",
+              "description": "Post moisturizer premium minimalis",
+              "tags": [
+                "skincare",
+                "moisturizer",
+                "premium",
+                "minimal"
+              ]
+            },
+            {
+              "id": "bn-moisturizer-02",
+              "filename": "skincare-moisturizer1.webp",
+              "description": "Post moisturizer lifestyle model",
+              "tags": [
+                "skincare",
+                "moisturizer",
+                "lifestyle",
+                "model"
+              ]
+            },
+            {
+              "id": "bn-serum-01",
+              "filename": "skincare-serum.webp",
+              "description": "Post promosi serum premium",
+              "tags": [
+                "skincare",
+                "serum",
+                "premium",
+                "promo"
+              ]
+            },
+            {
+              "id": "bn-serum-02",
+              "filename": "skincare-serum2.webp",
+              "description": "Post serum highlight kandungan",
+              "tags": [
+                "skincare",
+                "serum",
+                "ingredient",
+                "detail"
+              ]
+            },
+            {
+              "id": "bn-serum-03",
+              "filename": "skincare-serum3.webp",
+              "description": "Post serum minimalis benefit-focused",
+              "tags": [
+                "skincare",
+                "serum",
+                "minimal",
+                "benefit"
+              ]
+            },
+            {
+              "id": "bn-serum-04",
+              "filename": "skincare-serum4.webp",
+              "description": "Post serum elegan dark background",
+              "tags": [
+                "skincare",
+                "serum",
+                "elegan",
+                "dark"
+              ]
+            },
+            {
+              "id": "bn-serum-05",
+              "filename": "skincare-serum5.webp",
+              "description": "Post serum clean aesthetic",
+              "tags": [
+                "skincare",
+                "serum",
+                "clean"
+              ]
+            },
+            {
+              "id": "bn-serum-06",
+              "filename": "skincare-serum6.webp",
+              "description": "Post serum campaign lifestyle",
+              "tags": [
+                "skincare",
+                "serum",
+                "campaign",
+                "lifestyle"
+              ]
+            },
+            {
+              "id": "bn-serum-07",
+              "filename": "skincare-serum7.webp",
+              "description": "Post editorial serum premium",
+              "tags": [
+                "skincare",
+                "serum",
+                "editorial",
+                "premium"
+              ]
+            },
+            {
+              "id": "bn-serum-08",
+              "filename": "skincare-serum8.webp",
+              "description": "Post serum dengan warna brand",
+              "tags": [
+                "skincare",
+                "serum",
+                "brand color"
+              ]
+            },
+            {
+              "id": "bn-serumlaunch-01",
+              "filename": "skincare-serumlaunch.webp",
+              "description": "Post launch serum premium",
+              "tags": [
+                "skincare",
+                "serum",
+                "launch",
+                "new product"
+              ]
+            },
+            {
+              "id": "bn-serumlaunch-02",
+              "filename": "skincare-serumlaunch2.webp",
+              "description": "Post announcement serum baru",
+              "tags": [
+                "skincare",
+                "serum",
+                "announcement",
+                "launch"
+              ]
+            },
+            {
+              "id": "bn-serumlaunch-03",
+              "filename": "skincare-serumlaunch3.webp",
+              "description": "Post campaign serum launching",
+              "tags": [
+                "skincare",
+                "serum",
+                "campaign",
+                "launch"
+              ]
+            },
+            {
+              "id": "bn-serumtestimoni-01",
+              "filename": "skincare-serumtestimoni.webp",
+              "description": "Post testimonial serum skincare",
+              "tags": [
+                "skincare",
+                "serum",
+                "testimonial"
+              ]
+            },
+            {
+              "id": "bn-serumtestimoni-02",
+              "filename": "skincare-serumtestimoni2.webp",
+              "description": "Post testimoni before-after serum",
+              "tags": [
+                "skincare",
+                "serum",
+                "before after"
+              ]
+            },
+            {
+              "id": "bn-toner-01",
+              "filename": "skincare-toner1.webp",
+              "description": "Post toner skincare fresh",
+              "tags": [
+                "skincare",
+                "toner",
+                "fresh"
+              ]
+            },
+            {
+              "id": "bn-tonerlaunch",
+              "filename": "skincare-tonerlaunch.webp",
+              "description": "Post launch toner baru",
+              "tags": [
+                "skincare",
+                "toner",
+                "launch"
+              ]
+            },
+            {
+              "id": "bn-facewashlaunch-01",
+              "filename": "skincare-facewashlaunch.webp",
+              "description": "Post launch face wash baru",
+              "tags": [
+                "skincare",
+                "face wash",
+                "launch"
+              ]
+            },
+            {
+              "id": "bn-facewashlaunch-02",
+              "filename": "skincare-facewashlaunch2.webp",
+              "description": "Post promo face wash",
+              "tags": [
+                "skincare",
+                "face wash",
+                "promo"
+              ]
+            },
+            {
+              "id": "bn-facewashtestimoni",
+              "filename": "skincare-facewashtestimoni.webp",
+              "description": "Post testimonial face wash",
+              "tags": [
+                "skincare",
+                "face wash",
+                "testimonial"
+              ]
+            },
+            {
+              "id": "bn-launch-01",
+              "filename": "skincarelaunch.webp",
+              "description": "Post launch campaign skincare",
+              "tags": [
+                "skincare",
+                "launch",
+                "campaign"
+              ]
+            },
+            {
+              "id": "bn-launch-02",
+              "filename": "skincarelaunch1.webp",
+              "description": "Post announcement skincare baru",
+              "tags": [
+                "skincare",
+                "launch",
+                "announcement"
+              ]
+            },
+            {
+              "id": "bn-ampoule-01",
+              "filename": "skincare-ampoule.webp",
+              "description": "Post ampoule serum premium",
+              "tags": [
+                "skincare",
+                "ampoule",
+                "serum"
+              ]
+            },
+            {
+              "id": "bn-ampoule-02",
+              "filename": "skincare-ampoule1.webp",
+              "description": "Post ampoule skincare editorial",
+              "tags": [
+                "skincare",
+                "ampoule",
+                "editorial"
+              ]
+            },
+            {
+              "id": "bn-sunscreen-01",
+              "filename": "sunscreen.webp",
+              "description": "Post sunscreen SPF benefit-focused",
+              "tags": [
+                "skincare",
+                "sunscreen",
+                "SPF"
+              ]
+            },
+            {
+              "id": "bn-sunscreen-02",
+              "filename": "sunscreen1.webp",
+              "description": "Post sunscreen lifestyle editorial",
+              "tags": [
+                "skincare",
+                "sunscreen",
+                "lifestyle"
+              ]
+            },
+            {
+              "id": "bn-lipstick-01",
+              "filename": "lipstick1.webp",
+              "description": "Post lipstik bold statement",
+              "tags": [
+                "kosmetik",
+                "lipstik",
+                "bold"
+              ]
+            },
+            {
+              "id": "bn-lipstick-02",
+              "filename": "lipstick2.webp",
+              "description": "Post lipstik shade collection",
+              "tags": [
+                "kosmetik",
+                "lipstik",
+                "collection"
+              ]
+            },
+            {
+              "id": "bn-bodycare-wash",
+              "filename": "bodycare-bodywash.webp",
+              "description": "Post body wash premium",
+              "tags": [
+                "bodycare",
+                "body wash",
+                "premium"
+              ]
+            },
+            {
+              "id": "bn-bodycare-scrub",
+              "filename": "bodycare-scrubtestimoni.webp",
+              "description": "Post testimonial body scrub",
+              "tags": [
+                "bodycare",
+                "scrub",
+                "testimonial"
+              ]
+            },
+            {
+              "id": "bn-bodycare-shampoo",
+              "filename": "bodycare-shampootestimoni.webp",
+              "description": "Post testimonial sampo",
+              "tags": [
+                "bodycare",
+                "shampoo",
+                "testimonial"
+              ]
+            },
+            {
+              "id": "bn-diffuser",
+              "filename": "difusserlaunch1.webp",
+              "description": "Post launch diffuser aromaterapi",
+              "tags": [
+                "lifestyle",
+                "diffuser",
+                "launch"
+              ]
+            },
+            {
+              "id": "bn-parfumlaunch",
+              "filename": "parfumlaunch1.webp",
+              "description": "Post launch parfum baru",
+              "tags": [
+                "parfum",
+                "launch"
+              ]
+            },
+            {
+              "id": "bn-perfume-01",
+              "filename": "perfume1.webp",
+              "description": "Post parfum premium luxury",
+              "tags": [
+                "parfum",
+                "premium",
+                "luxury"
+              ]
+            },
+            {
+              "id": "bn-perfume-02",
+              "filename": "perfume2.webp",
+              "description": "Post botol parfum minimalis",
+              "tags": [
+                "parfum",
+                "minimal"
+              ]
+            },
+            {
+              "id": "bn-perfume-03",
+              "filename": "perfume3.webp",
+              "description": "Post parfum koleksi premium",
+              "tags": [
+                "parfum",
+                "koleksi"
+              ]
+            },
+            {
+              "id": "bn-scent-candle",
+              "filename": "scent-candle.webp",
+              "description": "Post lilin aromaterapi lifestyle",
+              "tags": [
+                "lifestyle",
+                "candle",
+                "aromaterapi"
+              ]
+            },
+            {
+              "id": "bn-freese-after",
+              "filename": "freese-after.webp",
+              "description": "Post promo body lotion benefit",
+              "tags": [
+                "skincare",
+                "body lotion",
+                "promo"
+              ]
+            },
+            {
+              "id": "bn-freese-before",
+              "filename": "freese-before.webp",
+              "description": "Post visual sebelum pakai produk",
+              "tags": [
+                "skincare",
+                "before",
+                "transformation"
+              ]
             }
           ]
         },
         {
           "id": "fashion",
-          "name": "Fashion & Aksesoris",
+          "name": "Fashion & Aksesori",
           "icon": "TShirt",
           "photos": [
             {
-              "id": "fashion-aksesoris-01",
-              "filename": "aksesoris.png",
-              "description": "Post editorial perhiasan dengan model",
-              "tags": ["fashion", "aksesoris", "perhiasan", "gelang", "editorial", "model"]
+              "id": "bn-fa-baju",
+              "filename": "fashion-baju.webp",
+              "description": "Post fashion baju lifestyle editorial",
+              "tags": [
+                "fashion",
+                "baju",
+                "lifestyle",
+                "editorial"
+              ]
             },
             {
-              "id": "fashion-shirt-01",
-              "filename": "fashion-shirt.png",
-              "description": "Post kemeja gaya minimal lifestyle",
-              "tags": ["fashion", "baju", "kemeja", "minimal", "lifestyle"]
+              "id": "bn-fa-shirt",
+              "filename": "fashion-shirt.webp",
+              "description": "Post fashion kemeja casual",
+              "tags": [
+                "fashion",
+                "shirt",
+                "casual"
+              ]
+            },
+            {
+              "id": "bn-fa-aksesoris",
+              "filename": "aksesoris.webp",
+              "description": "Post editorial perhiasan dengan model",
+              "tags": [
+                "fashion",
+                "aksesori",
+                "perhiasan",
+                "editorial"
+              ]
+            },
+            {
+              "id": "bn-fa-jamtangan-01",
+              "filename": "jamtangan1.webp",
+              "description": "Post jam tangan premium",
+              "tags": [
+                "fashion",
+                "jam tangan",
+                "premium"
+              ]
+            },
+            {
+              "id": "bn-fa-jamtangan-02",
+              "filename": "jamtangan2.webp",
+              "description": "Post jam tangan koleksi",
+              "tags": [
+                "fashion",
+                "jam tangan",
+                "koleksi"
+              ]
+            },
+            {
+              "id": "bn-fa-sepatu",
+              "filename": "sepatu1.webp",
+              "description": "Post sepatu sneakers",
+              "tags": [
+                "fashion",
+                "sepatu",
+                "sneakers"
+              ]
+            },
+            {
+              "id": "bn-fa-tas-01",
+              "filename": "tas.webp",
+              "description": "Post tas handbag",
+              "tags": [
+                "fashion",
+                "tas",
+                "handbag"
+              ]
+            },
+            {
+              "id": "bn-fa-tas-02",
+              "filename": "tas1.webp",
+              "description": "Post tas branded",
+              "tags": [
+                "fashion",
+                "tas",
+                "branded"
+              ]
+            },
+            {
+              "id": "bn-fa-headset",
+              "filename": "headset1.webp",
+              "description": "Post headset elektronik",
+              "tags": [
+                "elektronik",
+                "headset",
+                "audio"
+              ]
             }
           ]
         },
         {
           "id": "fnb",
-          "name": "F&B & Kuliner",
+          "name": "Food & Beverage",
           "icon": "ForkKnife",
           "photos": [
             {
-              "id": "fnb-makanan-01",
-              "filename": "makanan.png",
-              "description": "Menu board rice bowl bold dark",
-              "tags": ["fnb", "makanan", "menu board", "rice bowl", "bold", "dark background"]
+              "id": "bn-fnb-crunch",
+              "filename": "makanan-crunch.webp",
+              "description": "Post snack crunch lifestyle",
+              "tags": [
+                "fnb",
+                "snack",
+                "makanan"
+              ]
             },
             {
-              "id": "fnb-minuman-cup-01",
-              "filename": "minuman-cup.png",
-              "description": "Post minuman cup playful vibrant",
-              "tags": ["fnb", "minuman", "cup", "shake", "playful", "vibrant", "colorful"]
+              "id": "bn-fnb-crunch2",
+              "filename": "makanan-crunch2.webp",
+              "description": "Post snack crunch editorial",
+              "tags": [
+                "fnb",
+                "snack",
+                "editorial"
+              ]
             },
             {
-              "id": "fnb-minuman-kaleng-01",
-              "filename": "minuman-kaleng.png",
-              "description": "Post minuman kaleng modern colorful",
-              "tags": ["fnb", "minuman", "kaleng", "sparkling", "modern", "colorful"]
+              "id": "bn-fnb-sambal",
+              "filename": "makanan-sambal.webp",
+              "description": "Post sambal produk artisanal",
+              "tags": [
+                "fnb",
+                "sambal",
+                "makanan"
+              ]
             },
             {
-              "id": "fnb-minuman-kopi-01",
-              "filename": "minuman-kopi.png",
-              "description": "Menu board kopi handwritten rustic",
-              "tags": ["fnb", "kopi", "coffee", "menu board", "handwritten", "rustic", "cafe"]
+              "id": "bn-fnb-makanan",
+              "filename": "makanan.webp",
+              "description": "Post produk makanan lifestyle",
+              "tags": [
+                "fnb",
+                "makanan",
+                "lifestyle"
+              ]
+            },
+            {
+              "id": "bn-fnb-bery",
+              "filename": "minuman-bery.webp",
+              "description": "Post minuman berry premium",
+              "tags": [
+                "fnb",
+                "minuman",
+                "berry"
+              ]
+            },
+            {
+              "id": "bn-fnb-cup",
+              "filename": "minuman-cup.webp",
+              "description": "Post minuman cup packaging",
+              "tags": [
+                "fnb",
+                "minuman",
+                "cup"
+              ]
+            },
+            {
+              "id": "bn-fnb-kaleng",
+              "filename": "minuman-kaleng.webp",
+              "description": "Post minuman kaleng lifestyle",
+              "tags": [
+                "fnb",
+                "minuman",
+                "kaleng"
+              ]
+            },
+            {
+              "id": "bn-fnb-kalengtea",
+              "filename": "minuman-kalengtea.webp",
+              "description": "Post minuman teh kaleng",
+              "tags": [
+                "fnb",
+                "minuman",
+                "teh",
+                "kaleng"
+              ]
+            },
+            {
+              "id": "bn-fnb-kopi",
+              "filename": "minuman-kopi.webp",
+              "description": "Post kopi artisanal",
+              "tags": [
+                "fnb",
+                "kopi",
+                "artisanal"
+              ]
+            },
+            {
+              "id": "bn-fnb-matcha",
+              "filename": "minuman-matcha.webp",
+              "description": "Post matcha drink premium",
+              "tags": [
+                "fnb",
+                "matcha",
+                "premium"
+              ]
+            },
+            {
+              "id": "bn-fnb-botol",
+              "filename": "botol1.webp",
+              "description": "Post produk botol minuman",
+              "tags": [
+                "fnb",
+                "minuman",
+                "botol"
+              ]
             }
           ]
         }
       ]
     },
     "carousel": {
-      "title": "Inspirasi Carousel Brand",
-      "description": "Referensi carousel Instagram — foto tampil per brand, urut dari slide pertama",
-      "categories": []
+      "title": "Inspirasi Carousel",
+      "basePath": "/carousel/",
+      "categories": [
+        {
+          "id": "carousel-all",
+          "name": "Semua",
+          "icon": "Images",
+          "photos": [
+            {
+              "id": "cr-bl-01",
+              "filename": "bodylotion 3 slides/slide 1.webp",
+              "set": "Bodylotion (3 Slide)",
+              "description": "Slide 1 – hero produk bodylotion",
+              "tags": [
+                "bodycare",
+                "bodylotion"
+              ]
+            },
+            {
+              "id": "cr-bl-02",
+              "filename": "bodylotion 3 slides/slide 2.webp",
+              "set": "Bodylotion (3 Slide)",
+              "description": "Slide 2 – benefit bodylotion",
+              "tags": [
+                "bodycare",
+                "benefit"
+              ]
+            },
+            {
+              "id": "cr-bl-03",
+              "filename": "bodylotion 3 slides/slide 3.webp",
+              "set": "Bodylotion (3 Slide)",
+              "description": "Slide 3 – closing bodylotion",
+              "tags": [
+                "bodycare",
+                "closing"
+              ]
+            },
+            {
+              "id": "cr-pf-01",
+              "filename": "parfum 2 slides/slide 1.webp",
+              "set": "Parfum (2 Slide)",
+              "description": "Slide 1 – hero produk parfum",
+              "tags": [
+                "parfum",
+                "lifestyle"
+              ]
+            },
+            {
+              "id": "cr-pf-02",
+              "filename": "parfum 2 slides/slide 2.webp",
+              "set": "Parfum (2 Slide)",
+              "description": "Slide 2 – closing parfum",
+              "tags": [
+                "parfum",
+                "closing"
+              ]
+            },
+            {
+              "id": "cr-babywash-2-slides-01",
+              "filename": "babywash 2 slides/1.webp",
+              "set": "Babywash (2 Slide)",
+              "description": "Slide 1 – hero produk produk",
+              "tags": [
+                "produk"
+              ]
+            },
+            {
+              "id": "cr-babywash-2-slides-02",
+              "filename": "babywash 2 slides/2.webp",
+              "set": "Babywash (2 Slide)",
+              "description": "Slide 2 – closing produk",
+              "tags": [
+                "produk"
+              ]
+            },
+            {
+              "id": "cr-bodywash-2-slides-01",
+              "filename": "bodywash 2 slides/1.webp",
+              "set": "Bodywash (2 Slide)",
+              "description": "Slide 1 – hero produk body",
+              "tags": [
+                "bodycare",
+                "body wash"
+              ]
+            },
+            {
+              "id": "cr-bodywash-2-slides-02",
+              "filename": "bodywash 2 slides/2.webp",
+              "set": "Bodywash (2 Slide)",
+              "description": "Slide 2 – closing body",
+              "tags": [
+                "bodycare",
+                "body wash"
+              ]
+            },
+            {
+              "id": "cr-cushion-2-slides-01",
+              "filename": "cushion 2 slides/1.webp",
+              "set": "Cushion (2 Slide)",
+              "description": "Slide 1 – hero produk cushion",
+              "tags": [
+                "kosmetik",
+                "cushion"
+              ]
+            },
+            {
+              "id": "cr-cushion-2-slides-02",
+              "filename": "cushion 2 slides/2.webp",
+              "set": "Cushion (2 Slide)",
+              "description": "Slide 2 – closing cushion",
+              "tags": [
+                "kosmetik",
+                "cushion"
+              ]
+            },
+            {
+              "id": "cr-facewash-3-slides-01",
+              "filename": "facewash 3 slides/1.webp",
+              "set": "Facewash (3 Slide)",
+              "description": "Slide 1 – hero produk face",
+              "tags": [
+                "skincare",
+                "face wash"
+              ]
+            },
+            {
+              "id": "cr-facewash-3-slides-02",
+              "filename": "facewash 3 slides/2.webp",
+              "set": "Facewash (3 Slide)",
+              "description": "Slide 2 – benefit 1 face",
+              "tags": [
+                "skincare",
+                "face wash"
+              ]
+            },
+            {
+              "id": "cr-facewash-3-slides-03",
+              "filename": "facewash 3 slides/3.webp",
+              "set": "Facewash (3 Slide)",
+              "description": "Slide 3 – closing face",
+              "tags": [
+                "skincare",
+                "face wash"
+              ]
+            },
+            {
+              "id": "cr-hairclay-2-slides-01",
+              "filename": "hairclay 2 slides/1.webp",
+              "set": "Hairclay (2 Slide)",
+              "description": "Slide 1 – hero produk clay",
+              "tags": [
+                "skincare",
+                "clay mask"
+              ]
+            },
+            {
+              "id": "cr-hairclay-2-slides-02",
+              "filename": "hairclay 2 slides/2.webp",
+              "set": "Hairclay (2 Slide)",
+              "description": "Slide 2 – closing clay",
+              "tags": [
+                "skincare",
+                "clay mask"
+              ]
+            },
+            {
+              "id": "cr-hairoil-4-slides-01",
+              "filename": "hairoil 4 slides/1.webp",
+              "set": "Hairoil (4 Slide)",
+              "description": "Slide 1 – hero produk hair",
+              "tags": [
+                "haircare",
+                "hair oil"
+              ]
+            },
+            {
+              "id": "cr-hairoil-4-slides-02",
+              "filename": "hairoil 4 slides/2.webp",
+              "set": "Hairoil (4 Slide)",
+              "description": "Slide 2 – benefit 1 hair",
+              "tags": [
+                "haircare",
+                "hair oil"
+              ]
+            },
+            {
+              "id": "cr-hairoil-4-slides-03",
+              "filename": "hairoil 4 slides/3.webp",
+              "set": "Hairoil (4 Slide)",
+              "description": "Slide 3 – benefit 2 hair",
+              "tags": [
+                "haircare",
+                "hair oil"
+              ]
+            },
+            {
+              "id": "cr-hairoil-4-slides-04",
+              "filename": "hairoil 4 slides/4.webp",
+              "set": "Hairoil (4 Slide)",
+              "description": "Slide 4 – closing hair",
+              "tags": [
+                "haircare",
+                "hair oil"
+              ]
+            },
+            {
+              "id": "cr-kaos-2-slides-01",
+              "filename": "kaos 2 slides/1.webp",
+              "set": "Kaos (2 Slide)",
+              "description": "Slide 1 – hero produk kaos",
+              "tags": [
+                "fashion",
+                "kaos"
+              ]
+            },
+            {
+              "id": "cr-kaos-2-slides-02",
+              "filename": "kaos 2 slides/2.webp",
+              "set": "Kaos (2 Slide)",
+              "description": "Slide 2 – closing kaos",
+              "tags": [
+                "fashion",
+                "kaos"
+              ]
+            },
+            {
+              "id": "cr-moisturizer-3-slides-01",
+              "filename": "moisturizer 3 slides/1.webp",
+              "set": "Moisturizer (3 Slide)",
+              "description": "Slide 1 – hero produk moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-moisturizer-3-slides-02",
+              "filename": "moisturizer 3 slides/2.webp",
+              "set": "Moisturizer (3 Slide)",
+              "description": "Slide 2 – benefit 1 moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-moisturizer-3-slides-03",
+              "filename": "moisturizer 3 slides/3.webp",
+              "set": "Moisturizer (3 Slide)",
+              "description": "Slide 3 – closing moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-moisturizer-4slides-01",
+              "filename": "moisturizer 4slides/1.webp",
+              "set": "Moisturizer (4 Slide)",
+              "description": "Slide 1 – hero produk moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-moisturizer-4slides-02",
+              "filename": "moisturizer 4slides/2.webp",
+              "set": "Moisturizer (4 Slide)",
+              "description": "Slide 2 – benefit 1 moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-moisturizer-4slides-03",
+              "filename": "moisturizer 4slides/3.webp",
+              "set": "Moisturizer (4 Slide)",
+              "description": "Slide 3 – benefit 2 moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-moisturizer-4slides-04",
+              "filename": "moisturizer 4slides/4.webp",
+              "set": "Moisturizer (4 Slide)",
+              "description": "Slide 4 – closing moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-parfum-3-slides-01",
+              "filename": "parfum 3 slides/1.webp",
+              "set": "Parfum (3 Slide)",
+              "description": "Slide 1 – hero produk parfum",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "cr-parfum-3-slides-02",
+              "filename": "parfum 3 slides/2.webp",
+              "set": "Parfum (3 Slide)",
+              "description": "Slide 2 – benefit 1 parfum",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "cr-parfum-3-slides-03",
+              "filename": "parfum 3 slides/3.webp",
+              "set": "Parfum (3 Slide)",
+              "description": "Slide 3 – closing parfum",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "cr-serum-3-slides-01",
+              "filename": "serum 3 slides/1.webp",
+              "set": "Serum (3 Slide)",
+              "description": "Slide 1 – hero produk serum",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "cr-serum-3-slides-02",
+              "filename": "serum 3 slides/2.webp",
+              "set": "Serum (3 Slide)",
+              "description": "Slide 2 – benefit 1 serum",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "cr-serum-3-slides-03",
+              "filename": "serum 3 slides/3.webp",
+              "set": "Serum (3 Slide)",
+              "description": "Slide 3 – closing serum",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "cr-serum2-3-slides-01",
+              "filename": "serum2 3 slides/1.webp",
+              "set": "Serum 2 (3 Slide)",
+              "description": "Slide 1 – hero produk serum",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "cr-serum2-3-slides-02",
+              "filename": "serum2 3 slides/2.webp",
+              "set": "Serum 2 (3 Slide)",
+              "description": "Slide 2 – benefit 1 serum",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "cr-serum2-3-slides-03",
+              "filename": "serum2 3 slides/3.webp",
+              "set": "Serum 2 (3 Slide)",
+              "description": "Slide 3 – closing serum",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "cr-serum3-2-slides-01",
+              "filename": "serum3 2 slides/1.webp",
+              "set": "Serum 3 (2 Slide)",
+              "description": "Slide 1 – hero produk serum",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "cr-serum3-2-slides-02",
+              "filename": "serum3 2 slides/2.webp",
+              "set": "Serum 3 (2 Slide)",
+              "description": "Slide 2 – closing serum",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "cr-sunscreen-2slides-01",
+              "filename": "sunscreen 2slides/1.webp",
+              "set": "Sunscreen (2 Slide)",
+              "description": "Slide 1 – hero produk sunscreen",
+              "tags": [
+                "skincare",
+                "sunscreen"
+              ]
+            },
+            {
+              "id": "cr-sunscreen-2slides-02",
+              "filename": "sunscreen 2slides/2.webp",
+              "set": "Sunscreen (2 Slide)",
+              "description": "Slide 2 – closing sunscreen",
+              "tags": [
+                "skincare",
+                "sunscreen"
+              ]
+            },
+            {
+              "id": "cr-tumbler-2-slides-01",
+              "filename": "tumbler 2 slides/1.webp",
+              "set": "Tumbler (2 Slide)",
+              "description": "Slide 1 – hero produk tumbler",
+              "tags": [
+                "lifestyle",
+                "tumbler"
+              ]
+            },
+            {
+              "id": "cr-tumbler-2-slides-02",
+              "filename": "tumbler 2 slides/2.webp",
+              "set": "Tumbler (2 Slide)",
+              "description": "Slide 2 – benefit 1 tumbler",
+              "tags": [
+                "lifestyle",
+                "tumbler"
+              ]
+            },
+            {
+              "id": "cr-tumbler-2-slides-03",
+              "filename": "tumbler 2 slides/3.webp",
+              "set": "Tumbler (2 Slide)",
+              "description": "Slide 3 – closing tumbler",
+              "tags": [
+                "lifestyle",
+                "tumbler"
+              ]
+            },
+            {
+              "id": "cr-tumbler-3-slides-01",
+              "filename": "tumbler 3 slides/1.webp",
+              "set": "Tumbler (3 Slide)",
+              "description": "Slide 1 – hero produk tumbler",
+              "tags": [
+                "lifestyle",
+                "tumbler"
+              ]
+            },
+            {
+              "id": "cr-tumbler-3-slides-02",
+              "filename": "tumbler 3 slides/2.webp",
+              "set": "Tumbler (3 Slide)",
+              "description": "Slide 2 – benefit 1 tumbler",
+              "tags": [
+                "lifestyle",
+                "tumbler"
+              ]
+            },
+            {
+              "id": "cr-tumbler-3-slides-03",
+              "filename": "tumbler 3 slides/3.webp",
+              "set": "Tumbler (3 Slide)",
+              "description": "Slide 3 – closing tumbler",
+              "tags": [
+                "lifestyle",
+                "tumbler"
+              ]
+            }
+          ]
+        }
+      ]
     },
-    "food": {
-      "title": "Inspirasi Foto F&B",
-      "description": "Referensi foto makanan & minuman untuk F&B Menu Visual",
-      "categories": []
+    "studio": {
+      "title": "Inspirasi Studio",
+      "basePath": "/studio/",
+      "categories": [
+        {
+          "id": "studio-all",
+          "name": "Semua",
+          "icon": "Camera",
+          "photos": [
+            {
+              "id": "st-serum-01",
+              "filename": "skincare-serum.webp",
+              "description": "Serum — studio clean shot",
+              "tags": [
+                "skincare",
+                "serum",
+                "clean"
+              ]
+            },
+            {
+              "id": "st-serum-02",
+              "filename": "skincare-serum2.webp",
+              "description": "Serum 2 — pencahayaan studio",
+              "tags": [
+                "skincare",
+                "serum",
+                "studio"
+              ]
+            },
+            {
+              "id": "st-serum-03",
+              "filename": "skincare-serum3.webp",
+              "description": "Serum 3 — minimal hero shot",
+              "tags": [
+                "skincare",
+                "serum",
+                "minimal"
+              ]
+            },
+            {
+              "id": "st-ampoule-01",
+              "filename": "skincare-ampoule.webp",
+              "description": "Ampoule — commercial product shot",
+              "tags": [
+                "skincare",
+                "ampoule",
+                "commercial"
+              ]
+            },
+            {
+              "id": "st-ampoule-02",
+              "filename": "skinare-ampoule studio.webp",
+              "description": "Ampoule studio — dramatic lighting",
+              "tags": [
+                "skincare",
+                "ampoule",
+                "dramatic"
+              ]
+            },
+            {
+              "id": "st-facewash",
+              "filename": "skincare-facewash.webp",
+              "description": "Face wash — clean studio shot",
+              "tags": [
+                "skincare",
+                "face wash",
+                "clean"
+              ]
+            },
+            {
+              "id": "st-set-01",
+              "filename": "skincare-set.webp",
+              "description": "Skincare set — product grouping",
+              "tags": [
+                "skincare",
+                "set",
+                "grouping"
+              ]
+            },
+            {
+              "id": "st-set-02",
+              "filename": "skincare-set2.webp",
+              "description": "Skincare set 2 — lifestyle arrangement",
+              "tags": [
+                "skincare",
+                "set",
+                "lifestyle"
+              ]
+            },
+            {
+              "id": "st-moisturizer",
+              "filename": "skincare-moisturizer birutema.webp",
+              "description": "Moisturizer blue theme — premium look",
+              "tags": [
+                "skincare",
+                "moisturizer",
+                "premium"
+              ]
+            },
+            {
+              "id": "st-sunscreen",
+              "filename": "sunscreen.webp",
+              "description": "Sunscreen — bright studio shot",
+              "tags": [
+                "skincare",
+                "sunscreen"
+              ]
+            },
+            {
+              "id": "st-parfume-01",
+              "filename": "parfume.webp",
+              "description": "Parfum — luxury dramatic lighting",
+              "tags": [
+                "parfum",
+                "luxury",
+                "dramatic"
+              ]
+            },
+            {
+              "id": "st-parfume-02",
+              "filename": "perfume2.webp",
+              "description": "Parfum 2 — minimalis studio",
+              "tags": [
+                "parfum",
+                "minimal"
+              ]
+            },
+            {
+              "id": "st-parfume-03",
+              "filename": "perfume3.webp",
+              "description": "Parfum 3 — editorial",
+              "tags": [
+                "parfum",
+                "editorial"
+              ]
+            },
+            {
+              "id": "st-kopi",
+              "filename": "biji kopi.webp",
+              "description": "Biji kopi — F&B product shot",
+              "tags": [
+                "fnb",
+                "kopi"
+              ]
+            },
+            {
+              "id": "st-botolkaleng",
+              "filename": "botol kaleng.webp",
+              "description": "Botol kaleng — packaged beverage shot",
+              "tags": [
+                "fnb",
+                "botol",
+                "kaleng"
+              ]
+            },
+            {
+              "id": "st-botolminum",
+              "filename": "botol minum.webp",
+              "description": "Botol minum / tumbler shot",
+              "tags": [
+                "fnb",
+                "tumbler"
+              ]
+            },
+            {
+              "id": "st-ampoule1",
+              "filename": "ampoule1.webp",
+              "description": "Ampoule serum skincare",
+              "tags": [
+                "skincare",
+                "ampoule"
+              ]
+            },
+            {
+              "id": "st-bodywash1",
+              "filename": "bodywash1.webp",
+              "description": "Body wash bodycare",
+              "tags": [
+                "bodycare",
+                "body wash"
+              ]
+            },
+            {
+              "id": "st-casing1",
+              "filename": "casing1.webp",
+              "description": "Casing HP gadget",
+              "tags": [
+                "gadget",
+                "casing hp"
+              ]
+            },
+            {
+              "id": "st-cctv1",
+              "filename": "cctv1.webp",
+              "description": "CCTV gadget",
+              "tags": [
+                "gadget",
+                "cctv"
+              ]
+            },
+            {
+              "id": "st-cleanser1",
+              "filename": "cleanser1.webp",
+              "description": "Cleanser skincare",
+              "tags": [
+                "skincare",
+                "cleanser"
+              ]
+            },
+            {
+              "id": "st-dispenser1",
+              "filename": "dispenser1.webp",
+              "description": "Dispenser air",
+              "tags": [
+                "peralatan",
+                "dispenser"
+              ]
+            },
+            {
+              "id": "st-earphone1",
+              "filename": "earphone1.webp",
+              "description": "Audio gadget",
+              "tags": [
+                "gadget",
+                "audio"
+              ]
+            },
+            {
+              "id": "st-jamtangan1",
+              "filename": "jamtangan1.webp",
+              "description": "Jam tangan premium",
+              "tags": [
+                "fashion",
+                "jam tangan"
+              ]
+            },
+            {
+              "id": "st-jamtangan2",
+              "filename": "jamtangan2.webp",
+              "description": "Jam tangan premium",
+              "tags": [
+                "fashion",
+                "jam tangan"
+              ]
+            },
+            {
+              "id": "st-kacamata1",
+              "filename": "kacamata1.webp",
+              "description": "Kacamata fashion",
+              "tags": [
+                "fashion",
+                "kacamata"
+              ]
+            },
+            {
+              "id": "st-kaos1",
+              "filename": "kaos1.webp",
+              "description": "Kaos fashion",
+              "tags": [
+                "fashion",
+                "kaos"
+              ]
+            },
+            {
+              "id": "st-keyboard1",
+              "filename": "keyboard1.webp",
+              "description": "Keyboard gadget",
+              "tags": [
+                "gadget",
+                "keyboard"
+              ]
+            },
+            {
+              "id": "st-lipstick1",
+              "filename": "lipstick1.webp",
+              "description": "Lipstik kosmetik",
+              "tags": [
+                "kosmetik",
+                "lipstik"
+              ]
+            },
+            {
+              "id": "st-micellerwater1",
+              "filename": "micellerwater1.webp",
+              "description": "Micellar water skincare",
+              "tags": [
+                "skincare",
+                "micellar water"
+              ]
+            },
+            {
+              "id": "st-moisturizer1",
+              "filename": "moisturizer1.webp",
+              "description": "Moisturizer skincare",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "st-moisturizer2",
+              "filename": "moisturizer2.webp",
+              "description": "Moisturizer skincare",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "st-perfume4",
+              "filename": "perfume4.webp",
+              "description": "Parfum premium",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "st-perfume5",
+              "filename": "perfume5.webp",
+              "description": "Parfum premium",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "st-perfume6",
+              "filename": "perfume6.webp",
+              "description": "Parfum premium",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "st-perfume7",
+              "filename": "perfume7.webp",
+              "description": "Parfum premium",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "st-sepatu1",
+              "filename": "sepatu1.webp",
+              "description": "Sepatu sneakers",
+              "tags": [
+                "fashion",
+                "sepatu"
+              ]
+            },
+            {
+              "id": "st-sepatu2",
+              "filename": "sepatu2.webp",
+              "description": "Sepatu sneakers",
+              "tags": [
+                "fashion",
+                "sepatu"
+              ]
+            },
+            {
+              "id": "st-serum",
+              "filename": "serum.webp",
+              "description": "Serum skincare premium",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "st-skincare-serum4",
+              "filename": "skincare-serum4.webp",
+              "description": "Serum skincare premium",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "st-speaker1",
+              "filename": "speaker1.webp",
+              "description": "Audio gadget",
+              "tags": [
+                "gadget",
+                "audio"
+              ]
+            },
+            {
+              "id": "st-sunscreen1",
+              "filename": "sunscreen1.webp",
+              "description": "Sunscreen SPF",
+              "tags": [
+                "skincare",
+                "sunscreen"
+              ]
+            },
+            {
+              "id": "st-tas1",
+              "filename": "tas1.webp",
+              "description": "Tas fashion",
+              "tags": [
+                "fashion",
+                "tas"
+              ]
+            },
+            {
+              "id": "st-tumbler1",
+              "filename": "tumbler1.webp",
+              "description": "Tumbler lifestyle",
+              "tags": [
+                "lifestyle",
+                "tumbler"
+              ]
+            },
+            {
+              "id": "st-tumbler2",
+              "filename": "tumbler2.webp",
+              "description": "Tumbler lifestyle",
+              "tags": [
+                "lifestyle",
+                "tumbler"
+              ]
+            }
+          ]
+        }
+      ]
     },
     "marketplace": {
       "title": "Inspirasi Thumbnail Marketplace",
-      "description": "Referensi thumbnail produk untuk Shopee, Tokopedia, dan marketplace lain",
-      "categories": []
+      "basePath": "/marketplace/",
+      "categories": [
+        {
+          "id": "marketplace-all",
+          "name": "Semua",
+          "icon": "Storefront",
+          "photos": [
+            {
+              "id": "mp-serum",
+              "filename": "skincare-serum.webp",
+              "description": "Thumbnail serum skincare premium",
+              "tags": [
+                "skincare",
+                "serum",
+                "marketplace"
+              ]
+            },
+            {
+              "id": "mp-moisturizer",
+              "filename": "skincare-moisturizer.webp",
+              "description": "Thumbnail moisturizer clean",
+              "tags": [
+                "skincare",
+                "moisturizer",
+                "marketplace"
+              ]
+            },
+            {
+              "id": "mp-sunscreen",
+              "filename": "skincare-sunscreen.webp",
+              "description": "Thumbnail sunscreen SPF",
+              "tags": [
+                "skincare",
+                "sunscreen",
+                "marketplace"
+              ]
+            },
+            {
+              "id": "mp-toner",
+              "filename": "skincare-toneuplotion.webp",
+              "description": "Thumbnail toner lotion",
+              "tags": [
+                "skincare",
+                "toner",
+                "marketplace"
+              ]
+            },
+            {
+              "id": "mp-babylotion",
+              "filename": "babylotion.webp",
+              "description": "Baby lotion",
+              "tags": [
+                "baby care",
+                "baby lotion"
+              ]
+            },
+            {
+              "id": "mp-babyoil1",
+              "filename": "babyoil1.webp",
+              "description": "Baby oil",
+              "tags": [
+                "baby care",
+                "baby oil"
+              ]
+            },
+            {
+              "id": "mp-bodyscrub1",
+              "filename": "bodyscrub1.webp",
+              "description": "Body scrub bodycare",
+              "tags": [
+                "bodycare",
+                "scrub"
+              ]
+            },
+            {
+              "id": "mp-casing1",
+              "filename": "casing1.webp",
+              "description": "Casing HP gadget",
+              "tags": [
+                "gadget",
+                "casing hp"
+              ]
+            },
+            {
+              "id": "mp-clay1",
+              "filename": "clay1.webp",
+              "description": "Clay mask skincare",
+              "tags": [
+                "skincare",
+                "clay mask"
+              ]
+            },
+            {
+              "id": "mp-facemist1",
+              "filename": "facemist1.webp",
+              "description": "Face mist skincare",
+              "tags": [
+                "skincare",
+                "face mist"
+              ]
+            },
+            {
+              "id": "mp-facewash1",
+              "filename": "facewash1.webp",
+              "description": "Face wash skincare",
+              "tags": [
+                "skincare",
+                "face wash"
+              ]
+            },
+            {
+              "id": "mp-facialwash1",
+              "filename": "facialwash1.webp",
+              "description": "Face wash skincare",
+              "tags": [
+                "skincare",
+                "face wash"
+              ]
+            },
+            {
+              "id": "mp-foundation1",
+              "filename": "foundation1.webp",
+              "description": "Foundation kosmetik",
+              "tags": [
+                "kosmetik",
+                "foundation"
+              ]
+            },
+            {
+              "id": "mp-gelang1",
+              "filename": "gelang1.webp",
+              "description": "Gelang aksesoris",
+              "tags": [
+                "fashion",
+                "aksesoris"
+              ]
+            },
+            {
+              "id": "mp-hairpowder1",
+              "filename": "hairpowder1.webp",
+              "description": "Hair powder haircare",
+              "tags": [
+                "haircare",
+                "hair powder"
+              ]
+            },
+            {
+              "id": "mp-hoodie1",
+              "filename": "hoodie1.webp",
+              "description": "Hoodie fashion",
+              "tags": [
+                "fashion",
+                "hoodie"
+              ]
+            },
+            {
+              "id": "mp-jilbab",
+              "filename": "jilbab.webp",
+              "description": "Hijab fashion",
+              "tags": [
+                "fashion",
+                "hijab"
+              ]
+            },
+            {
+              "id": "mp-kipasangin1",
+              "filename": "kipasangin1.webp",
+              "description": "Kipas angin",
+              "tags": [
+                "gadget",
+                "kipas angin"
+              ]
+            },
+            {
+              "id": "mp-koper1",
+              "filename": "koper1.webp",
+              "description": "Tas fashion",
+              "tags": [
+                "fashion",
+                "tas"
+              ]
+            },
+            {
+              "id": "mp-lilin1",
+              "filename": "lilin1.webp",
+              "description": "Lilin aromaterapi",
+              "tags": [
+                "lifestyle",
+                "aromaterapi"
+              ]
+            },
+            {
+              "id": "mp-liptint1",
+              "filename": "liptint1.webp",
+              "description": "Lip tint kosmetik",
+              "tags": [
+                "kosmetik",
+                "lip tint"
+              ]
+            },
+            {
+              "id": "mp-makeup1",
+              "filename": "makeup1.webp",
+              "description": "Produk makeup",
+              "tags": [
+                "kosmetik",
+                "makeup"
+              ]
+            },
+            {
+              "id": "mp-moisturizer1",
+              "filename": "moisturizer1.webp",
+              "description": "Moisturizer skincare",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "mp-parfume1",
+              "filename": "parfume1.webp",
+              "description": "Parfum premium",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "mp-parfume2",
+              "filename": "parfume2.webp",
+              "description": "Parfum premium",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "mp-perfume3",
+              "filename": "perfume3.webp",
+              "description": "Parfum premium",
+              "tags": [
+                "parfum",
+                "perfume"
+              ]
+            },
+            {
+              "id": "mp-powerbank1",
+              "filename": "powerbank1.webp",
+              "description": "Powerbank gadget",
+              "tags": [
+                "gadget",
+                "powerbank"
+              ]
+            },
+            {
+              "id": "mp-serum2",
+              "filename": "serum2.webp",
+              "description": "Serum skincare premium",
+              "tags": [
+                "skincare",
+                "serum"
+              ]
+            },
+            {
+              "id": "mp-shirt1",
+              "filename": "shirt1.webp",
+              "description": "Kaos fashion",
+              "tags": [
+                "fashion",
+                "kaos"
+              ]
+            },
+            {
+              "id": "mp-shirt2",
+              "filename": "shirt2.webp",
+              "description": "Kaos fashion",
+              "tags": [
+                "fashion",
+                "kaos"
+              ]
+            },
+            {
+              "id": "mp-slingbag1",
+              "filename": "slingbag1.webp",
+              "description": "Tas fashion",
+              "tags": [
+                "fashion",
+                "tas"
+              ]
+            },
+            {
+              "id": "mp-susncreen1",
+              "filename": "susncreen1.webp",
+              "description": "Sunscreen SPF",
+              "tags": [
+                "skincare",
+                "sunscreen"
+              ]
+            },
+            {
+              "id": "mp-tas1",
+              "filename": "tas1.webp",
+              "description": "Tas fashion",
+              "tags": [
+                "fashion",
+                "tas"
+              ]
+            },
+            {
+              "id": "mp-toner1",
+              "filename": "toner1.webp",
+              "description": "Toner skincare",
+              "tags": [
+                "skincare",
+                "toner"
+              ]
+            },
+            {
+              "id": "mp-toner2",
+              "filename": "toner2.webp",
+              "description": "Toner skincare",
+              "tags": [
+                "skincare",
+                "toner"
+              ]
+            },
+            {
+              "id": "mp-topi1",
+              "filename": "topi1.webp",
+              "description": "Topi fashion",
+              "tags": [
+                "fashion",
+                "topi"
+              ]
+            },
+            {
+              "id": "mp-tumbler1",
+              "filename": "tumbler1.webp",
+              "description": "Tumbler lifestyle",
+              "tags": [
+                "lifestyle",
+                "tumbler"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "food": {
+      "title": "Inspirasi Foto F&B",
+      "basePath": "/",
+      "categories": [
+        {
+          "id": "food-makanan",
+          "name": "Makanan",
+          "icon": "ForkKnife",
+          "photos": [
+            {
+              "id": "fd-crunch-01",
+              "filename": "makanan-crunch.webp",
+              "description": "Snack crunch lifestyle shot",
+              "tags": [
+                "makanan",
+                "snack",
+                "lifestyle"
+              ]
+            },
+            {
+              "id": "fd-crunch-02",
+              "filename": "makanan-crunch2.webp",
+              "description": "Snack crunch editorial",
+              "tags": [
+                "makanan",
+                "snack",
+                "editorial"
+              ]
+            },
+            {
+              "id": "fd-sambal",
+              "filename": "makanan-sambal.webp",
+              "description": "Sambal produk artisanal close-up",
+              "tags": [
+                "makanan",
+                "sambal",
+                "artisanal"
+              ]
+            },
+            {
+              "id": "fd-makanan",
+              "filename": "makanan.webp",
+              "description": "Produk makanan lifestyle",
+              "tags": [
+                "makanan",
+                "lifestyle"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "food-minuman",
+          "name": "Minuman",
+          "icon": "Coffee",
+          "photos": [
+            {
+              "id": "fd-bery",
+              "filename": "minuman-bery.webp",
+              "description": "Minuman berry premium",
+              "tags": [
+                "minuman",
+                "berry",
+                "premium"
+              ]
+            },
+            {
+              "id": "fd-cup",
+              "filename": "minuman-cup.webp",
+              "description": "Minuman cup packaging shot",
+              "tags": [
+                "minuman",
+                "cup",
+                "packaging"
+              ]
+            },
+            {
+              "id": "fd-kaleng",
+              "filename": "minuman-kaleng.webp",
+              "description": "Minuman kaleng lifestyle",
+              "tags": [
+                "minuman",
+                "kaleng",
+                "lifestyle"
+              ]
+            },
+            {
+              "id": "fd-kalengtea",
+              "filename": "minuman-kalengtea.webp",
+              "description": "Minuman teh kaleng premium",
+              "tags": [
+                "minuman",
+                "teh",
+                "kaleng"
+              ]
+            },
+            {
+              "id": "fd-kopi",
+              "filename": "minuman-kopi.webp",
+              "description": "Kopi artisanal pour-over",
+              "tags": [
+                "minuman",
+                "kopi",
+                "artisanal"
+              ]
+            },
+            {
+              "id": "fd-matcha",
+              "filename": "minuman-matcha.webp",
+              "description": "Matcha drink premium aesthetic",
+              "tags": [
+                "minuman",
+                "matcha",
+                "premium"
+              ]
+            },
+            {
+              "id": "fd-botol",
+              "filename": "botol1.webp",
+              "description": "Botol minuman produk shot",
+              "tags": [
+                "minuman",
+                "botol",
+                "produk"
+              ]
+            }
+          ]
+        }
+      ]
     }
   }
 }

@@ -25,7 +25,8 @@ api.interceptors.response.use(
       if (!["/login", "/register"].includes(path)) {
         localStorage.removeItem("feedify_token");
         localStorage.removeItem("feedify_user");
-        window.location.href = "/login";
+        // Dispatch event — AuthContext handles soft redirect via React Router (no full page reload)
+        window.dispatchEvent(new CustomEvent("auth:unauthorized"));
       }
     }
     return Promise.reject(err);

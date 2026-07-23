@@ -13,9 +13,11 @@ function getCachedUser() {
 }
 
 export function AuthProvider({ children }) {
-  // Seed immediately from localStorage so the app renders without waiting for API
+  // Seed immediately from localStorage — no loading flash if user is already cached
   const [user, setUser]       = useState(getCachedUser);
-  const [loading, setLoading] = useState(!!localStorage.getItem("feedify_token"));
+  const [loading, setLoading] = useState(
+    !!localStorage.getItem("feedify_token") && !getCachedUser()
+  );
 
   const loadUser = useCallback(async () => {
     const token = localStorage.getItem("feedify_token");
@@ -49,6 +51,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  // Listen for 401s from any API call — clear auth state and let ProtectedRoute redirect via React Router (no full page reload)
+  useEffect(() => {
+    const handle = () => { setUser(null); };
+    window.addEventListener("auth:unauthorized", handle);
+    return () => window.removeEventListener("auth:unauthorized", handle);
+  }, []);
 
   const login = async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
