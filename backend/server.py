@@ -7317,7 +7317,14 @@ async def upload_manual_payment_proof(order_id: str, body: ManualProofIn, curren
         {"$set": {"proof_photo_base64": photo, "status": "menunggu_verifikasi", "proof_uploaded_at": now_iso()}},
     )
     order["proof_photo_base64"] = photo
-    asyncio.create_task(_notify_telegram_payment_proof(order))
+    # Serverless-safe: AWAIT the Telegram notification instead of fire-and-forget.
+    # On Vercel the function freezes right after responding, which cancels any
+    # create_task() still in flight (that's the empty-message CancelledError in logs).
+    # Best-effort — the proof is already saved, so a Telegram failure never blocks the user.
+    try:
+        await _notify_telegram_payment_proof(order)
+    except Exception as e:
+        logger.error(f"Telegram proof notification failed (non-blocking): {e}")
     return {"ok": True, "status": "menunggu_verifikasi"}
 
 
