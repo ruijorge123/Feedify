@@ -1,7 +1,7 @@
 import { Outlet, NavLink, Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useCredits } from "@/lib/credits";
+import ProductTour from "@/components/ProductTour";
 import api from "@/lib/api";
 import { useMenuLockStatus, menuMode } from "@/lib/menuLock";
 import {
@@ -20,20 +20,22 @@ import {
   Storefront,
   Palette,
   ShieldStar,
-  Lightning,
   FilmSlate,
   Wrench,
   Camera,
   Microphone,
   CaretDown,
+  Package,
+  EyeSlash,
+  SquaresFour,
 } from "@phosphor-icons/react";
 
 const mobileNav = [
-  { to: "/dashboard", label: "Home", icon: HouseSimple, testid: "nav-home" },
-  { to: "/generate/banner", label: "Feed Post", icon: ImageSquare, testid: "nav-banner", lockKey: "banner" },
-  { to: "/studio", label: "Studio", icon: Camera, testid: "nav-studio", lockKey: "studio" },
-  { to: "/generate/carousel", label: "Carousel", icon: Stack, testid: "nav-carousel", lockKey: "carousel" },
-  { to: "/more", label: "More", icon: DotsThreeOutline, testid: "nav-more" },
+  { to: "/dashboard",             label: "Home",           icon: HouseSimple,    testid: "nav-home" },
+  { to: "/generate/banner",       label: "Feed & Banner",  icon: ImageSquare,    testid: "nav-banner",        lockKey: "banner" },
+  { to: "/generate/feed-generator", label: "Feed Gen",     icon: SquaresFour,    testid: "nav-feed-generator", lockKey: "feed-generator" },
+  { to: "/studio",                label: "Studio",         icon: Camera,         testid: "nav-studio",        lockKey: "studio" },
+  { to: "/more",                  label: "More",           icon: DotsThreeOutline, testid: "nav-more" },
 ];
 
 const sidebarSections = [
@@ -43,23 +45,19 @@ const sidebarSections = [
     ],
   },
   {
-    title: "Generate",
+    title: "Toolkit",
     items: [
-      { to: "/generate/banner", label: "Feed Post", icon: ImageSquare, testid: "nav-banner", lockKey: "banner" },
+      { to: "/generate/banner", label: "Feed & Banner", icon: ImageSquare, testid: "nav-banner", lockKey: "banner" },
+      { to: "/generate/feed-generator", label: "Feed Generator", icon: SquaresFour, testid: "nav-feed-generator", lockKey: "feed-generator" },
       { to: "/studio", label: "Studio", icon: Camera, testid: "nav-studio", lockKey: "studio" },
       { to: "/generate/carousel", label: "Carousel", icon: Stack, testid: "nav-carousel", lockKey: "carousel" },
-      { to: "/generate/copywriting", label: "Copywriting", icon: PenNib, testid: "nav-copy", lockKey: "copywriting" },
-      { to: "/generate/reels", label: "Reels", icon: FilmSlate, testid: "nav-reels", lockKey: "reels" },
-      { to: "/generate/talking-avatar", label: "Talking Avatar", icon: Microphone, testid: "nav-talking-avatar", lockKey: "talking-avatar" },
       { to: "/generate/marketplace", label: "Marketplace", icon: Storefront, testid: "nav-marketplace", lockKey: "marketplace" },
-      { to: "/generate/food", label: "F&B Menu", icon: ForkKnife, testid: "nav-food", adminOnly: true, lockKey: "food" },
-    ],
-  },
-  {
-    title: "Planning & QA",
-    items: [
+      { to: "/generate/copywriting", label: "Copywriting", icon: PenNib, testid: "nav-copy", lockKey: "copywriting" },
       { to: "/growth-consultant", label: "Growth Consultant", icon: Brain, testid: "nav-growth", lockKey: "growth-consultant" },
       { to: "/calendar", label: "Calendar Planner", icon: CalendarBlank, testid: "nav-calendar", lockKey: "calendar" },
+      { to: "/generate/reels", label: "Reels", icon: FilmSlate, testid: "nav-reels", lockKey: "reels" },
+      { to: "/generate/talking-avatar", label: "Video Presenter", icon: Microphone, testid: "nav-talking-avatar", lockKey: "talking-avatar" },
+      { to: "/generate/food", label: "F&B Menu", icon: ForkKnife, testid: "nav-food", adminOnly: true, lockKey: "food" },
     ],
   },
   {
@@ -76,13 +74,12 @@ export default function AppShell() {
   const location = useLocation();
   const [activeBrand, setActiveBrand] = useState(null);
   const [collapsedSections, setCollapsedSections] = useState({});
-  const { credits } = useCredits();
   const lockStatus = useMenuLockStatus();
   const isAdmin = user?.role === "admin";
   const isHidden = (item) => !isAdmin && item.lockKey && menuMode(lockStatus, item.lockKey) === "hidden";
   const isMaintenance = (item) => item.lockKey && menuMode(lockStatus, item.lockKey) === "maintenance";
+  const isHiddenAdmin = (item) => isAdmin && item.lockKey && menuMode(lockStatus, item.lockKey) === "hidden";
   const toggleSection = (title) => setCollapsedSections(prev => ({ ...prev, [title]: !prev[title] }));
-  const balance = credits?.balance ?? credits?.credits_remaining ?? null;
 
   const fetchBrand = () => {
     api.get("/brand-profile").then(({ data }) => setActiveBrand(data)).catch(() => {});
@@ -127,9 +124,10 @@ export default function AppShell() {
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
           {sidebarSections.map((section, si) => {
             const eligible = section.items.filter(item => (!item.adminOnly || isAdmin) && !isHidden(item));
-            const activeItems = eligible.filter(i => !isMaintenance(i));
+            const activeItems = eligible.filter(i => !isMaintenance(i) && !isHiddenAdmin(i));
             const maintItems  = eligible.filter(i =>  isMaintenance(i));
-            const sorted = [...activeItems, ...maintItems];
+            const hiddenAdminItems = eligible.filter(i => isHiddenAdmin(i));
+            const sorted = [...activeItems, ...maintItems, ...hiddenAdminItems];
             const isCollapsed = !!collapsedSections[section.title];
 
             return (
@@ -161,6 +159,7 @@ export default function AppShell() {
                   <div className="space-y-0.5">
                     {sorted.map((item) => {
                       const underMaintenance = isMaintenance(item);
+                      const underHiddenAdmin = isHiddenAdmin(item);
                       return (
                         <NavLink
                           key={item.to}
@@ -168,7 +167,7 @@ export default function AppShell() {
                           data-testid={item.testid}
                           className={({ isActive }) =>
                             `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                              underMaintenance
+                              underMaintenance || underHiddenAdmin
                                 ? "opacity-50 text-brand-cream/55 hover:bg-white/8 hover:opacity-70"
                                 : isActive
                                   ? "bg-brand-gold/20 text-brand-gold border border-brand-gold/25"
@@ -183,6 +182,11 @@ export default function AppShell() {
                               <Wrench size={9} weight="fill" /> maint
                             </span>
                           )}
+                          {underHiddenAdmin && (
+                            <span className="flex items-center gap-1 bg-red-500/20 text-red-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-red-500/25 flex-shrink-0">
+                              <EyeSlash size={9} weight="fill" /> hidden
+                            </span>
+                          )}
                         </NavLink>
                       );
                     })}
@@ -193,19 +197,7 @@ export default function AppShell() {
           })}
         </nav>
 
-        {/* Credit badge */}
-        <Link to="/credits" className="mx-3 mb-1 flex items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-brand-gold/15 hover:bg-brand-gold/25 border border-brand-gold/25 transition-all" data-testid="sidebar-credits">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-brand-gold/25 flex items-center justify-center flex-shrink-0">
-              <Lightning size={14} weight="fill" className="text-brand-gold" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-brand-cream">{balance !== null ? `${balance} kredit` : "—"}</div>
-              <div className="text-[9px] text-brand-cream/40 leading-none">tidak expired</div>
-            </div>
-          </div>
-          <span className="text-[9px] font-bold text-brand-gold bg-brand-gold/20 px-2 py-0.5 rounded-full">+ Beli</span>
-        </Link>
+
 
         {/* Bottom */}
         <div className="p-3 border-t border-white/10 space-y-0.5">
@@ -243,6 +235,18 @@ export default function AppShell() {
             <SignOut size={18} />
             Keluar
           </button>
+          <NavLink
+            to="/products"
+            data-testid="nav-products"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                isActive ? "bg-brand-gold/20 text-brand-gold border border-brand-gold/25" : "text-brand-cream/70 hover:bg-white/10 hover:text-brand-cream"
+              }`
+            }
+          >
+            <Package size={18} weight={location.pathname === "/products" ? "fill" : "regular"} />
+            Produk
+          </NavLink>
 
           {activeBrand && (
             <NavLink to="/settings" className="mx-1 mt-1 flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/10 transition-all group">
@@ -283,10 +287,7 @@ export default function AppShell() {
           </div>
         </NavLink>
         <div className="flex items-center gap-2">
-          <Link to="/credits" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand-gold/20 border border-brand-gold/30 text-brand-cream text-xs font-bold" data-testid="mobile-credits-badge">
-            <Lightning size={12} weight="fill" className="text-brand-gold" />
-            {balance !== null ? balance : "—"}
-          </Link>
+          
           <NavLink
             to="/settings"
             className="h-9 w-9 rounded-full bg-white/15 flex items-center justify-center text-brand-cream"
@@ -315,25 +316,30 @@ export default function AppShell() {
           {mobileNav.filter(item => !isHidden(item)).map((item) => {
             const isActive = location.pathname === item.to;
             const underMaintenance = isMaintenance(item);
-            const maintenanceIcon = underMaintenance && (
+            const underHiddenAdmin = isHiddenAdmin(item);
+            const statusIcon = underMaintenance ? (
               <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-amber-500 border-2 border-brand flex items-center justify-center">
                 <Wrench size={7} weight="fill" className="text-white" />
               </span>
-            );
+            ) : underHiddenAdmin ? (
+              <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-brand flex items-center justify-center">
+                <EyeSlash size={7} weight="fill" className="text-white" />
+              </span>
+            ) : null;
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
                 data-testid={`${item.testid}-mobile`}
                 className={`flex flex-col items-center justify-center gap-1 py-1 rounded-xl text-[10px] font-medium transition-all btn-touch ${
-                  underMaintenance && !isAdmin ? "text-brand-cream/55" : isActive ? "text-brand-gold" : "text-brand-cream/55"
+                  (underMaintenance || underHiddenAdmin) ? "text-brand-cream/40 opacity-60" : isActive ? "text-brand-gold" : "text-brand-cream/55"
                 }`}
               >
                 <div className={`relative h-9 w-9 rounded-xl flex items-center justify-center transition-all ${
-                  isActive && !underMaintenance ? "bg-white/15" : "bg-transparent"
+                  isActive && !underMaintenance && !underHiddenAdmin ? "bg-white/15" : "bg-transparent"
                 }`}>
                   <item.icon size={20} weight={isActive ? "fill" : "regular"} />
-                  {maintenanceIcon}
+                  {statusIcon}
                 </div>
                 <span className="leading-none">{item.label}</span>
               </NavLink>
@@ -341,6 +347,9 @@ export default function AppShell() {
           })}
         </div>
       </nav>
+
+      {/* Product Tour — auto on first login for new users */}
+      <ProductTour />
     </div>
   );
 }
