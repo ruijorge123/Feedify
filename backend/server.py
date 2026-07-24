@@ -30,12 +30,6 @@ try:
 except ImportError:
     _CERTIFI_CA = None
 
-try:
-    from pywebpush import webpush, WebPushException
-    _WEBPUSH_AVAILABLE = True
-except ImportError:
-    _WEBPUSH_AVAILABLE = False
-
 # Reels video generation modules (optional — requires FAL_KEY + OPENAI_API_KEY)
 try:
     from video_service import run_reels_pipeline
@@ -100,9 +94,11 @@ SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USER = os.environ.get('SMTP_USER', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 SMTP_FROM = os.environ.get('SMTP_FROM', '')
-VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
-VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '').replace('\\n', '\n')
-VAPID_EMAIL = os.environ.get('VAPID_EMAIL', 'mailto:support@feedify.id')
+# OneSignal — web push for scheduled reminders. Replaces the old VAPID/pywebpush flow above;
+# scheduling delivery is delegated to OneSignal's own `send_after` (serverless-safe — no
+# always-on polling loop needed, unlike the old _reminder_loop).
+ONESIGNAL_APP_ID = os.environ.get('ONESIGNAL_APP_ID', '')
+ONESIGNAL_REST_API_KEY = os.environ.get('ONESIGNAL_REST_API_KEY', '')
 
 # Manual transfer checkout (Lifetime plan) + Telegram admin bot
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
@@ -6606,20 +6602,36 @@ Kembalikan JSON array dengan {count} objek, masing-masing:
 
 # ============= NOTIFICATION HELPERS =============
 
-def _send_web_push(subscription_info: dict, title: str, body: str) -> bool:
-    """Send a web push notification (synchronous — run in executor)."""
-    if not _WEBPUSH_AVAILABLE or not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+async def _send_onesignal_notification(user_id: str, title: str, body: str, send_after: Optional[str] = None) -> bool:
+    """Send (or schedule) a push notification via OneSignal, targeted at a Feedify user by
+    external_id (set via OneSignal.login() on the frontend — see AuthContext.jsx).
+    `send_after` (ISO 8601) delegates the actual timed delivery to OneSignal's own
+    infrastructure — no backend polling loop needed, so this works fine on serverless."""
+    if not ONESIGNAL_APP_ID or not ONESIGNAL_REST_API_KEY:
         return False
+    payload = {
+        "app_id": ONESIGNAL_APP_ID,
+        "include_aliases": {"external_id": [str(user_id)]},
+        "target_channel": "push",
+        "headings": {"en": title},
+        "contents": {"en": body},
+    }
+    if send_after:
+        payload["send_after"] = send_after
     try:
-        webpush(
-            subscription_info=subscription_info,
-            data=json.dumps({"title": title, "body": body, "icon": "/logo192.png", "badge": "/logo192.png"}),
-            vapid_private_key=VAPID_PRIVATE_KEY,
-            vapid_claims={"sub": VAPID_EMAIL},
-        )
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://api.onesignal.com/notifications",
+                json=payload,
+                headers={"Authorization": f"Key {ONESIGNAL_REST_API_KEY}", "Content-Type": "application/json"},
+                timeout=15,
+            )
+        if resp.status_code >= 400:
+            logger.warning(f"OneSignal notification failed: {resp.status_code} {resp.text[:300]}")
+            return False
         return True
     except Exception as e:
-        logger.warning(f"Web push failed: {e}")
+        logger.warning(f"OneSignal notification failed: {e}")
         return False
 
 
@@ -6664,82 +6676,6 @@ async def _migrate_compress_payment_proofs():
             logger.info(f"Compressed {compressed} oversized payment proof photo(s).")
     except Exception as e:
         logger.warning(f"Payment proof migration failed: {e}")
-
-
-async def _reminder_loop():
-    """Background task: check every 60s for due reminders, send web push."""
-    await asyncio.sleep(10)  # wait for server to fully start
-    loop = asyncio.get_event_loop()
-    while True:
-        try:
-            now_str = datetime.now(timezone.utc).isoformat()
-            due = await db.scheduled_posts.find({
-                "reminder_sent": False,
-                "reminder_at": {"$lte": now_str},
-                "status": {"$in": ["scheduled", "draft"]},
-            }, {"_id": 0}).to_list(50)
-
-            for post in due:
-                await db.scheduled_posts.update_one(
-                    {"id": post["id"]},
-                    {"$set": {"reminder_sent": True}},
-                )
-                # Send push notification to the post owner
-                sub_doc = await db.push_subscriptions.find_one({"user_id": post.get("user_id")})
-                if sub_doc and sub_doc.get("subscription"):
-                    title = f"⏰ Reminder: {post.get('title', 'Konten')}"
-                    body_text = f"Jadwal posting kamu hari ini pukul {post.get('post_time', '')}. Ayo siapkan!"
-                    await loop.run_in_executor(
-                        None, _send_web_push, sub_doc["subscription"], title, body_text
-                    )
-                logger.info(f"Reminder processed for post {post['id']}")
-        except Exception as e:
-            logger.error(f"Reminder loop error: {e}")
-        await asyncio.sleep(60)
-
-
-# ============= PUSH NOTIFICATION ENDPOINTS =============
-
-@api_router.get("/push/vapid-public-key")
-async def get_vapid_public_key():
-    """Return the VAPID public key for the frontend to subscribe."""
-    if not VAPID_PUBLIC_KEY:
-        raise HTTPException(status_code=503, detail="Push notifications not configured")
-    return {"public_key": VAPID_PUBLIC_KEY}
-
-
-@api_router.post("/push/subscribe")
-async def push_subscribe(request: Request, current_user: dict = Depends(get_current_user)):
-    """Save or update a user's push subscription."""
-    body = await request.json()
-    subscription = body.get("subscription")
-    if not subscription or not subscription.get("endpoint"):
-        raise HTTPException(status_code=400, detail="Subscription tidak valid")
-
-    await db.push_subscriptions.update_one(
-        {"user_id": current_user["id"]},
-        {"$set": {
-            "user_id": current_user["id"],
-            "subscription": subscription,
-            "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
-        }},
-        upsert=True,
-    )
-    return {"ok": True}
-
-
-@api_router.delete("/push/unsubscribe")
-async def push_unsubscribe(current_user: dict = Depends(get_current_user)):
-    """Remove user's push subscription."""
-    await db.push_subscriptions.delete_one({"user_id": current_user["id"]})
-    return {"ok": True}
-
-
-@api_router.get("/push/subscription-status")
-async def push_subscription_status(current_user: dict = Depends(get_current_user)):
-    """Check if user has an active push subscription."""
-    doc = await db.push_subscriptions.find_one({"user_id": current_user["id"]})
-    return {"subscribed": bool(doc)}
 
 
 # ============= SCHEDULING ENDPOINTS =============
@@ -6789,6 +6725,20 @@ async def create_schedule(payload: SchedulePostIn, current_user: dict = Depends(
         "created_at": now_iso(),
     }
     await db.scheduled_posts.insert_one(doc)
+
+    # Schedule the reminder with OneSignal right away — send_after delegates the actual
+    # timed delivery to OneSignal's infrastructure, so no backend polling loop is needed
+    # (works the same whether the backend is a persistent server or serverless/Vercel).
+    reminder_ok = await _send_onesignal_notification(
+        current_user["id"],
+        f"⏰ Reminder: {payload.title or 'Konten'}",
+        f"Jadwal posting kamu hari ini pukul {payload.post_time}. Ayo siapkan!",
+        send_after=reminder_at,
+    )
+    if reminder_ok:
+        await db.scheduled_posts.update_one({"id": doc_id}, {"$set": {"reminder_sent": True}})
+        doc["reminder_sent"] = True
+
     doc.pop("_id", None)
     return doc
 
@@ -8872,7 +8822,6 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    asyncio.create_task(_reminder_loop())
     asyncio.create_task(_migrate_compress_product_photos())
     asyncio.create_task(_migrate_compress_payment_proofs())
     _start_market_cache_cleanup()
