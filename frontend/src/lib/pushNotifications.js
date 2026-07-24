@@ -29,12 +29,12 @@ export function unlinkOneSignalUser() {
 }
 
 export async function subscribeToPush() {
-  return withOneSignal(async (OneSignal) => {
-    const granted = await OneSignal.Notifications.requestPermission();
-    if (!granted) throw new Error("Izin notifikasi ditolak");
-    await OneSignal.User.PushSubscription.optIn();
-    return true;
-  });
+  // optIn() alone shows the native permission prompt (if not already granted) AND
+  // subscribes in one step — calling requestPermission() first was a redundant extra
+  // round-trip that just made this feel slow for no benefit.
+  await withOneSignal((OneSignal) => OneSignal.User.PushSubscription.optIn());
+  if (Notification.permission !== "granted") throw new Error("Izin notifikasi ditolak");
+  return true;
 }
 
 export async function unsubscribeFromPush() {
@@ -45,13 +45,13 @@ export async function getPushStatus() {
   if (!("Notification" in window)) {
     return { supported: false, subscribed: false, permission: "default" };
   }
+  // Notification.permission is a plain synchronous browser API — reading it directly
+  // avoids waiting on the OneSignal SDK queue just for this part.
+  const permission = Notification.permission;
   try {
-    return await withOneSignal(async (OneSignal) => ({
-      supported: true,
-      subscribed: !!OneSignal.User.PushSubscription.optedIn,
-      permission: OneSignal.Notifications.permissionNative || Notification.permission,
-    }));
+    const subscribed = await withOneSignal((OneSignal) => !!OneSignal.User.PushSubscription.optedIn);
+    return { supported: true, subscribed, permission };
   } catch {
-    return { supported: true, subscribed: false, permission: Notification.permission };
+    return { supported: true, subscribed: false, permission };
   }
 }
