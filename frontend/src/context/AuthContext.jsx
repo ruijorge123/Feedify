@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import api from "@/lib/api";
 import { resetCreditsCache } from "@/lib/credits";
 import { resetConfigCache } from "@/lib/config";
+import { linkOneSignalUser, unlinkOneSignalUser } from "@/lib/pushNotifications";
 
 const AuthContext = createContext(null);
 
@@ -52,6 +53,12 @@ export function AuthProvider({ children }) {
     loadUser();
   }, [loadUser]);
 
+  // Tag this browser's OneSignal subscription with our user id whenever it changes,
+  // so scheduled reminders can be targeted straight to this account.
+  useEffect(() => {
+    if (user?.id) linkOneSignalUser(user.id);
+  }, [user?.id]);
+
   // Listen for 401s from any API call — clear auth state and let ProtectedRoute redirect via React Router (no full page reload)
   useEffect(() => {
     const handle = () => { setUser(null); };
@@ -87,6 +94,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    unlinkOneSignalUser();
     localStorage.clear();
     sessionStorage.clear();
     resetCreditsCache();

@@ -47,7 +47,8 @@ import {
   ChatCircleDots,
 } from "@phosphor-icons/react";
 import { Switch } from "@/components/ui/switch";
-import ProductTour, { resetTour } from "@/components/ProductTour";
+import { resetTour } from "@/components/ProductTour";
+import { triggerTour } from "@/lib/tourTrigger";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
@@ -1079,7 +1080,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [roleDialog, setRoleDialog] = useState({ open: false, target: null });
   const [detailDrawer, setDetailDrawer] = useState({ open: false, userId: null });
-  const [tourOpen, setTourOpen] = useState(false);
 
   const LIMIT = 20;
 
@@ -1126,7 +1126,7 @@ export default function AdminPage() {
           <p className="text-xs text-stone-500 mt-0.5">Preview tour yang dilihat user baru saat pertama login</p>
         </div>
         <button
-          onClick={() => { resetTour(); setTourOpen(true); }}
+          onClick={() => { resetTour(); triggerTour(); }}
           className="flex-shrink-0 flex items-center gap-2 bg-brand text-brand-cream text-sm font-semibold px-4 py-2 rounded-full hover:bg-brand-light transition-colors"
           data-testid="admin-preview-tour"
         >
@@ -1339,7 +1339,6 @@ export default function AdminPage() {
         userId={detailDrawer.userId}
         onClose={() => setDetailDrawer({ open: false, userId: null })}
       />
-      <ProductTour forceOpen={tourOpen} onClose={() => setTourOpen(false)} />
     </div>
   );
 }

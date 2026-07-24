@@ -7,18 +7,11 @@ import {
 } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
+import DebugJsonButton from "@/components/DebugJsonButton";
 import InspirationGallery from "@/components/InspirationGallery";
 import { toast } from "react-toastify";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-const PHOTOGRAPHY_STYLES = [
-  { key: "commercial", label: "Commercial", desc: "Foto iklan profesional, pencahayaan studio terkontrol.", recommended: true },
-  { key: "lifestyle",  label: "Lifestyle",  desc: "Suasana natural, interaksi nyata, cahaya ambient." },
-  { key: "luxury",     label: "Luxury",     desc: "Dramatis, bayangan dalam, premium. Setara Dior/Chanel." },
-  { key: "editorial",  label: "Editorial",  desc: "Kreatif, berbasis narasi. Kualitas majalah Vogue." },
-  { key: "minimal",    label: "Minimal",    desc: "Studio bersih, ruang kosong maksimal. Presisi ala Apple." },
-];
 
 const COMPOSITIONS = [
   { key: "hero_product",    label: "Hero Product",    desc: "Produk sebagai pusat visual, dampak maksimal." },
@@ -98,8 +91,7 @@ export default function StudioPage() {
   const [referenceImg,   setReferenceImg]   = useState(null);
   const [galleryOpen,    setGalleryOpen]    = useState(false);
 
-  // Photography settings
-  const [photoStyle,     setPhotoStyle]     = useState("commercial");
+  // Photography settings — style now follows the picked inspiration photo, not a manual dropdown
   const [composition,    setComposition]    = useState("hero_product");
 
   // Model state
@@ -149,7 +141,7 @@ export default function StudioPage() {
         product_id:           selectedProductId || undefined,
         product_category:     selectedProduct?.category || "general",
         business_goal:        "brand_campaign",
-        photography_style:    photoStyle,
+        reference_image_base64: referenceImg ? referenceImg.split(",")[1] : undefined,
         composition,
         model_type:           resolvedModelType(),
         wearing_product:      isFashion && modelEnabled,
@@ -171,7 +163,6 @@ export default function StudioPage() {
   };
 
   const catLabel   = selectedProduct?.category || "general";
-  const styleLabel = PHOTOGRAPHY_STYLES.find(s => s.key === photoStyle)?.label || photoStyle;
   const compLabel  = activeCompositions.find(c => c.key === composition)?.label || composition;
 
   return (
@@ -325,39 +316,10 @@ export default function StudioPage() {
             </button>
           </div>
 
-          {/* ③ Photography Style */}
+          {/* ③ Komposisi */}
           <div className="feedify-card p-5 space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</div>
-              <div>
-                <h3 className="font-heading text-base font-bold text-brand">Photography Style</h3>
-                <p className="text-xs text-stone-500">Arah visual & estetika keseluruhan foto</p>
-              </div>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {PHOTOGRAPHY_STYLES.map((s) => (
-                <button key={s.key} type="button" onClick={() => setPhotoStyle(s.key)}
-                  data-testid={`studio-style-${s.key}`}
-                  className={`relative p-4 rounded-xl border text-left transition-all ${
-                    photoStyle === s.key
-                      ? "border-brand bg-brand/5 shadow-sm"
-                      : "border-stone-100 bg-white hover:border-brand/30"
-                  }`}>
-                  {s.recommended && (
-                    <span className="absolute top-2 right-2 text-[7px] font-bold px-1.5 py-0.5 rounded-full bg-brand-gold/20 text-brand border border-brand-gold/30">⭐ Recommended</span>
-                  )}
-                  <div className={`font-heading font-bold text-sm mb-1 ${photoStyle === s.key ? "text-brand" : "text-stone-800"}`}>{s.label}</div>
-                  <div className="text-[11px] text-stone-500 leading-relaxed pr-12">{s.desc}</div>
-                  {photoStyle === s.key && <CheckCircle size={14} weight="fill" className="text-brand absolute bottom-3 right-3" />}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ④ Komposisi */}
-          <div className="feedify-card p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">4</div>
               <div>
                 <h3 className="font-heading text-base font-bold text-brand">Komposisi</h3>
                 <p className="text-xs text-stone-500">
@@ -533,6 +495,9 @@ export default function StudioPage() {
                 dashboardType="studio"
                 title={selectedProduct?.name || "Studio"}
               />
+              <div className="mt-3">
+                <DebugJsonButton data={promptResult?.prompt_json} title="studio-prompt.json" />
+              </div>
             </div>
           )}
 
@@ -560,7 +525,7 @@ export default function StudioPage() {
               </div>
             )}
             {[
-              ["Style",     styleLabel],
+              ["Gaya foto", referenceImg ? "Ikuti foto inspirasi" : "Belum pilih foto inspirasi"],
               ["Komposisi", compLabel],
               ["Model",     modelEnabled ? (modelGender === "wanita" ? "Wanita" : "Pria") + (modelStyle ? ` · ${MODEL_STYLES.find(s=>s.id===modelStyle)?.label}` : "") : "Tanpa model"],
             ].map(([label, value]) => (

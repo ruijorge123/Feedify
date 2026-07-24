@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { copyToClipboard, openChatGPT } from "@/lib/chatgpt";
 import ChatGptImageSteps from "@/components/ChatGptImageSteps";
 import PhotoPrepBlock from "@/components/PhotoPrepBlock";
+import DebugJsonButton from "@/components/DebugJsonButton";
 import {
   SquaresFour,
   Package,
@@ -275,6 +276,9 @@ export default function FeedGeneratorPage() {
           </div>
         </div>
         <PromptStepper prompts={result.prompts || []} onReset={() => setResult(null)} productPhoto={selectedProduct?.photo_base64 || null} />
+        <div className="mt-3">
+          <DebugJsonButton data={result.prompts} title="feed-generator-prompts.json" />
+        </div>
       </div>
     );
   }

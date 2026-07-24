@@ -351,6 +351,7 @@ class StudioIn(BaseModel):
     product_id: Optional[str] = None                # product library ID — auto-fills category/name
     product_category: str = "general"               # general|fashion|skincare|parfum|tas|sepatu|aksesori|fnb|elektronik
     business_goal: str = "brand_campaign"           # marketplace|social_media|brand_campaign|product_launch|website_banner|advertisement|packaging
+    reference_image_base64: Optional[str] = None    # inspiration photo picked from gallery — style follows this instead of a manual dropdown
     photography_style: str = "commercial"           # commercial|lifestyle|luxury|editorial|minimal
     composition: str = "hero_product"               # hero_product|flat_lay|floating|macro_detail|closeup|holding_product|splash|symmetrical|rule_of_thirds|eye_level|top_down|45_degree|low_angle|high_angle|full_body|three_quarter|lookbook|detail_texture|sitting|walking
     model_type: str = "no_model"                   # no_model|female|hijab_female|male|couple|family
@@ -932,8 +933,10 @@ def _natural_feed(j: dict) -> str:
     elif not has_reference:
         p += "Background: clean, elegant lifestyle scene with natural props that match the brand palette. "
 
-    # Composition
-    if composition:
+    # Composition — skip when a reference photo is present: the "adopt its composition"
+    # instruction above (has_reference/reference_composition block) already covers this, and a
+    # generic preset composition line here would contradict it instead of reinforcing it.
+    if composition and not has_reference:
         p += f"Composition: {composition}. "
 
     # Text overlays — brand identity must be visible
@@ -1774,14 +1777,32 @@ def _natural_studio(j: dict) -> str:
 
 
 def _append_reference_hint(prompt: str, has_reference: bool) -> str:
+    """Instruct the model (ChatGPT, at generation time) to analyze the attached reference
+    photo itself — no backend vision API call needed, and no extra round-trip for the user
+    (one paste, one send, one reply). Forces the analysis to be written out as REAL visible
+    text in the reply (not "silently"/"for yourself") before the image — an unstated internal
+    step is easy for the model to skip; a step it must actually produce as output text is not.
+    Both the written analysis and the image come back in that same single response."""
     if not has_reference:
         return prompt
-    return prompt + (
-        " IMPORTANT: A reference image is provided as visual inspiration for composition, mood, and styling. "
-        "Match the reference's composition, lighting style, framing, and overall aesthetic closely. "
-        "However, replace any product/text/branding in the reference with the brand-specific elements above "
-        "— keep brand colors, headline text, CTA, and product identity as specified, but adopt the reference's visual approach."
+    step1 = (
+        "BEFORE GENERATING, WRITE OUT YOUR ANALYSIS OF THE ATTACHED REFERENCE PHOTO AS TEXT IN YOUR REPLY "
+        "(a short paragraph, visible to the user) — do not skip this, do not just think it silently. Cover: "
+        "(1) composition — product position, framing, negative space; "
+        "(2) camera angle — eye-level, 3/4 angle, overhead, low-angle, etc.; "
+        "(3) lighting — direction, quality, shadows (soft side-light, backlit, top-down, etc.); "
+        "(4) mood — e.g. fresh, luxurious, playful, warm, clinical; "
+        "(5) background/surface — texture and style of the backdrop; "
+        "(6) props — any objects present and their placement; "
+        "(7) any visible text or layout style.\n\n"
+        "THEN, in the SAME reply, generate the image — using the exact photographic style, composition, "
+        "camera angle, lighting and mood you just wrote down. Follow the brief below for what to actually "
+        "put in the frame — replace any product/text/branding from the reference with the brand-specific "
+        "elements specified there (keep brand colors, headline text, CTA, and product identity as "
+        "specified), but the *photographic execution* must match your own written analysis precisely.\n\n"
+        "── BRIEF ──\n"
     )
+    return step1 + prompt
 
 
 def _openai_image_sync(prompt: str, aspect_ratio: str = "1:1") -> str:
@@ -4872,32 +4893,9 @@ async def preview_banner_prompt(payload: BannerPromptIn, current_user: dict = De
             if not payload.product_photo_base64 and product.get("photo_base64"):
                 payload.product_photo_base64 = product["photo_base64"]
 
-    # Run deep inspiration analysis — cap at 15 s so the endpoint never hangs
-    inspiration_analysis: dict = {}
-    if payload.reference_image_base64:
-        try:
-            inspiration_analysis = await asyncio.wait_for(
-                _analyze_inspiration_deep(payload.reference_image_base64), timeout=15.0
-            )
-        except asyncio.TimeoutError:
-            logger.warning("Inspiration analysis timed out — proceeding without it")
-            inspiration_analysis = {}
-        # Extract headline from text_overlay — only if no headline was provided
-        if not payload.headline and inspiration_analysis.get("text_overlay"):
-            payload.headline = inspiration_analysis["text_overlay"]
-        # Inject inspiration visual analysis into composition/lighting/style
-        if inspiration_analysis.get("composition"):
-            payload.composition_style = inspiration_analysis["composition"]
-        if inspiration_analysis.get("lighting"):
-            payload.lighting = inspiration_analysis["lighting"]
-        if inspiration_analysis.get("visual_style") and payload.style_preset == "Minimal Clean":
-            payload.style_preset = inspiration_analysis["visual_style"]
-
+    # Reference photo analysis happens inside ChatGPT itself (see _append_reference_hint) —
+    # no backend vision API call, so this stays free regardless of usage volume.
     prompt_json = _build_banner_prompt(payload, brand, product=product)
-
-    # Attach inspiration analysis to the output JSON so ChatGPT gets the full picture
-    if inspiration_analysis:
-        prompt_json["inspiration_analysis"] = inspiration_analysis
 
     natural_prompt = _build_natural_prompt(prompt_json)
     natural_prompt = _append_reference_hint(natural_prompt, bool(payload.reference_image_base64))
@@ -4906,7 +4904,6 @@ async def preview_banner_prompt(payload: BannerPromptIn, current_user: dict = De
         "natural_prompt": natural_prompt,
         "has_reference_image": bool(payload.reference_image_base64),
         "product": {k: v for k, v in product.items() if k != "photo_base64"} if product else None,
-        "inspiration_analysis": inspiration_analysis,
     }
 
 
@@ -4921,33 +4918,18 @@ async def generate_banner(payload: BannerPromptIn, current_user: dict = Depends(
     prompt_obj = _build_banner_prompt(payload, brand)
 
     # product_photo_base64 = actual product to preserve (locked, used for image edit)
-    # reference_image_base64 = style/composition inspiration (analyzed by vision, NOT used as edit image)
+    # reference_image_base64 = style/composition inspiration — described via text instruction
+    # (_append_reference_hint) instead of a paid vision API call; gpt-image-1 reads the
+    # instruction + the reference image itself (attached below) to match the style.
     product_img = payload.product_photo_base64
 
-    # Run vision analysis (reference) + background removal (product) in PARALLEL to save time
-    parallel_tasks = []
-    if payload.reference_image_base64:
-        parallel_tasks.append(_analyze_reference_composition(payload.reference_image_base64))
-    if product_img:
-        parallel_tasks.append(_remove_background(product_img))
-
-    reference_composition = ""
     cleaned_image = None
-    if parallel_tasks:
-        results = await asyncio.gather(*parallel_tasks, return_exceptions=True)
-        idx = 0
-        if payload.reference_image_base64:
-            reference_composition = results[idx] if not isinstance(results[idx], Exception) else ""
-            idx += 1
-        if product_img:
-            cleaned_image = results[idx] if not isinstance(results[idx], Exception) else None
-
-    # Inject reference composition into prompt so model knows exactly how to stage the scene
-    if reference_composition:
-        prompt_obj["reference_composition"] = reference_composition
+    if product_img:
+        cleaned_image = await _remove_background(product_img)
 
     try:
         natural_prompt = _build_natural_prompt(prompt_obj)
+        natural_prompt = _append_reference_hint(natural_prompt, bool(payload.reference_image_base64))
         if cleaned_image:
             image_b64 = await _call_openai_image_edit(natural_prompt, payload.aspect_ratio, cleaned_image)
         else:
@@ -4998,9 +4980,11 @@ async def preview_carousel_prompt(payload: CarouselPromptIn, current_user: dict 
     """Return structured prompt JSON for all slides without generating images. No credits consumed."""
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
     prompt_obj = _build_carousel_prompts(payload, brand)
-    # Inject natural_prompt into each slide so frontend can copy directly
+    has_reference = bool(payload.reference_image_base64)
+    # Inject natural_prompt into each slide so frontend can copy directly.
+    # Reference photo (if any) is analyzed by ChatGPT itself at generation time — no vision API call.
     for slide in prompt_obj.get("slides", []):
-        slide["natural_prompt"] = _build_natural_prompt(slide)
+        slide["natural_prompt"] = _append_reference_hint(_build_natural_prompt(slide), has_reference)
     return {"prompt_json": prompt_obj}
 
 
@@ -6326,7 +6310,9 @@ async def studio_preview(payload: StudioIn, current_user: dict = Depends(get_cur
             })
     prompt_obj = _build_studio_prompt(payload)
     natural = _natural_studio(prompt_obj)
-    return {"prompt_json": prompt_obj, "natural_prompt": natural}
+    # Reference photo (if any) is analyzed by ChatGPT itself at generation time — no vision API call.
+    natural = _append_reference_hint(natural, bool(payload.reference_image_base64))
+    return {"prompt_json": prompt_obj, "natural_prompt": natural, "has_reference_image": bool(payload.reference_image_base64)}
 
 
 @api_router.post("/studio/generate")
@@ -6337,6 +6323,7 @@ async def studio_generate(payload: StudioIn, current_user: dict = Depends(get_cu
 
     prompt_obj = _build_studio_prompt(payload)
     natural = _natural_studio(prompt_obj)
+    natural = _append_reference_hint(natural, bool(payload.reference_image_base64))
 
     # Background removal — run once before the generation loop
     product_image = None
@@ -6655,6 +6642,28 @@ async def _migrate_compress_product_photos():
             logger.info(f"Compressed {compressed} oversized product photo(s).")
     except Exception as e:
         logger.warning(f"Product photo migration failed: {e}")
+
+
+async def _migrate_compress_payment_proofs():
+    """One-time background pass: shrink oversized payment-proof screenshots already stored.
+    Uncompressed screenshots can reach 1-2MB+ as base64, which crashes MongoDB Compass
+    when it tries to render the field inline (idempotent — skips already-small photos)."""
+    try:
+        await asyncio.sleep(6)  # let startup settle first
+        compressed = 0
+        cursor = db.manual_payments.find({"proof_photo_base64": {"$ne": None}}, {"id": 1, "proof_photo_base64": 1})
+        async for p in cursor:
+            photo = p.get("proof_photo_base64")
+            if not photo or len(photo) < 200_000:  # ~150KB — already small, skip
+                continue
+            new_photo = _compress_product_photo(photo, max_dim=1280, quality=85)
+            if new_photo != photo and len(new_photo) < len(photo):
+                await db.manual_payments.update_one({"id": p["id"]}, {"$set": {"proof_photo_base64": new_photo}})
+                compressed += 1
+        if compressed:
+            logger.info(f"Compressed {compressed} oversized payment proof photo(s).")
+    except Exception as e:
+        logger.warning(f"Payment proof migration failed: {e}")
 
 
 async def _reminder_loop():
@@ -7311,6 +7320,11 @@ async def upload_manual_payment_proof(order_id: str, body: ManualProofIn, curren
         raise HTTPException(status_code=400, detail="Format foto tidak valid")
     if len(raw) > 20 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Ukuran foto maksimal 20MB")
+
+    # Compress before storing — payment screenshots can be several MB raw, which
+    # bloats the document and crashes MongoDB Compass when it tries to render the
+    # base64 string inline. Keep enough resolution to read the transferred amount.
+    photo = _compress_product_photo(photo, max_dim=1280, quality=85)
 
     await db.manual_payments.update_one(
         {"id": order_id},
@@ -8009,9 +8023,27 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
 
 @api_router.get("/admin/manual-payments")
 async def admin_list_manual_payments(status: Optional[str] = None, admin_user: dict = Depends(require_admin)):
-    query = {"status": status} if status else {}
-    items = await db.manual_payments.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
-    return items
+    """List manual payment orders — collapsed to the single most recent order per email.
+
+    Older attempts for the same email (expired unpaid orders, or a rejected order
+    the user has since re-uploaded on) are noise once a newer order exists; only the
+    latest reflects what actually still needs the admin's attention. Older records
+    stay in the database untouched — this only affects what's shown here."""
+    all_items = await db.manual_payments.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+
+    seen_emails = set()
+    latest_per_email = []
+    for item in all_items:
+        email_key = (item.get("email") or "").strip().lower()
+        if email_key:
+            if email_key in seen_emails:
+                continue
+            seen_emails.add(email_key)
+        latest_per_email.append(item)
+
+    if status:
+        latest_per_email = [i for i in latest_per_email if i.get("status") == status]
+    return latest_per_email
 
 
 @api_router.post("/admin/manual-payments/{order_id}/approve")
@@ -8842,6 +8874,7 @@ app.add_middleware(
 async def startup():
     asyncio.create_task(_reminder_loop())
     asyncio.create_task(_migrate_compress_product_photos())
+    asyncio.create_task(_migrate_compress_payment_proofs())
     _start_market_cache_cleanup()
 
 

@@ -10,6 +10,7 @@ import {
 import BrandDnaCard from "@/components/BrandDnaCard";
 import InspirationGallery from "@/components/InspirationGallery";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
+import DebugJsonButton from "@/components/DebugJsonButton";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -760,6 +761,9 @@ export default function CarouselGeneratorPage() {
                 dashboardType="carousel"
                 title={promptResult?.prompt_json?.carousel_meta?.topic || selectedProduct?.name || "Carousel"}
               />
+              <div className="mt-3">
+                <DebugJsonButton data={promptResult?.prompt_json} title="carousel-prompt.json" />
+              </div>
             </div>
           )}
 

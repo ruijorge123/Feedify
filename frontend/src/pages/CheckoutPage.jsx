@@ -166,18 +166,25 @@ export default function CheckoutPage() {
         </div>
       </nav>
 
-      <div className="max-w-2xl mx-auto px-5 py-10 space-y-5">
-        <div>
-          <h1 className="font-heading font-bold text-brand text-3xl tracking-[-0.02em]">Aktivasi Lifetime Feedify</h1>
-          <p className="text-stone-500 text-sm mt-1.5">Scan QRIS di bawah, bayar nominal uniknya, lalu upload bukti — tim kami aktifkan akunmu.</p>
+      <div className="max-w-2xl mx-auto px-5 py-10 space-y-6">
+        <div className="text-center sm:text-left">
+          <div className="inline-flex items-center gap-1.5 mb-3 px-3 py-1 rounded-full bg-brand-gold/10 border border-brand-gold/30">
+            <Sparkle size={11} weight="fill" className="text-brand-gold" />
+            <span className="text-[10px] uppercase tracking-[0.18em] font-bold text-brand">Akses Selamanya</span>
+          </div>
+          <h1 className="font-heading font-bold text-brand text-3xl sm:text-[34px] tracking-[-0.02em] leading-[1.1]">Aktivasi Lifetime Feedify</h1>
+          <p className="text-stone-500 text-sm mt-2 leading-relaxed">Scan QRIS di bawah, bayar nominal uniknya, lalu upload bukti — tim kami aktifkan akunmu.</p>
         </div>
 
         {/* Step 1 — QRIS scan + unique nominal */}
-        <div className="bg-white rounded-3xl border border-brand-sand p-6" data-testid="manual-qris-card">
-          <div className="flex items-center justify-between mb-5">
-            <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-light">Langkah 1 — Scan & Bayar QRIS</div>
+        <div className="bg-white rounded-3xl border border-brand-sand shadow-[0_1px_2px_rgba(11,61,46,0.04)] p-6 sm:p-7" data-testid="manual-qris-card">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2.5">
+              <span className="flex-shrink-0 h-6 w-6 rounded-full bg-brand text-brand-cream text-[11px] font-bold flex items-center justify-center">1</span>
+              <span className="text-xs font-bold text-brand uppercase tracking-[0.12em]">Scan &amp; Bayar QRIS</span>
+            </div>
             {secondsLeft !== null && !expired && order?.status === "menunggu_transfer" && (
-              <div className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${secondsLeft < 300 ? "bg-red-50 text-red-500" : "bg-stone-100 text-stone-500"}`}>
+              <div className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full tabular-nums ${secondsLeft < 300 ? "bg-red-50 text-red-500" : "bg-stone-100 text-stone-500"}`}>
                 <Timer size={12} weight="bold" /> {fmtCountdown(secondsLeft)}
               </div>
             )}
@@ -196,30 +203,32 @@ export default function CheckoutPage() {
           ) : (
             <>
               {/* QRIS image */}
-              <div className="rounded-2xl bg-white border border-stone-200 p-3 mb-4 flex justify-center">
+              <div className="rounded-2xl bg-white border border-stone-200 p-4 mb-5 flex justify-center">
                 <img
-                  src="/datapenting/qris.webp"
+                  src="/datapenting/qris2.jpeg"
                   alt="QRIS Feedify — scan untuk bayar"
-                  className="w-full max-w-[300px] rounded-lg"
+                  className="w-full max-w-[280px] rounded-lg"
                   data-testid="qris-image"
                 />
               </div>
 
               {/* Nominal — wajib persis */}
-              <div className="rounded-2xl bg-brand-gold/10 border-2 border-brand-gold/40 p-5 mb-3">
-                <div className="text-[10px] uppercase tracking-wide text-brand font-bold mb-2">Bayar PERSIS nominal ini</div>
+              <div className="relative rounded-2xl bg-white border border-brand-sand p-5 mb-3 overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand-gold/20 via-brand-gold to-brand-gold/20" />
+                <div className="text-[10px] uppercase tracking-[0.14em] text-stone-400 font-bold mb-2">Bayar persis nominal ini</div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-heading font-bold text-brand text-3xl tracking-tight" data-testid="manual-unique-amount">{fmtRp(order?.amount)}</span>
+                  <span className="font-heading font-extrabold text-brand text-[32px] leading-none tracking-tight tabular-nums" data-testid="manual-unique-amount">{fmtRp(order?.amount)}</span>
                   <button onClick={() => handleCopy("nominal", order?.amount)} data-testid="manual-copy-amount-btn"
-                    className="flex-shrink-0 h-10 w-10 rounded-full bg-brand text-brand-cream hover:bg-brand-light flex items-center justify-center transition-colors">
-                    {copiedField === "nominal" ? <Check size={16} weight="bold" /> : <Copy size={16} weight="bold" />}
+                    className="flex-shrink-0 inline-flex items-center gap-1.5 h-10 pl-3.5 pr-4 rounded-full bg-brand text-brand-cream hover:bg-brand-light text-xs font-bold transition-colors">
+                    {copiedField === "nominal" ? <><Check size={15} weight="bold" /> Tersalin</> : <><Copy size={15} weight="bold" /> Salin</>}
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-xl bg-stone-50 border border-stone-100 p-3">
+              <div className="flex items-start gap-2.5 rounded-xl bg-stone-50 border border-stone-100 p-3.5">
+                <WarningCircle size={16} weight="fill" className="text-brand-gold flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-stone-500 leading-relaxed">
-                  ⚠️ Scan QRIS di atas pakai aplikasi apa aja (GoPay, DANA, OVO, ShopeePay, atau m-banking), lalu masukkan nominal <b>persis {fmtRp(order?.amount)}</b> sampai 3 digit terakhir — jangan dibulatkan. Nominal unik ini yang bikin kami cepat mengenali pembayaranmu.
+                  Scan QRIS di atas pakai aplikasi apa aja (GoPay, DANA, OVO, ShopeePay, atau m-banking), lalu masukkan nominal <b className="text-brand">persis {fmtRp(order?.amount)}</b> sampai 3 digit terakhir — jangan dibulatkan. Nominal unik ini yang bikin kami cepat mengenali pembayaranmu.
                 </p>
               </div>
             </>
@@ -228,8 +237,11 @@ export default function CheckoutPage() {
 
         {/* Step 2 — upload proof / status */}
         {!expired && (
-          <div className="bg-white rounded-3xl border border-brand-sand p-6" data-testid="manual-proof-card">
-            <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-light mb-5">Langkah 2 — Bukti Pembayaran</div>
+          <div className="bg-white rounded-3xl border border-brand-sand shadow-[0_1px_2px_rgba(11,61,46,0.04)] p-6 sm:p-7" data-testid="manual-proof-card">
+            <div className="flex items-center gap-2.5 mb-6">
+              <span className="flex-shrink-0 h-6 w-6 rounded-full bg-brand text-brand-cream text-[11px] font-bold flex items-center justify-center">2</span>
+              <span className="text-xs font-bold text-brand uppercase tracking-[0.12em]">Bukti Pembayaran</span>
+            </div>
 
             {order?.status === "lunas" ? (
               <div className="text-center py-4">
@@ -280,9 +292,11 @@ export default function CheckoutPage() {
                   </div>
                 ) : (
                   <label htmlFor="proof-upload" data-testid="manual-upload-dropzone"
-                    className="block cursor-pointer border-2 border-dashed border-brand-gold/60 bg-brand-gold/5 rounded-2xl p-8 text-center hover:border-brand-gold hover:bg-brand-gold/8 transition-colors">
-                    <UploadSimple size={28} className="mx-auto text-brand-gold mb-2" weight="duotone" />
-                    <div className="font-semibold text-brand text-sm">Upload Bukti Pembayaran</div>
+                    className="block cursor-pointer border-2 border-dashed border-brand-gold/50 bg-brand-gold/5 rounded-2xl p-9 text-center hover:border-brand-gold hover:bg-brand-gold/10 transition-colors">
+                    <div className="h-12 w-12 rounded-full bg-brand-gold/15 flex items-center justify-center mx-auto mb-3">
+                      <UploadSimple size={22} className="text-brand-gold" weight="duotone" />
+                    </div>
+                    <div className="font-bold text-brand text-sm">Upload Bukti Pembayaran</div>
                     <div className="text-xs text-stone-400 mt-1">Screenshot atau foto struk transfer</div>
                   </label>
                 )}
@@ -294,15 +308,17 @@ export default function CheckoutPage() {
         )}
 
         {/* Trust footer */}
-        <div className="flex items-center justify-center gap-4 flex-wrap px-2 pt-2">
+        <div className="flex items-center justify-center gap-x-5 gap-y-2 flex-wrap px-2 pt-1">
           <div className="flex items-center gap-1.5 text-xs text-stone-500">
-            <ShieldCheck size={14} className="text-green-500" /> Bayar via QRIS
+            <ShieldCheck size={15} className="text-green-500" /> Bayar via QRIS
           </div>
+          <span className="h-3 w-px bg-stone-200 hidden sm:block" />
           <div className="flex items-center gap-1.5 text-xs text-stone-500">
-            <ImageIcon size={14} className="text-brand-gold" weight="duotone" /> Verifikasi bukti pembayaran
+            <ImageIcon size={15} className="text-brand-gold" weight="duotone" /> Verifikasi bukti pembayaran
           </div>
+          <span className="h-3 w-px bg-stone-200 hidden sm:block" />
           <div className="flex items-center gap-1.5 text-xs text-stone-500">
-            <Sparkle size={14} weight="fill" className="text-brand-gold" /> Aktif otomatis setelah dikonfirmasi
+            <Sparkle size={15} weight="fill" className="text-brand-gold" /> Aktif otomatis setelah dikonfirmasi
           </div>
         </div>
       </div>

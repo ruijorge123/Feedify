@@ -11,6 +11,7 @@ import {
 import BrandDnaCard from "@/components/BrandDnaCard";
 import InspirationGallery from "@/components/InspirationGallery";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
+import DebugJsonButton from "@/components/DebugJsonButton";
 import CampaignGoalSelector from "@/components/CampaignGoalSelector";
 
 const MODEL_STYLES = [
@@ -599,6 +600,9 @@ export default function BannerGeneratorPage() {
                 dashboardType="banner"
                 title={promptResult?.prompt_json?.prompt_structure?.branding_elements?.headline || selectedProduct?.name || "Feed & Banner"}
               />
+              <div className="mt-3">
+                <DebugJsonButton data={promptResult?.prompt_json} title="banner-prompt.json" />
+              </div>
             </div>
           )}
 

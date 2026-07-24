@@ -1,20 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { X, ArrowLeft, ArrowRight } from "@phosphor-icons/react";
+import { subscribeTourTrigger } from "@/lib/tourTrigger";
 
 export const TOUR_KEY = "feedify_tour_v1_done";
 
 // Desktop target = sidebar nav testid
 // Mobile target  = bottom-nav testid (suffix -mobile). "nav-more-mobile" for items only in More menu.
+// `route`: page the target only exists on — the tour auto-navigates there first.
+// Omit `route` for sidebar/bottom-nav items, which are always mounted (AppShell), on every page.
 const STEPS = [
   {
     target:       "dash-visual-studio",
     mobileTarget: "dash-visual-studio",
+    route: "/dashboard",
     emoji: "🎨",  title: "Feedify AI Visual Studio",  tag: "Semua Tools Editing Foto",
     desc: "Di halaman Home ada Visual Studio — semua tools editing foto jadi satu: edit foto, hapus background, gabung foto, pasang produk ke model, dan banyak lagi. Generate tanpa batas.",
   },
   {
     target:       "dash-market-research",
     mobileTarget: "dash-market-research",
+    route: "/dashboard",
     emoji: "📊",  title: "Riset Pasar AI",   tag: "Cek Potensi Sebelum Buat Konten",
     desc: "Masih di Home, cek tren & potensi pasar dari keyword produkmu — Google Trends real-time, keyword research, dan rekomendasi ide konten. Riset dulu, baru generate konten yang relevan.",
   },
@@ -109,6 +115,8 @@ export default function ProductTour({ forceOpen = false, onClose }) {
   const [visible, setVisible] = useState(false);
   const [rect,    setRect]    = useState(null);
   const [stepKey, setStepKey] = useState(0);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => { injectCSS(); }, []);
 
@@ -121,30 +129,43 @@ export default function ProductTour({ forceOpen = false, onClose }) {
     }
   }, [forceOpen]);
 
-  /* Update spotlight rect when step or visibility changes */
+  /* External trigger — e.g. AdminPage's "Lihat Tour" button, which lives on a
+     different page than steps that require /dashboard. Using this shared instance
+     (mounted once in AppShell) instead of a per-page tour means the tour survives
+     the cross-page navigation below instead of unmounting with the triggering page. */
+  useEffect(() => {
+    return subscribeTourTrigger(() => { setStep(0); setStepKey(0); setVisible(true); });
+  }, []);
+
+  /* Navigate to the step's required page (if any), then measure + spotlight the target.
+     Cross-page steps need longer/more retries so we catch the lazy-loaded page once it mounts. */
   useEffect(() => {
     if (!visible) return;
     const cur = STEPS[step];
     const isDesktop = window.innerWidth >= 1024;
     const target = isDesktop ? cur.target : cur.mobileTarget;
-    const update = () => setRect(getRect(target));
 
-    // Scroll the target into view first (for on-page sections below the fold),
-    // then re-measure once the scroll settles.
-    const el = document.querySelector(`[data-testid="${target}"]`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    update();
-    const t1 = setTimeout(update, 250);
-    const t2 = setTimeout(update, 550);
+    const needsNav = cur.route && location.pathname !== cur.route;
+    if (needsNav) navigate(cur.route);
 
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      clearTimeout(t1); clearTimeout(t2);
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
+    const measure = () => {
+      const el = document.querySelector(`[data-testid="${target}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setRect(getRect(target));
     };
-  }, [visible, step]);
+
+    measure();
+    const delays = needsNav ? [80, 200, 400, 650, 950] : [250, 550];
+    const timers = delays.map((d) => setTimeout(measure, d));
+
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      timers.forEach(clearTimeout);
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [visible, step, location.pathname, navigate]);
 
   const goTo = useCallback((i) => { setStep(i); setStepKey(k => k + 1); }, []);
 

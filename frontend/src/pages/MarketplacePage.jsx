@@ -11,6 +11,7 @@ import {
 import BrandDnaCard from "@/components/BrandDnaCard";
 import InspirationGallery from "@/components/InspirationGallery";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
+import DebugJsonButton from "@/components/DebugJsonButton";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -511,6 +512,11 @@ export default function MarketplacePage() {
               dashboardType="marketplace"
               title={selectedProduct?.name || "Marketplace"}
             />
+          )}
+          {promptResult && (
+            <div className="mt-3">
+              <DebugJsonButton data={promptResult?.prompt_json} title="marketplace-prompt.json" />
+            </div>
           )}
 
         </div>

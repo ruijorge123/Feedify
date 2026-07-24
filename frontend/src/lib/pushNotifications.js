@@ -1,62 +1,57 @@
-import api from "./api";
+// Web push via OneSignal — replaces the old raw VAPID/pywebpush flow.
+// The SDK is loaded + initialized in public/index.html (window.OneSignalDeferred).
 
-function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = window.atob(base64);
-  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+// Safe way to call OneSignal SDK methods from anywhere: queues the call if the SDK
+// hasn't finished loading/initializing yet, runs immediately once it has.
+function withOneSignal(callback) {
+  return new Promise((resolve, reject) => {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async (OneSignal) => {
+      try {
+        resolve(await callback(OneSignal));
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
 }
 
-export async function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return null;
-  try {
-    const reg = await navigator.serviceWorker.register("/sw.js");
-    return reg;
-  } catch (e) {
-    console.warn("SW registration failed:", e);
-    return null;
-  }
+// Tags the current browser's push subscription with our own user id, so the backend
+// can target notifications straight to this Feedify account via OneSignal's REST API.
+// Called from AuthContext whenever the logged-in user changes — not tied to the
+// subscribe button, so it's already set by the time the user opts in.
+export function linkOneSignalUser(userId) {
+  return withOneSignal((OneSignal) => OneSignal.login(String(userId))).catch(() => {});
+}
+
+export function unlinkOneSignalUser() {
+  return withOneSignal((OneSignal) => OneSignal.logout()).catch(() => {});
 }
 
 export async function subscribeToPush() {
-  if (!("PushManager" in window)) throw new Error("Push not supported");
-
-  const reg = await registerServiceWorker();
-  if (!reg) throw new Error("Service worker tidak tersedia");
-
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") throw new Error("Izin notifikasi ditolak");
-
-  const { data } = await api.get("/push/vapid-public-key");
-  const applicationServerKey = urlBase64ToUint8Array(data.public_key);
-
-  const subscription = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey,
+  return withOneSignal(async (OneSignal) => {
+    const granted = await OneSignal.Notifications.requestPermission();
+    if (!granted) throw new Error("Izin notifikasi ditolak");
+    await OneSignal.User.PushSubscription.optIn();
+    return true;
   });
-
-  await api.post("/push/subscribe", { subscription: subscription.toJSON() });
-  return subscription;
 }
 
 export async function unsubscribeFromPush() {
-  if (!("serviceWorker" in navigator)) return;
-  const reg = await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.getSubscription();
-  if (sub) await sub.unsubscribe();
-  await api.delete("/push/unsubscribe");
+  return withOneSignal((OneSignal) => OneSignal.User.PushSubscription.optOut());
 }
 
 export async function getPushStatus() {
-  if (!("PushManager" in window) || !("serviceWorker" in navigator)) {
+  if (!("Notification" in window)) {
     return { supported: false, subscribed: false, permission: "default" };
   }
-  const permission = Notification.permission;
-  const reg = await navigator.serviceWorker.getRegistration("/sw.js");
-  const sub = reg ? await reg.pushManager.getSubscription() : null;
-  return {
-    supported: true,
-    subscribed: !!sub,
-    permission,
-  };
+  try {
+    return await withOneSignal(async (OneSignal) => ({
+      supported: true,
+      subscribed: !!OneSignal.User.PushSubscription.optedIn,
+      permission: OneSignal.Notifications.permissionNative || Notification.permission,
+    }));
+  } catch {
+    return { supported: true, subscribed: false, permission: Notification.permission };
+  }
 }
