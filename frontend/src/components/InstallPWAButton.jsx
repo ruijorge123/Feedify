@@ -20,20 +20,23 @@ function isStandalone() {
 // beforeinstallprompt flow; iOS Safari and macOS Safari have no such API at all, so those
 // get a short manual-steps modal instead (Apple never exposes a programmatic install prompt).
 export default function InstallPWAButton({ className }) {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  // beforeinstallprompt only ever fires once per page load, and Chrome/Edge often fire it
+  // before this component mounts — index.html captures it as early as possible into
+  // window.__pwaInstallPrompt, so a listener attached here (post-mount) would otherwise
+  // never see it. Check that global first; fall back to a live listener in case it fires later.
+  const [deferredPrompt, setDeferredPrompt] = useState(() => window.__pwaInstallPrompt || null);
   const [installed, setInstalled] = useState(isStandalone());
   const [showInstructions, setShowInstructions] = useState(false);
 
   useEffect(() => {
-    const onBeforeInstall = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
+    const onReady = () => setDeferredPrompt(window.__pwaInstallPrompt || null);
     const onInstalled = () => { setInstalled(true); setDeferredPrompt(null); };
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("pwa-install-ready", onReady);
+    window.addEventListener("beforeinstallprompt", onReady);
     window.addEventListener("appinstalled", onInstalled);
     return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("pwa-install-ready", onReady);
+      window.removeEventListener("beforeinstallprompt", onReady);
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);

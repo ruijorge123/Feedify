@@ -16,6 +16,18 @@
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Feedify" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <script>
+          // Chrome/Edge fire beforeinstallprompt as soon as install criteria are met — often
+          // before React has mounted and attached its own listener, which would silently lose
+          // the event (it only fires once per page load). Capturing it here, at the very top
+          // of <head>, guarantees it's caught regardless of how long the app takes to load.
+          window.__pwaInstallPrompt = null;
+          window.addEventListener("beforeinstallprompt", function (e) {
+            e.preventDefault();
+            window.__pwaInstallPrompt = e;
+            window.dispatchEvent(new CustomEvent("pwa-install-ready"));
+          });
+        </script>
 
         <title>Feedify</title>
         <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
