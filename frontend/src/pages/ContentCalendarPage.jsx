@@ -269,8 +269,10 @@ export default function ContentCalendarPage() {
     }
   };
 
-  const removeEvent = (id) => setConfirmDialog({ open: true, type: "event", id, loading: false });
-  const deleteSchedule = (id) => setConfirmDialog({ open: true, type: "schedule", id, loading: false });
+  // Close the edit modal before opening the confirm dialog — otherwise the modal (portaled
+  // at z-[60]) covers the confirm dialog and its buttons become unreachable.
+  const removeEvent = (id) => { setShowModal(false); setConfirmDialog({ open: true, type: "event", id, loading: false }); };
+  const deleteSchedule = (id) => { setShowModal(false); setConfirmDialog({ open: true, type: "schedule", id, loading: false }); };
 
   const handleConfirmDelete = async () => {
     const { type, id } = confirmDialog;
