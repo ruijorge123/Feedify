@@ -6941,7 +6941,15 @@ async def _send_push_notification(user_id: str, title: str, body: str, send_afte
     }
     if send_after:
         try:
-            payload["send_at"] = datetime.fromisoformat(send_after).astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            target_dt = datetime.fromisoformat(send_after)
+            # Webpushr rejects (400/407 "Schedule date must be at least 5 minutes in future")
+            # any send_at closer than 5 minutes out — confirmed by direct reproduction. This
+            # happens whenever the reminder time ends up very close to save-time (e.g. a
+            # H-30-menit reminder for a post only ~31 minutes away). Omitting send_at entirely
+            # makes Webpushr send right away instead of silently failing to schedule at all —
+            # a few minutes early beats never arriving.
+            if target_dt > datetime.now(target_dt.tzinfo) + timedelta(minutes=5):
+                payload["send_at"] = target_dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         except Exception:
             pass
     try:
