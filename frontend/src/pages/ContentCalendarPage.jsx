@@ -32,7 +32,32 @@ const STATUS_STYLE = {
 
 const STATUS_LABEL = { scheduled: "Terjadwal", posted: "Sudah Posted", draft: "Draft" };
 
-const EMPTY_FORM = { title: "", scheduled_date: "", prompt_id: "", notes: "", status: "draft", photo_base64: null, caption: "" };
+const EMPTY_FORM = { title: "", scheduled_date: "", scheduled_time: "09:00", reminder_hours_before: 24, prompt_id: "", notes: "", status: "draft", photo_base64: null, caption: "" };
+
+const REMINDER_OPTIONS = [
+  { value: 1, label: "H-1 jam sebelum" },
+  { value: 3, label: "H-3 jam sebelum" },
+  { value: 6, label: "H-6 jam sebelum" },
+  { value: 24, label: "H-1 hari (24 jam) sebelum" },
+  { value: 48, label: "H-2 hari (48 jam) sebelum" },
+  { value: 72, label: "H-3 hari (72 jam) sebelum" },
+];
+
+// Hours between now and the WIB (UTC+7) datetime the user picked. The explicit +07:00
+// offset makes this correct regardless of the browser/device's own timezone setting —
+// all Feedify users are Indonesian UMKM entering times in WIB.
+function hoursUntilWIB(dateStr, timeStr) {
+  if (!dateStr) return -Infinity;
+  const target = new Date(`${dateStr}T${timeStr || "09:00"}:00+07:00`);
+  return (target.getTime() - Date.now()) / (1000 * 60 * 60);
+}
+
+// Only offer reminder options that still land in the future — e.g. a schedule for
+// tomorrow should never offer "H-3 hari sebelum" (that reminder time is already in the past).
+function feasibleReminderOptions(dateStr, timeStr) {
+  const diff = hoursUntilWIB(dateStr, timeStr);
+  return REMINDER_OPTIONS.filter((o) => o.value < diff);
+}
 
 // ─── Notification panel (extracted) ──────────────────────────────
 function NotifPanel() {
@@ -152,21 +177,6 @@ function NotifPanel() {
             </div>
           </div>
 
-          {/* Default reminder */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500 mb-1.5 block">Waktu Pengingat Default</label>
-            <select className="input text-sm" value={notif.default_reminder_hours}
-              onChange={e => setNotif(s => ({ ...s, default_reminder_hours: parseInt(e.target.value) }))}
-              data-testid="notif-default-reminder">
-              <option value={1}>H-1 jam sebelum posting</option>
-              <option value={3}>H-3 jam sebelum posting</option>
-              <option value={6}>H-6 jam sebelum posting</option>
-              <option value={24}>H-1 hari sebelum posting</option>
-              <option value={48}>H-2 hari sebelum posting</option>
-              <option value={72}>H-3 hari sebelum posting</option>
-            </select>
-          </div>
-
           <button onClick={save} disabled={saving} data-testid="save-notif-btn"
             className="w-full py-2.5 bg-brand text-brand-cream rounded-full text-sm font-semibold hover:bg-brand-light btn-touch disabled:opacity-60 inline-flex items-center justify-center gap-2">
             {saving ? <><CircleNotch size={14} className="animate-spin" /> Menyimpan...</> : "Simpan Pengaturan"}
@@ -207,6 +217,20 @@ export default function ContentCalendarPage() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [monthStr]);
+
+  // Keep the reminder selection valid whenever the user changes the date/time in the modal —
+  // e.g. switching from "in 3 days" to "tomorrow" must drop a stale "H-3 hari" selection
+  // instead of silently sending a reminder time that's already in the past.
+  useEffect(() => {
+    if (!showModal) return;
+    const opts = feasibleReminderOptions(form.scheduled_date, form.scheduled_time);
+    if (opts.length === 0) {
+      if (form.reminder_hours_before !== null) setForm((f) => ({ ...f, reminder_hours_before: null }));
+    } else if (!opts.some((o) => o.value === form.reminder_hours_before)) {
+      setForm((f) => ({ ...f, reminder_hours_before: opts[opts.length - 1].value }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.scheduled_date, form.scheduled_time, showModal]);
 
   const calendarDays = useMemo(() => {
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -306,6 +330,7 @@ export default function ContentCalendarPage() {
   };
 
   const promptIcon = (type) => TYPE_ICON[type] || CalendarBlank;
+  const reminderOptions = feasibleReminderOptions(form.scheduled_date, form.scheduled_time);
 
   return (
     <div className="space-y-6" data-testid="content-calendar-page">
@@ -363,7 +388,11 @@ export default function ContentCalendarPage() {
                   <div key={i} className={`aspect-[3/4] p-1 rounded-xl border text-left flex flex-col ${
                     isToday ? "border-brand bg-brand-gold/10" : "border-brand-sand bg-white"
                   }`}>
-                    <button onClick={() => openAdd(d)} className="w-full text-left" data-testid={`day-${key}`}>
+                    {/* If this day already has manual content, open it for editing instead of a
+                        blank Add form — clicking the day number used to always call openAdd(),
+                        which let a user "edit" by filling a second, unrelated blank entry on the
+                        same day instead of updating the one already there. */}
+                    <button onClick={() => (evts.length > 0 ? openEdit(evts[0]) : openAdd(d))} className="w-full text-left" data-testid={`day-${key}`}>
                       <div className={`text-xs font-bold ${isToday ? "text-brand" : "text-stone-600"}`}>
                         {d.getDate()}
                         {hasPending && <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-brand-gold align-top mt-0.5" />}
@@ -532,9 +561,36 @@ export default function ContentCalendarPage() {
                   <input type="text" className="input" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} data-testid="event-title" placeholder="mis. Promo weekend, Konten edukasi..." />
                 </Field>
 
-                {/* Tanggal */}
-                <Field label="Tanggal Posting">
-                  <input type="date" className="input" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} data-testid="event-date" />
+                {/* Tanggal & Jam */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Tanggal Posting">
+                    <input type="date" className="input" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} data-testid="event-date" />
+                  </Field>
+                  <Field label="Jam Posting">
+                    <input type="time" className="input" value={form.scheduled_time} onChange={e => setForm(f => ({ ...f, scheduled_time: e.target.value }))} data-testid="event-time" />
+                  </Field>
+                </div>
+
+                {/* Waktu Pengingat — options are filtered to what's still feasible given the
+                    date/time above, so e.g. tomorrow's schedule never offers "H-3 hari sebelum". */}
+                <Field label="Waktu Pengingat">
+                  {reminderOptions.length > 0 ? (
+                    <>
+                      <select
+                        className="input text-sm"
+                        value={form.reminder_hours_before ?? ""}
+                        onChange={e => setForm(f => ({ ...f, reminder_hours_before: parseInt(e.target.value) }))}
+                        data-testid="event-reminder"
+                      >
+                        {reminderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                      <p className="text-[11px] text-stone-400 mt-1">Kamu akan dapat notifikasi di Feedify sebelum jadwal posting ini.</p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                      Jadwal terlalu dekat atau sudah lewat — tidak ada opsi pengingat yang bisa diatur.
+                    </p>
+                  )}
                 </Field>
 
                 {/* Status */}

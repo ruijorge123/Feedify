@@ -376,6 +376,8 @@ class CalendarIdeasIn(BaseModel):
 class CalendarEventIn(BaseModel):
     title: str
     scheduled_date: str  # ISO date string (YYYY-MM-DD)
+    scheduled_time: str = "09:00"
+    reminder_hours_before: Optional[int] = None  # None = no reminder (e.g. schedule too close/past for any option)
     prompt_id: Optional[str] = None
     notes: str = ""
     status: str = "draft"  # draft, scheduled, posted
@@ -6887,12 +6889,43 @@ async def list_calendar(current_user: dict = Depends(get_current_user), month: O
     return events
 
 
+async def _apply_calendar_reminder(data: dict, user_id: str) -> None:
+    """Compute reminder_at (WIB) from scheduled_date/scheduled_time and fire the OneSignal
+    reminder for a calendar_events doc, mirroring create_schedule/update_schedule. Mutates
+    `data` in place with reminder_at/reminder_sent. No-op (clears reminder fields) when the
+    frontend sent reminder_hours_before=None — e.g. the schedule is too close/past for any
+    feasible option."""
+    reminder_hours = data.get("reminder_hours_before")
+    if not reminder_hours:
+        data["reminder_at"] = None
+        data["reminder_sent"] = False
+        return
+    try:
+        h, m = data["scheduled_time"].split(":")
+        post_dt = datetime.strptime(data["scheduled_date"], "%Y-%m-%d").replace(
+            hour=int(h), minute=int(m), tzinfo=WIB_TZ
+        )
+    except Exception:
+        data["reminder_at"] = None
+        data["reminder_sent"] = False
+        return
+    reminder_at = (post_dt - timedelta(hours=reminder_hours)).isoformat()
+    data["reminder_at"] = reminder_at
+    data["reminder_sent"] = await _send_onesignal_notification(
+        user_id,
+        f"⏰ Reminder: {data.get('title') or 'Konten'}",
+        f"Jadwal posting kamu hari ini pukul {data['scheduled_time']}. Ayo siapkan!",
+        send_after=reminder_at,
+    )
+
+
 @api_router.post("/calendar")
 async def create_calendar_event(payload: CalendarEventIn, current_user: dict = Depends(get_current_user)):
     event_id = str(uuid.uuid4())
     data = payload.model_dump()
     if data.get("photo_base64"):
         data["photo_base64"] = _compress_product_photo(data["photo_base64"])
+    await _apply_calendar_reminder(data, current_user["id"])
     doc = {
         "id": event_id,
         "user_id": current_user["id"],
@@ -6908,6 +6941,10 @@ async def update_calendar_event(event_id: str, payload: CalendarEventIn, current
     data = payload.model_dump()
     if data.get("photo_base64"):
         data["photo_base64"] = _compress_product_photo(data["photo_base64"])
+    # Re-schedule the reminder at the new date/time — otherwise editing a schedule (the
+    # exact case reported: changing the date) would leave the old reminder firing at the
+    # stale time, or leave the entry with no reminder at all if one wasn't set before.
+    await _apply_calendar_reminder(data, current_user["id"])
     result = await db.calendar_events.update_one(
         {"id": event_id, "user_id": current_user["id"]},
         {"$set": data},

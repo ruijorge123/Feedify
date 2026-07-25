@@ -15,14 +15,46 @@ log()  { echo -e "${GREEN}[feedify]${NC} $*"; }
 warn() { echo -e "${YELLOW}[warn]${NC} $*"; }
 die()  { echo -e "${RED}[error]${NC} $*"; exit 1; }
 
-# ── cleanup on Ctrl+C ────────────────────────────────────────────────────────
+# ── process / port cleanup helpers ───────────────────────────────────────────
 BE_PID=""
 FE_PID=""
+
+# Force-free a TCP port: TERM whatever is listening, then KILL if it survives.
+# This is the reliable catch-all on macOS — uvicorn --reload's worker child and
+# webpack's dev-server child hold the ports even after the parent PID is killed,
+# and uvicorn's graceful shutdown can hang forever on the infinite background loops.
+free_port() {
+  local port="$1" pids
+  pids=$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
+  [ -z "$pids" ] && return 0
+  kill $pids 2>/dev/null || true
+  sleep 1
+  pids=$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
+  [ -n "$pids" ] && kill -9 $pids 2>/dev/null || true
+}
+
+# Kill a PID together with its direct children (reloader→worker, yarn→craco).
+kill_tree() {
+  local pid="$1"
+  [ -z "$pid" ] && return 0
+  pkill -TERM -P "$pid" 2>/dev/null || true
+  kill -TERM "$pid" 2>/dev/null || true
+}
+
+# ── cleanup on Ctrl+C ────────────────────────────────────────────────────────
+_CLEANED=0
 cleanup() {
+  [ "$_CLEANED" = "1" ] && return   # ignore repeated Ctrl+C
+  _CLEANED=1
+  trap '' SIGINT SIGTERM            # don't re-enter cleanup while cleaning up
+  set +e
   echo ""
   log "Menghentikan server..."
-  [ -n "$BE_PID" ] && kill "$BE_PID" 2>/dev/null
-  [ -n "$FE_PID" ] && kill "$FE_PID" 2>/dev/null
+  kill_tree "$FE_PID"
+  kill_tree "$BE_PID"
+  free_port 8001
+  free_port 3000
+  log "Server berhenti. Port 8001 & 3000 sudah bebas."
   exit 0
 }
 trap cleanup SIGINT SIGTERM
@@ -128,6 +160,10 @@ fi
 
 # ── 8. Start backend ─────────────────────────────────────────────────────────
 echo ""
+# Free the ports first — clears any leftover process from a previous run that
+# didn't shut down cleanly, so we never hit "Address already in use".
+free_port 8001
+free_port 3000
 log "${BOLD}Memulai Backend${NC} → http://localhost:8001"
 cd "$BACKEND_DIR"
 uvicorn server:app --reload --host 0.0.0.0 --port 8001 &
