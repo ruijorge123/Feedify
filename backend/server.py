@@ -6923,17 +6923,42 @@ Kembalikan JSON array dengan {count} objek, masing-masing:
 
 # ============= NOTIFICATION HELPERS =============
 
+async def _resolve_onesignal_subscription_ids(user_id: str) -> list:
+    """Look up a Feedify user's currently-enabled OneSignal push subscriptions by external_id.
+    Confirmed via direct testing that include_aliases targeting is flaky for accounts that have
+    been subscribed/resubscribed across many sessions (intermittent "invalid_aliases" even with
+    valid subscriptions) — resolving to concrete subscription_ids up front and sending directly
+    to those is what actually worked reliably in every manual test."""
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://api.onesignal.com/apps/{ONESIGNAL_APP_ID}/users/by/external_id/{user_id}",
+                headers={"Authorization": f"Key {ONESIGNAL_REST_API_KEY}"},
+                timeout=15,
+            )
+        if resp.status_code >= 400:
+            return []
+        subs = resp.json().get("subscriptions", [])
+        return [s["id"] for s in subs if s.get("enabled") and s.get("type", "").endswith("Push")]
+    except Exception as e:
+        logger.warning(f"OneSignal subscription lookup failed: {e}")
+        return []
+
+
 async def _send_onesignal_notification(user_id: str, title: str, body: str, send_after: Optional[str] = None) -> bool:
     """Send (or schedule) a push notification via OneSignal, targeted at a Feedify user by
-    external_id (set via OneSignal.login() on the frontend — see AuthContext.jsx).
+    resolving their external_id to concrete subscription_ids first (see
+    _resolve_onesignal_subscription_ids — include_aliases targeting alone was confirmed unreliable).
     `send_after` (ISO 8601) delegates the actual timed delivery to OneSignal's own
     infrastructure — no backend polling loop needed, so this works fine on serverless."""
     if not ONESIGNAL_APP_ID or not ONESIGNAL_REST_API_KEY:
         return False
+    subscription_ids = await _resolve_onesignal_subscription_ids(user_id)
+    if not subscription_ids:
+        return False
     payload = {
         "app_id": ONESIGNAL_APP_ID,
-        "include_aliases": {"external_id": [str(user_id)]},
-        "target_channel": "push",
+        "include_subscription_ids": subscription_ids,
         "headings": {"en": title},
         "contents": {"en": body},
     }
