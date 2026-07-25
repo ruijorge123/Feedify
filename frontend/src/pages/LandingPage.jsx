@@ -8,6 +8,7 @@ import {
   CircleNotch, XCircle,
 } from "@phosphor-icons/react";
 import SupportChatWidget from "@/components/SupportChatWidget";
+import InstallPWAButton from "@/components/InstallPWAButton";
 
 export default function LandingPage() {
   return (
@@ -156,6 +157,7 @@ function DarkHero() {
                 {hasAccess ? (
                   /* Logged in + has access */
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <InstallPWAButton />
                     <button
                       onClick={() => navigate("/dashboard")}
                       data-testid="hero-dashboard-cta"
