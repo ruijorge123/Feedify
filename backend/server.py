@@ -95,11 +95,12 @@ SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USER = os.environ.get('SMTP_USER', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 SMTP_FROM = os.environ.get('SMTP_FROM', '')
-# OneSignal — web push for scheduled reminders. Replaces the old VAPID/pywebpush flow above;
-# scheduling delivery is delegated to OneSignal's own `send_after` (serverless-safe — no
-# always-on polling loop needed, unlike the old _reminder_loop).
-ONESIGNAL_APP_ID = os.environ.get('ONESIGNAL_APP_ID', '')
-ONESIGNAL_REST_API_KEY = os.environ.get('ONESIGNAL_REST_API_KEY', '')
+# Webpushr — web push for scheduled reminders (replaces OneSignal, which replaced the old
+# VAPID/pywebpush flow before it). Scheduling delivery is delegated to Webpushr's own `send_at`
+# (serverless-safe — no always-on polling loop needed, unlike the old _reminder_loop). Targeting
+# is via the "feedify_user_id" custom attribute, tagged client-side (see pushNotifications.js).
+WEBPUSHR_REST_API_KEY = os.environ.get('WEBPUSHR_REST_API_KEY', '')
+WEBPUSHR_AUTH_TOKEN = os.environ.get('WEBPUSHR_AUTH_TOKEN', '')
 
 # Manual transfer checkout (Lifetime plan) + Telegram admin bot
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
@@ -6923,67 +6924,44 @@ Kembalikan JSON array dengan {count} objek, masing-masing:
 
 # ============= NOTIFICATION HELPERS =============
 
-async def _resolve_onesignal_subscription_ids(user_id: str) -> list:
-    """Look up a Feedify user's currently-enabled OneSignal push subscriptions by external_id.
-    Confirmed via direct testing that include_aliases targeting is flaky for accounts that have
-    been subscribed/resubscribed across many sessions (intermittent "invalid_aliases" even with
-    valid subscriptions) — resolving to concrete subscription_ids up front and sending directly
-    to those is what actually worked reliably in every manual test."""
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"https://api.onesignal.com/apps/{ONESIGNAL_APP_ID}/users/by/external_id/{user_id}",
-                headers={"Authorization": f"Key {ONESIGNAL_REST_API_KEY}"},
-                timeout=15,
-            )
-        if resp.status_code >= 400:
-            return []
-        subs = resp.json().get("subscriptions", [])
-        return [s["id"] for s in subs if s.get("enabled") and s.get("type", "").endswith("Push")]
-    except Exception as e:
-        logger.warning(f"OneSignal subscription lookup failed: {e}")
-        return []
-
-
-async def _send_onesignal_notification(user_id: str, title: str, body: str, send_after: Optional[str] = None) -> bool:
-    """Send (or schedule) a push notification via OneSignal, targeted at a Feedify user by
-    resolving their external_id to concrete subscription_ids first (see
-    _resolve_onesignal_subscription_ids — include_aliases targeting alone was confirmed unreliable).
-    `send_after` (ISO 8601) delegates the actual timed delivery to OneSignal's own
-    infrastructure — no backend polling loop needed, so this works fine on serverless."""
-    if not ONESIGNAL_APP_ID or not ONESIGNAL_REST_API_KEY:
-        return False
-    subscription_ids = await _resolve_onesignal_subscription_ids(user_id)
-    if not subscription_ids:
+async def _send_push_notification(user_id: str, title: str, body: str, send_after: Optional[str] = None) -> bool:
+    """Send (or schedule) a push notification via Webpushr, targeted at a Feedify user by the
+    "feedify_user_id" custom attribute (tagged client-side via webpushr('attributes', ...) —
+    see pushNotifications.js / AuthContext.jsx). `send_after` (ISO 8601, any UTC offset) is
+    converted to the UTC 'YYYY-MM-DD HH:MM:SS' format Webpushr's send_at expects, delegating the
+    actual timed delivery to Webpushr's own infrastructure — no backend polling loop needed."""
+    if not WEBPUSHR_REST_API_KEY or not WEBPUSHR_AUTH_TOKEN:
         return False
     payload = {
-        "app_id": ONESIGNAL_APP_ID,
-        "include_subscription_ids": subscription_ids,
-        "headings": {"en": title},
-        "contents": {"en": body},
-        # The OneSignal app has no chrome_web_default_notification_icon configured (confirmed
-        # empty via the Apps API) and we never sent one per-notification either — this was
-        # confirmed as the cause of Android Chrome falling back to its generic "This site has
-        # been updated in the background" banner instead of showing our actual title/body.
-        "chrome_web_icon": "https://feedify-ai.vercel.app/icon-192.png",
-        "firefox_icon": "https://feedify-ai.vercel.app/icon-192.png",
+        "title": title,
+        "message": body,
+        "target_url": "https://feedify-ai.vercel.app/calendar",
+        "attribute": {"feedify_user_id": str(user_id)},
+        "icon": "https://feedify-ai.vercel.app/icon-192.png",
     }
     if send_after:
-        payload["send_after"] = send_after
+        try:
+            payload["send_at"] = datetime.fromisoformat(send_after).astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                "https://api.onesignal.com/notifications",
+                "https://api.webpushr.com/v1/notification/send/attribute",
                 json=payload,
-                headers={"Authorization": f"Key {ONESIGNAL_REST_API_KEY}", "Content-Type": "application/json"},
+                headers={
+                    "webpushrKey": WEBPUSHR_REST_API_KEY,
+                    "webpushrAuthToken": WEBPUSHR_AUTH_TOKEN,
+                    "Content-Type": "application/json",
+                },
                 timeout=15,
             )
         if resp.status_code >= 400:
-            logger.warning(f"OneSignal notification failed: {resp.status_code} {resp.text[:300]}")
+            logger.warning(f"Webpushr notification failed: {resp.status_code} {resp.text[:300]}")
             return False
         return True
     except Exception as e:
-        logger.warning(f"OneSignal notification failed: {e}")
+        logger.warning(f"Webpushr notification failed: {e}")
         return False
 
 
@@ -7103,10 +7081,10 @@ async def create_schedule(payload: SchedulePostIn, current_user: dict = Depends(
     }
     await db.scheduled_posts.insert_one(doc)
 
-    # Schedule the reminder with OneSignal right away — send_after delegates the actual
-    # timed delivery to OneSignal's infrastructure, so no backend polling loop is needed
+    # Schedule the reminder with Webpushr right away — send_after delegates the actual
+    # timed delivery to Webpushr's infrastructure, so no backend polling loop is needed
     # (works the same whether the backend is a persistent server or serverless/Vercel).
-    reminder_ok = await _send_onesignal_notification(
+    reminder_ok = await _send_push_notification(
         current_user["id"],
         f"⏰ Reminder: {payload.title or 'Konten'}",
         f"Jadwal posting kamu hari ini pukul {payload.post_time}. Ayo siapkan!",
@@ -7169,9 +7147,9 @@ async def update_schedule(post_id: str, payload: SchedulePostIn, current_user: d
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
 
-    # Re-schedule the reminder at the new time (the original OneSignal notification
+    # Re-schedule the reminder at the new time (the original Webpushr notification
     # from creation time is otherwise unaffected and would still fire at the old time).
-    reminder_ok = await _send_onesignal_notification(
+    reminder_ok = await _send_push_notification(
         current_user["id"],
         f"⏰ Reminder: {payload.title or 'Konten'}",
         f"Jadwal posting kamu hari ini pukul {payload.post_time}. Ayo siapkan!",
@@ -7231,7 +7209,7 @@ async def list_calendar(current_user: dict = Depends(get_current_user), month: O
 
 
 async def _apply_calendar_reminder(data: dict, user_id: str) -> None:
-    """Compute reminder_at (WIB) from scheduled_date/scheduled_time and fire the OneSignal
+    """Compute reminder_at (WIB) from scheduled_date/scheduled_time and fire the Webpushr
     reminder for a calendar_events doc, mirroring create_schedule/update_schedule. Mutates
     `data` in place with reminder_at/reminder_sent. No-op (clears reminder fields) when the
     frontend sent reminder_hours_before=None — e.g. the schedule is too close/past for any
@@ -7258,7 +7236,7 @@ async def _apply_calendar_reminder(data: dict, user_id: str) -> None:
         # elapsed would re-fire the notification every time, since this function otherwise runs
         # unconditionally on every create/update.
         return
-    data["reminder_sent"] = await _send_onesignal_notification(
+    data["reminder_sent"] = await _send_push_notification(
         user_id,
         f"⏰ Reminder: {data.get('title') or 'Konten'}",
         f"Jadwal posting kamu hari ini pukul {data['scheduled_time']}. Ayo siapkan!",

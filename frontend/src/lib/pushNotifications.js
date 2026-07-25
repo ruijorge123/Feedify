@@ -1,75 +1,28 @@
-// Web push via OneSignal — replaces the old raw VAPID/pywebpush flow.
-// The SDK is loaded + initialized in public/index.html (window.OneSignalDeferred).
+// Web push via Webpushr — replaces the OneSignal integration (see public/index.html for the
+// SDK snippet + public/webpushr-sw.js for the service worker). Unlike OneSignal, Webpushr shows
+// its own permission prompt automatically once the snippet loads — there is no documented
+// programmatic subscribe/unsubscribe/status API to drive a custom toggle button, so this module
+// only tags whichever subscriber ends up opted-in with the logged-in Feedify user's id (via
+// Webpushr's custom-attribute mechanism), so the backend can target them by that attribute.
 
-// Safe way to call OneSignal SDK methods from anywhere: queues the call if the SDK
-// hasn't finished loading/initializing yet, runs immediately once it has.
-// Guarded with a timeout — if OneSignal.init() never completes (wrong domain for this
-// App ID, network/ad-blocker issue, etc.) the deferred callback below never fires, and
-// callers would otherwise hang forever (e.g. a toggle stuck spinning) with no feedback.
-function withOneSignal(callback, timeoutMs = 8000) {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      reject(new Error("Layanan notifikasi tidak tersedia di sini (cek domain terdaftar)."));
-    }, timeoutMs);
+const WEBPUSHR_ATTRIBUTE_KEY = "feedify_user_id";
 
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    window.OneSignalDeferred.push(async (OneSignal) => {
-      if (settled) return;
-      try {
-        const result = await callback(OneSignal);
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        resolve(result);
-      } catch (e) {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        reject(e);
-      }
-    });
-  });
-}
-
-// Tags the current browser's push subscription with our own user id, so the backend
-// can target notifications straight to this Feedify account via OneSignal's REST API.
-// Called from AuthContext whenever the logged-in user changes — not tied to the
-// subscribe button, so it's already set by the time the user opts in.
-export function linkOneSignalUser(userId) {
-  return withOneSignal((OneSignal) => OneSignal.login(String(userId))).catch(() => {});
-}
-
-export function unlinkOneSignalUser() {
-  return withOneSignal((OneSignal) => OneSignal.logout()).catch(() => {});
-}
-
-export async function subscribeToPush() {
-  // optIn() alone shows the native permission prompt (if not already granted) AND
-  // subscribes in one step — calling requestPermission() first was a redundant extra
-  // round-trip that just made this feel slow for no benefit.
-  await withOneSignal((OneSignal) => OneSignal.User.PushSubscription.optIn());
-  if (Notification.permission !== "granted") throw new Error("Izin notifikasi ditolak");
-  return true;
-}
-
-export async function unsubscribeFromPush() {
-  return withOneSignal((OneSignal) => OneSignal.User.PushSubscription.optOut());
-}
-
-export async function getPushStatus() {
-  if (!("Notification" in window)) {
-    return { supported: false, subscribed: false, permission: "default" };
-  }
-  // Notification.permission is a plain synchronous browser API — reading it directly
-  // avoids waiting on the OneSignal SDK queue just for this part.
-  const permission = Notification.permission;
+function callWebpushr(...args) {
   try {
-    const subscribed = await withOneSignal((OneSignal) => !!OneSignal.User.PushSubscription.optedIn);
-    return { supported: true, subscribed, permission };
+    window.webpushr = window.webpushr || function () {
+      (window.webpushr.q = window.webpushr.q || []).push(arguments);
+    };
+    window.webpushr(...args);
   } catch {
-    return { supported: true, subscribed: false, permission };
+    // Snippet not loaded (blocked, offline, etc.) — safe to ignore, matches prior OneSignal
+    // behavior of failing silently rather than surfacing an error to the user.
   }
+}
+
+export function linkWebpushrUser(userId) {
+  callWebpushr("attributes", { [WEBPUSHR_ATTRIBUTE_KEY]: String(userId) });
+}
+
+export function unlinkWebpushrUser() {
+  callWebpushr("attributes", { [WEBPUSHR_ATTRIBUTE_KEY]: "" });
 }

@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import api from "@/lib/api";
-import { subscribeToPush, unsubscribeFromPush, getPushStatus } from "@/lib/pushNotifications";
 import { toast } from 'react-toastify';
 import { Link } from "react-router-dom";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -80,14 +79,11 @@ function NotifPanel() {
   const [notif, setNotif] = useState(null);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
-  const [pushStatus, setPushStatus] = useState({ supported: false, subscribed: false, permission: "default" });
-  const [pushLoading, setPushLoading] = useState(false);
 
   useEffect(() => {
     api.get("/notifications/settings")
       .then(({ data }) => setNotif(data))
       .catch(() => setNotif({ default_reminder_hours: 24, notifications_enabled: true }));
-    getPushStatus().then(setPushStatus);
   }, []);
 
   const save = async () => {
@@ -96,30 +92,6 @@ function NotifPanel() {
     catch { toast.error("Gagal menyimpan"); }
     finally { setSaving(false); }
   };
-
-  const handlePushToggle = useCallback(async () => {
-    setPushLoading(true);
-    try {
-      if (pushStatus.subscribed) {
-        await unsubscribeFromPush();
-        toast.success("Notifikasi HP dinonaktifkan");
-        setPushStatus(s => ({ ...s, subscribed: false }));
-      } else {
-        await subscribeToPush();
-        toast.success("Notifikasi HP aktif! Kamu akan dapat pengingat langsung di HP.");
-        setPushStatus(s => ({ ...s, subscribed: true, permission: "granted" }));
-      }
-    } catch (err) {
-      const msg = err.message || "";
-      if (msg.includes("ditolak") || msg.includes("denied")) {
-        toast.error("Izin notifikasi diblokir. Aktifkan di pengaturan browser kamu.");
-      } else {
-        toast.error(msg || "Gagal mengatur notifikasi");
-      }
-    } finally {
-      setPushLoading(false);
-    }
-  }, [pushStatus.subscribed]);
 
   if (!notif) return null;
 
@@ -133,9 +105,6 @@ function NotifPanel() {
         <div className="flex items-center gap-2">
           <Bell size={18} weight="duotone" className="text-brand-gold" />
           <span className="font-heading font-bold text-brand text-sm">Pengaturan Notifikasi Pengingat</span>
-          {pushStatus.subscribed && (
-            <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">HP ✓</span>
-          )}
         </div>
         {open ? <CaretUp size={14} className="text-stone-400" /> : <CaretDown size={14} className="text-stone-400" />}
       </button>
@@ -143,34 +112,11 @@ function NotifPanel() {
       {open && (
         <div className="px-5 pb-5 space-y-4 border-t border-brand-sand/50">
 
-          {/* Web Push — kirim notif ke HP */}
-          {pushStatus.supported && (
-            <div className={`mt-4 rounded-xl p-4 border-2 transition-all ${pushStatus.subscribed ? "border-brand bg-brand/5" : "border-stone-200 bg-stone-50"}`}>
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-brand text-sm">Notifikasi ke HP / Browser</div>
-                  <div className="text-xs text-stone-500 mt-0.5 leading-snug">
-                    {pushStatus.subscribed
-                      ? "Aktif — reminder dikirim langsung ke HP kamu"
-                      : pushStatus.permission === "denied"
-                        ? "Diblokir — aktifkan di pengaturan browser"
-                        : "Izinkan agar reminder muncul di HP meski browser tertutup"}
-                  </div>
-                </div>
-                <button
-                  onClick={handlePushToggle}
-                  disabled={pushLoading || pushStatus.permission === "denied"}
-                  data-testid="push-toggle"
-                  className={`flex-shrink-0 h-7 w-12 rounded-full transition-all duration-200 relative disabled:opacity-50 ${pushStatus.subscribed ? "bg-brand" : "bg-stone-300"}`}
-                >
-                  {pushLoading
-                    ? <CircleNotch size={14} className="animate-spin text-white absolute inset-0 m-auto" />
-                    : <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all duration-200 ${pushStatus.subscribed ? "left-5" : "left-0.5"}`} />
-                  }
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Web Push — Webpushr shows its own permission prompt automatically (bell/banner)
+              once the page loads; there's no custom toggle here anymore. */}
+          <div className="mt-4 rounded-xl p-3 border border-stone-200 bg-stone-50 text-xs text-stone-500 leading-snug">
+            Notifikasi HP/browser diatur otomatis lewat prompt izin dari Webpushr saat kamu membuka Feedify — izinkan saat diminta agar reminder muncul di HP/browser kamu.
+          </div>
 
           {/* Enable app reminder toggle */}
           <div className={`rounded-xl p-4 border-2 transition-all ${notif.notifications_enabled ? "border-brand/40 bg-brand/3" : "border-stone-200 bg-stone-50"}`}>
