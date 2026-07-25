@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import api from "@/lib/api";
 import { subscribeToPush, unsubscribeFromPush, getPushStatus } from "@/lib/pushNotifications";
@@ -219,11 +219,18 @@ export default function ContentCalendarPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [monthStr]);
 
-  // Keep the reminder selection valid whenever the user changes the date/time in the modal —
-  // e.g. switching from "in 3 days" to "tomorrow" must drop a stale "H-3 hari" selection
-  // instead of silently sending a reminder time that's already in the past.
+  // Keep the reminder selection valid whenever the user actively changes the date/time in the
+  // modal — e.g. switching from "in 3 days" to "tomorrow" must drop a stale "H-3 hari"
+  // selection instead of silently sending a reminder time that's already in the past.
+  // skipClampRef guards against this firing on the render that just OPENED the modal: without
+  // it, re-opening an entry whose schedule has since gotten too close (e.g. its reminder
+  // already fired) would immediately null out its already-saved reminder_hours_before before
+  // the user touched anything — so saving with no other changes would silently cancel a
+  // reminder that was working fine.
+  const skipClampRef = useRef(false);
   useEffect(() => {
     if (!showModal) return;
+    if (skipClampRef.current) { skipClampRef.current = false; return; }
     const opts = feasibleReminderOptions(form.scheduled_date, form.scheduled_time);
     if (opts.length === 0) {
       if (form.reminder_hours_before !== null) setForm((f) => ({ ...f, reminder_hours_before: null }));
@@ -261,11 +268,13 @@ export default function ContentCalendarPage() {
 
   const openAdd = (date) => {
     setEditing(null);
+    skipClampRef.current = true;
     setForm({ ...EMPTY_FORM, scheduled_date: ymd(date) });
     setShowModal(true);
   };
   const openEdit = (ev) => {
     setEditing(ev.id);
+    skipClampRef.current = true;
     setForm({ ...EMPTY_FORM, ...ev, prompt_id: ev.prompt_id || "" });
     setShowModal(true);
   };
