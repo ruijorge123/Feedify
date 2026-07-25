@@ -291,6 +291,12 @@ export default function ContentCalendarPage() {
   const save = async () => {
     if (!form.title.trim()) { toast.error("Judul wajib diisi"); return; }
     if (!form.photo_base64) { toast.error("Upload foto dulu sebelum menyimpan"); return; }
+    // Draft doesn't need a firm schedule yet — but "Terjadwal" is a commitment, so date +
+    // reminder must actually be set (not left at whatever was last displayed/disabled).
+    if (form.status === "scheduled") {
+      if (!form.scheduled_date) { toast.error("Tanggal posting wajib diisi untuk status Terjadwal"); return; }
+      if (form.reminder_hours_before == null) { toast.error("Waktu pengingat wajib diisi untuk status Terjadwal"); return; }
+    }
     const payload = { ...form, prompt_id: form.prompt_id || null };
     try {
       if (editing) await api.patch(`/calendar/${editing}`, payload);
@@ -573,7 +579,7 @@ export default function ContentCalendarPage() {
 
                 {/* Tanggal & Jam */}
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Tanggal Posting">
+                  <Field label={`Tanggal Posting${form.status === "scheduled" ? " *" : ""}`}>
                     <input type="date" className="input" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} data-testid="event-date" />
                   </Field>
                   <Field label="Jam Posting">
@@ -582,8 +588,10 @@ export default function ContentCalendarPage() {
                 </div>
 
                 {/* Waktu Pengingat — options are filtered to what's still feasible given the
-                    date/time above, so e.g. tomorrow's schedule never offers "H-3 hari sebelum". */}
-                <Field label="Waktu Pengingat">
+                    date/time above, so e.g. tomorrow's schedule never offers "H-3 hari sebelum".
+                    Required (*) only when status is "scheduled" — draft can be saved without
+                    committing to a firm date/reminder yet. */}
+                <Field label={`Waktu Pengingat${form.status === "scheduled" ? " *" : ""}`}>
                   {reminderOptions.length > 0 ? (
                     <>
                       <select
