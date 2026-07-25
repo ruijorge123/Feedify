@@ -60,6 +60,21 @@ function feasibleReminderOptions(dateStr, timeStr) {
   return REMINDER_OPTIONS.filter((o) => o.value < diff);
 }
 
+// Exact clock time the reminder notification will fire at, formatted in WIB regardless of the
+// browser/device's own timezone setting — lets the user see e.g. "25 Jul, 22:30 WIB" instead of
+// just "H-30 menit sebelum" and having to do the subtraction themselves.
+function formatReminderClockTime(dateStr, timeStr, reminderHours) {
+  if (!dateStr || reminderHours == null) return "";
+  const target = new Date(`${dateStr}T${timeStr || "09:00"}:00+07:00`);
+  const reminderTime = new Date(target.getTime() - reminderHours * 60 * 60 * 1000);
+  const parts = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(reminderTime);
+  const get = (type) => parts.find((p) => p.type === type)?.value || "";
+  return `${get("day")} ${get("month")}, ${get("hour")}:${get("minute")} WIB`;
+}
+
 // ─── Notification panel (extracted) ──────────────────────────────
 function NotifPanel() {
   const [notif, setNotif] = useState(null);
@@ -610,7 +625,9 @@ export default function ContentCalendarPage() {
                         >
                           {reminderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
-                        <p className="text-[11px] text-stone-400 mt-1">Kamu akan dapat notifikasi di Feedify sebelum jadwal posting ini.</p>
+                        <p className="text-[11px] text-stone-400 mt-1">
+                          Kamu akan dapat notifikasi di Feedify pada <strong className="text-stone-600">{formatReminderClockTime(form.scheduled_date, form.scheduled_time, form.reminder_hours_before)}</strong>.
+                        </p>
                       </>
                     ) : form.reminder_hours_before != null ? (
                       <>
@@ -622,7 +639,9 @@ export default function ContentCalendarPage() {
                             {REMINDER_OPTIONS.find(o => o.value === form.reminder_hours_before)?.label || `H-${form.reminder_hours_before} jam sebelum`}
                           </option>
                         </select>
-                        <p className="text-[11px] text-stone-400 mt-1">Jadwal sudah lewat — pengingat ini terkunci dan tidak bisa diubah lagi.</p>
+                        <p className="text-[11px] text-stone-400 mt-1">
+                          Jadwal sudah lewat — pengingat ini terkunci di <strong className="text-stone-600">{formatReminderClockTime(form.scheduled_date, form.scheduled_time, form.reminder_hours_before)}</strong> dan tidak bisa diubah lagi.
+                        </p>
                       </>
                     ) : (
                       <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
