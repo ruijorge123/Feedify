@@ -7231,7 +7231,7 @@ async def _apply_calendar_reminder(data: dict, user_id: str) -> None:
         user_id,
         f"⏰ Reminder: {data.get('title') or 'Konten'}",
         f"Jadwal posting kamu hari ini pukul {data['scheduled_time']}. Ayo siapkan!",
-        send_after=reminder_at,
+        send_after=data["reminder_at"],
     )
 
 

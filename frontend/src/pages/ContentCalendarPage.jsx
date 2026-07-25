@@ -291,10 +291,10 @@ export default function ContentCalendarPage() {
   const save = async () => {
     if (!form.title.trim()) { toast.error("Judul wajib diisi"); return; }
     if (!form.photo_base64) { toast.error("Upload foto dulu sebelum menyimpan"); return; }
-    // Draft doesn't need a firm schedule yet — but "Terjadwal" is a commitment, so date +
-    // reminder must actually be set (not left at whatever was last displayed/disabled).
+    // Draft doesn't need a firm posting time/reminder yet (those fields are hidden for it) —
+    // but "Terjadwal" is a commitment, so jam posting + reminder must actually be set.
     if (form.status === "scheduled") {
-      if (!form.scheduled_date) { toast.error("Tanggal posting wajib diisi untuk status Terjadwal"); return; }
+      if (!form.scheduled_time) { toast.error("Jam posting wajib diisi untuk status Terjadwal"); return; }
       if (form.reminder_hours_before == null) { toast.error("Waktu pengingat wajib diisi untuk status Terjadwal"); return; }
     }
     const payload = { ...form, prompt_id: form.prompt_id || null };
@@ -577,51 +577,60 @@ export default function ContentCalendarPage() {
                   <input type="text" className="input" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} data-testid="event-title" placeholder="mis. Promo weekend, Konten edukasi..." />
                 </Field>
 
-                {/* Tanggal & Jam */}
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label={`Tanggal Posting${form.status === "scheduled" ? " *" : ""}`}>
+                {/* Tanggal — always shown regardless of status. Jam Posting + Waktu Pengingat
+                    only matter (and only appear) once the content is actually "Terjadwal";
+                    draft has no firm posting time yet, so those two fields stay hidden for it. */}
+                {form.status === "scheduled" ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Tanggal Posting">
+                      <input type="date" className="input" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} data-testid="event-date" />
+                    </Field>
+                    <Field label="Jam Posting *">
+                      <input type="time" className="input" value={form.scheduled_time} onChange={e => setForm(f => ({ ...f, scheduled_time: e.target.value }))} data-testid="event-time" />
+                    </Field>
+                  </div>
+                ) : (
+                  <Field label="Tanggal Posting">
                     <input type="date" className="input" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} data-testid="event-date" />
                   </Field>
-                  <Field label="Jam Posting">
-                    <input type="time" className="input" value={form.scheduled_time} onChange={e => setForm(f => ({ ...f, scheduled_time: e.target.value }))} data-testid="event-time" />
-                  </Field>
-                </div>
+                )}
 
-                {/* Waktu Pengingat — options are filtered to what's still feasible given the
-                    date/time above, so e.g. tomorrow's schedule never offers "H-3 hari sebelum".
-                    Required (*) only when status is "scheduled" — draft can be saved without
-                    committing to a firm date/reminder yet. */}
-                <Field label={`Waktu Pengingat${form.status === "scheduled" ? " *" : ""}`}>
-                  {reminderOptions.length > 0 ? (
-                    <>
-                      <select
-                        className="input text-sm"
-                        value={form.reminder_hours_before ?? ""}
-                        onChange={e => setForm(f => ({ ...f, reminder_hours_before: parseFloat(e.target.value) }))}
-                        data-testid="event-reminder"
-                      >
-                        {reminderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
-                      <p className="text-[11px] text-stone-400 mt-1">Kamu akan dapat notifikasi di Feedify sebelum jadwal posting ini.</p>
-                    </>
-                  ) : form.reminder_hours_before != null ? (
-                    <>
-                      {/* A reminder was already set (and likely already sent) before the schedule
-                          got this close/passed — show it locked-in rather than implying nothing
-                          was ever configured, which is what the plain "no options" message did. */}
-                      <select className="input text-sm bg-stone-100 text-stone-400 cursor-not-allowed" value={form.reminder_hours_before} disabled data-testid="event-reminder">
-                        <option value={form.reminder_hours_before}>
-                          {REMINDER_OPTIONS.find(o => o.value === form.reminder_hours_before)?.label || `H-${form.reminder_hours_before} jam sebelum`}
-                        </option>
-                      </select>
-                      <p className="text-[11px] text-stone-400 mt-1">Jadwal sudah lewat — pengingat ini terkunci dan tidak bisa diubah lagi.</p>
-                    </>
-                  ) : (
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                      Jadwal terlalu dekat atau sudah lewat — tidak ada opsi pengingat yang bisa diatur.
-                    </p>
-                  )}
-                </Field>
+                {/* Waktu Pengingat — only shown (and required) once status is "Terjadwal".
+                    Options are filtered to what's still feasible given the date/time above, so
+                    e.g. tomorrow's schedule never offers "H-3 hari sebelum". */}
+                {form.status === "scheduled" && (
+                  <Field label="Waktu Pengingat *">
+                    {reminderOptions.length > 0 ? (
+                      <>
+                        <select
+                          className="input text-sm"
+                          value={form.reminder_hours_before ?? ""}
+                          onChange={e => setForm(f => ({ ...f, reminder_hours_before: parseFloat(e.target.value) }))}
+                          data-testid="event-reminder"
+                        >
+                          {reminderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                        <p className="text-[11px] text-stone-400 mt-1">Kamu akan dapat notifikasi di Feedify sebelum jadwal posting ini.</p>
+                      </>
+                    ) : form.reminder_hours_before != null ? (
+                      <>
+                        {/* A reminder was already set (and likely already sent) before the schedule
+                            got this close/passed — show it locked-in rather than implying nothing
+                            was ever configured, which is what the plain "no options" message did. */}
+                        <select className="input text-sm bg-stone-100 text-stone-400 cursor-not-allowed" value={form.reminder_hours_before} disabled data-testid="event-reminder">
+                          <option value={form.reminder_hours_before}>
+                            {REMINDER_OPTIONS.find(o => o.value === form.reminder_hours_before)?.label || `H-${form.reminder_hours_before} jam sebelum`}
+                          </option>
+                        </select>
+                        <p className="text-[11px] text-stone-400 mt-1">Jadwal sudah lewat — pengingat ini terkunci dan tidak bisa diubah lagi.</p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                        Jadwal terlalu dekat atau sudah lewat — tidak ada opsi pengingat yang bisa diatur.
+                      </p>
+                    )}
+                  </Field>
+                )}
 
                 {/* Status */}
                 <Field label="Status">
