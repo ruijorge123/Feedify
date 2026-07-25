@@ -35,6 +35,7 @@ const STATUS_LABEL = { scheduled: "Terjadwal", posted: "Sudah Posted", draft: "D
 const EMPTY_FORM = { title: "", scheduled_date: "", scheduled_time: "09:00", reminder_hours_before: 24, prompt_id: "", notes: "", status: "draft", photo_base64: null, caption: "" };
 
 const REMINDER_OPTIONS = [
+  { value: 0.5, label: "H-30 menit sebelum" },
   { value: 1, label: "H-1 jam sebelum" },
   { value: 3, label: "H-3 jam sebelum" },
   { value: 6, label: "H-6 jam sebelum" },
@@ -579,7 +580,7 @@ export default function ContentCalendarPage() {
                       <select
                         className="input text-sm"
                         value={form.reminder_hours_before ?? ""}
-                        onChange={e => setForm(f => ({ ...f, reminder_hours_before: parseInt(e.target.value) }))}
+                        onChange={e => setForm(f => ({ ...f, reminder_hours_before: parseFloat(e.target.value) }))}
                         data-testid="event-reminder"
                       >
                         {reminderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}

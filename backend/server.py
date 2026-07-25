@@ -377,7 +377,7 @@ class CalendarEventIn(BaseModel):
     title: str
     scheduled_date: str  # ISO date string (YYYY-MM-DD)
     scheduled_time: str = "09:00"
-    reminder_hours_before: Optional[int] = None  # None = no reminder (e.g. schedule too close/past for any option)
+    reminder_hours_before: Optional[float] = None  # float — smallest option is 0.5 (H-30 menit); None = no reminder possible
     prompt_id: Optional[str] = None
     notes: str = ""
     status: str = "draft"  # draft, scheduled, posted
