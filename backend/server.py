@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone, timedelta
+WIB_TZ = timezone(timedelta(hours=7))  # Waktu Indonesia Barat — all Feedify users are Indonesian UMKM
 import bcrypt
 import jwt as pyjwt
 import json
@@ -5481,10 +5482,18 @@ Kembalikan HANYA JSON valid (tanpa fence):
 # ============= PROMPT HISTORY =============
 @api_router.get("/prompts")
 async def list_prompts(current_user: dict = Depends(get_current_user), dashboard_type: Optional[str] = None):
+    """List view — excludes full-resolution images. Fetching up to 200 docs' worth of
+    generated images at once crashed the serverless function (OOM/timeout on Vercel);
+    the frontend falls back to a type icon in the grid. Full image is fetched separately
+    via GET /prompts/{id} when the user actually opens one."""
     query = {"user_id": current_user["id"]}
     if dashboard_type:
         query["dashboard_type"] = dashboard_type
-    items = await db.generated_prompts.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    projection = {
+        "_id": 0, "image_base64": 0, "slide_images": 0,
+        "product_photo_base64": 0, "reference_image_base64": 0,
+    }
+    items = await db.generated_prompts.find(query, projection).sort("created_at", -1).to_list(200)
     return items
 
 
@@ -6678,20 +6687,45 @@ async def _migrate_compress_payment_proofs():
         logger.warning(f"Payment proof migration failed: {e}")
 
 
+async def _migrate_compress_calendar_photos():
+    """One-time background pass: shrink oversized calendar content photos already stored.
+    GET /calendar has no field exclusion (unlike /prompts and /schedule) since the edit
+    modal reuses the list-fetched photo directly — so uncompressed photos here directly
+    slow down every Calendar Planner page load, not just detail views (idempotent)."""
+    try:
+        await asyncio.sleep(7)  # let startup settle first
+        compressed = 0
+        cursor = db.calendar_events.find({"photo_base64": {"$ne": None}}, {"id": 1, "photo_base64": 1})
+        async for ev in cursor:
+            photo = ev.get("photo_base64")
+            if not photo or len(photo) < 200_000:  # ~150KB — already small, skip
+                continue
+            new_photo = _compress_product_photo(photo)
+            if new_photo != photo and len(new_photo) < len(photo):
+                await db.calendar_events.update_one({"id": ev["id"]}, {"$set": {"photo_base64": new_photo}})
+                compressed += 1
+        if compressed:
+            logger.info(f"Compressed {compressed} oversized calendar content photo(s).")
+    except Exception as e:
+        logger.warning(f"Calendar photo migration failed: {e}")
+
+
 # ============= SCHEDULING ENDPOINTS =============
 
 @api_router.post("/schedule")
 async def create_schedule(payload: SchedulePostIn, current_user: dict = Depends(get_current_user)):
     """Schedule a generated post with reminder notification."""
-    # Calculate reminder_at datetime
+    # Calculate reminder_at datetime. post_date/post_time are entered by Indonesian UMKM
+    # users in WIB (UTC+7) — they were previously stamped as UTC directly, so a reminder
+    # for "20:00" (8 PM WIB) would fire 7 hours early/late instead of on time.
     try:
         h, m = payload.post_time.split(":")
         post_dt = datetime.strptime(payload.post_date, "%Y-%m-%d").replace(
-            hour=int(h), minute=int(m), tzinfo=timezone.utc
+            hour=int(h), minute=int(m), tzinfo=WIB_TZ
         )
     except Exception:
         post_dt = datetime.strptime(payload.post_date, "%Y-%m-%d").replace(
-            hour=9, minute=0, tzinfo=timezone.utc
+            hour=9, minute=0, tzinfo=WIB_TZ
         )
     reminder_at = (post_dt - timedelta(hours=payload.reminder_hours_before)).isoformat()
 
@@ -6769,10 +6803,10 @@ async def update_schedule(post_id: str, payload: SchedulePostIn, current_user: d
     try:
         h, m = payload.post_time.split(":")
         post_dt = datetime.strptime(payload.post_date, "%Y-%m-%d").replace(
-            hour=int(h), minute=int(m), tzinfo=timezone.utc
+            hour=int(h), minute=int(m), tzinfo=WIB_TZ
         )
     except Exception:
-        post_dt = datetime.strptime(payload.post_date, "%Y-%m-%d").replace(hour=9, tzinfo=timezone.utc)
+        post_dt = datetime.strptime(payload.post_date, "%Y-%m-%d").replace(hour=9, tzinfo=WIB_TZ)
     reminder_at = (post_dt - timedelta(hours=payload.reminder_hours_before)).isoformat()
 
     update = {
@@ -6791,6 +6825,17 @@ async def update_schedule(post_id: str, payload: SchedulePostIn, current_user: d
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
+
+    # Re-schedule the reminder at the new time (the original OneSignal notification
+    # from creation time is otherwise unaffected and would still fire at the old time).
+    reminder_ok = await _send_onesignal_notification(
+        current_user["id"],
+        f"⏰ Reminder: {payload.title or 'Konten'}",
+        f"Jadwal posting kamu hari ini pukul {payload.post_time}. Ayo siapkan!",
+        send_after=reminder_at,
+    )
+    if reminder_ok:
+        await db.scheduled_posts.update_one({"id": post_id}, {"$set": {"reminder_sent": True}})
     return {"updated": True}
 
 
@@ -6845,10 +6890,13 @@ async def list_calendar(current_user: dict = Depends(get_current_user), month: O
 @api_router.post("/calendar")
 async def create_calendar_event(payload: CalendarEventIn, current_user: dict = Depends(get_current_user)):
     event_id = str(uuid.uuid4())
+    data = payload.model_dump()
+    if data.get("photo_base64"):
+        data["photo_base64"] = _compress_product_photo(data["photo_base64"])
     doc = {
         "id": event_id,
         "user_id": current_user["id"],
-        **payload.model_dump(),
+        **data,
         "created_at": now_iso(),
     }
     await db.calendar_events.insert_one(doc)
@@ -6857,9 +6905,12 @@ async def create_calendar_event(payload: CalendarEventIn, current_user: dict = D
 
 @api_router.patch("/calendar/{event_id}")
 async def update_calendar_event(event_id: str, payload: CalendarEventIn, current_user: dict = Depends(get_current_user)):
+    data = payload.model_dump()
+    if data.get("photo_base64"):
+        data["photo_base64"] = _compress_product_photo(data["photo_base64"])
     result = await db.calendar_events.update_one(
         {"id": event_id, "user_id": current_user["id"]},
-        {"$set": payload.model_dump()},
+        {"$set": data},
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
@@ -8824,6 +8875,7 @@ app.add_middleware(
 async def startup():
     asyncio.create_task(_migrate_compress_product_photos())
     asyncio.create_task(_migrate_compress_payment_proofs())
+    asyncio.create_task(_migrate_compress_calendar_photos())
     _start_market_cache_cleanup()
 
 

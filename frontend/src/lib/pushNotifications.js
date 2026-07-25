@@ -3,13 +3,31 @@
 
 // Safe way to call OneSignal SDK methods from anywhere: queues the call if the SDK
 // hasn't finished loading/initializing yet, runs immediately once it has.
-function withOneSignal(callback) {
+// Guarded with a timeout — if OneSignal.init() never completes (wrong domain for this
+// App ID, network/ad-blocker issue, etc.) the deferred callback below never fires, and
+// callers would otherwise hang forever (e.g. a toggle stuck spinning) with no feedback.
+function withOneSignal(callback, timeoutMs = 8000) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("Layanan notifikasi tidak tersedia di sini (cek domain terdaftar)."));
+    }, timeoutMs);
+
     window.OneSignalDeferred = window.OneSignalDeferred || [];
     window.OneSignalDeferred.push(async (OneSignal) => {
+      if (settled) return;
       try {
-        resolve(await callback(OneSignal));
+        const result = await callback(OneSignal);
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(result);
       } catch (e) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         reject(e);
       }
     });

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import api from "@/lib/api";
 import { subscribeToPush, unsubscribeFromPush, getPushStatus } from "@/lib/pushNotifications";
 import { toast } from 'react-toastify';
@@ -192,16 +193,16 @@ export default function ContentCalendarPage() {
   const monthStr = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`;
 
   const load = async () => {
-    try {
-      const [e, p, s] = await Promise.all([
-        api.get("/calendar", { params: { month: monthStr } }),
-        api.get("/prompts"),
-        api.get("/schedule", { params: { month: monthStr } }),
-      ]);
-      setEvents(e.data);
-      setPrompts(p.data);
-      setScheduledPosts(s.data);
-    } catch {}
+    // allSettled — a single failing endpoint (e.g. /prompts) must never wipe out the
+    // other two, which can succeed independently and still have data to show.
+    const [e, p, s] = await Promise.allSettled([
+      api.get("/calendar", { params: { month: monthStr } }),
+      api.get("/prompts"),
+      api.get("/schedule", { params: { month: monthStr } }),
+    ]);
+    if (e.status === "fulfilled") setEvents(e.value.data);
+    if (p.status === "fulfilled") setPrompts(p.value.data);
+    if (s.status === "fulfilled") setScheduledPosts(s.value.data);
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -466,10 +467,13 @@ export default function ContentCalendarPage() {
         )}
       </div>
 
-      {/* Event modal — tambah/edit konten manual */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 bg-brand/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6" onClick={() => setShowModal(false)} data-testid="event-modal">
-          <div onClick={e => e.stopPropagation()} className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[92vh] overflow-y-auto">
+      {/* Event modal — tambah/edit konten manual.
+          Portaled to <body> so it escapes AppShell's <main> stacking context (relative z-10),
+          otherwise the fixed bottom nav (z-40) renders ON TOP of the modal and hides the
+          Simpan button. z-[60] keeps it above the nav on all viewports. */}
+      {showModal && createPortal(
+        <div className="fixed inset-0 z-[60] bg-brand/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6" onClick={() => setShowModal(false)} data-testid="event-modal">
+          <div onClick={e => e.stopPropagation()} className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[92vh] overflow-y-auto flex flex-col">
             {/* Modal header */}
             <div className="sticky top-0 bg-white border-b border-brand-sand px-6 py-4 flex items-center justify-between z-10">
               <div className="font-heading text-lg font-bold text-brand">{editing ? "Edit Konten" : "Tambah Konten"}</div>
@@ -548,23 +552,27 @@ export default function ContentCalendarPage() {
                   <textarea className="input resize-none text-sm" rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Hook, konsep visual, referensi..." />
                 </Field>
               </div>
+            </div>
 
-              {/* Actions */}
-              <div className="flex gap-3 pt-1">
-                {editing && (
-                  <button onClick={() => removeEvent(editing)} data-testid="delete-event-btn"
-                    className="px-4 py-2.5 text-red-600 border border-red-200 rounded-full text-sm font-medium hover:bg-red-50 inline-flex items-center gap-1 btn-touch">
-                    <Trash size={14} /> Hapus
-                  </button>
-                )}
-                <button onClick={save} data-testid="save-event-btn"
-                  className="flex-1 py-2.5 bg-brand text-brand-cream rounded-full font-semibold text-sm hover:bg-brand-light btn-touch">
-                  {editing ? "Simpan Perubahan" : "Simpan Konten"}
+            {/* Actions — sticky footer inside the modal's own scroll area, so it's always
+                reachable above the mobile bottom nav (and never needs scrolling to find
+                on desktop) regardless of how tall the form content above gets. */}
+            <div className="sticky bottom-0 bg-white border-t border-brand-sand px-6 pt-4 flex gap-3"
+              style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}>
+              {editing && (
+                <button onClick={() => removeEvent(editing)} data-testid="delete-event-btn"
+                  className="px-4 py-2.5 text-red-600 border border-red-200 rounded-full text-sm font-medium hover:bg-red-50 inline-flex items-center gap-1 btn-touch">
+                  <Trash size={14} /> Hapus
                 </button>
-              </div>
+              )}
+              <button onClick={save} data-testid="save-event-btn"
+                className="flex-1 py-2.5 bg-brand text-brand-cream rounded-full font-semibold text-sm hover:bg-brand-light btn-touch">
+                {editing ? "Simpan Perubahan" : "Simpan Konten"}
+              </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <ConfirmDialog
