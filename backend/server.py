@@ -6961,6 +6961,12 @@ async def _send_onesignal_notification(user_id: str, title: str, body: str, send
         "include_subscription_ids": subscription_ids,
         "headings": {"en": title},
         "contents": {"en": body},
+        # The OneSignal app has no chrome_web_default_notification_icon configured (confirmed
+        # empty via the Apps API) and we never sent one per-notification either — this was
+        # confirmed as the cause of Android Chrome falling back to its generic "This site has
+        # been updated in the background" banner instead of showing our actual title/body.
+        "chrome_web_icon": "https://feedify-ai.vercel.app/icon-192.png",
+        "firefox_icon": "https://feedify-ai.vercel.app/icon-192.png",
     }
     if send_after:
         payload["send_after"] = send_after
