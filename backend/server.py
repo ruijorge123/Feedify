@@ -780,11 +780,51 @@ def _aspect_to_edit_size(aspect_ratio: str) -> str:
     return "1024x1792"
 
 
+# Mirrors frontend/src/lib/brandDna.js BRAND_DONTS_CATEGORIES — maps each don't-item string to
+# its category id so brand don'ts can be filtered by category (see _filter_brand_donts below).
+_BRAND_DONTS_BY_CATEGORY = {
+    "tampilan": ["Terlalu ramai", "Terlalu banyak dekorasi", "Terlalu banyak tulisan", "Terlalu penuh elemen",
+                 "Terlihat murahan", "Terlihat seperti marketplace", "Terlihat seperti brosur jadul",
+                 "Terlihat seperti template biasa", "Terlihat tidak profesional"],
+    "warna": ["Warna terlalu mencolok", "Warna neon", "Warna gelap dominan", "Warna pastel dominan",
+              "Warna pink dominan", "Warna emas berlebihan", "Warna hitam dominan"],
+    "latar": ["Latar gelap", "Latar terlalu ramai", "Latar putih polos", "Latar kayu", "Latar marmer",
+              "Latar luar ruangan", "Latar kafe", "Latar taman", "Latar rumah"],
+    "objek": ["Bunga", "Daun", "Air percikan", "Buah-buahan", "Model wanita", "Model pria", "Anak-anak",
+              "Hewan", "Karakter kartun", "Maskot", "Perhiasan", "Aksesori mewah", "Lampu neon"],
+    "suasana": ["Terlalu mewah", "Terlalu formal", "Terlalu feminin", "Terlalu maskulin", "Terlalu lucu",
+                "Terlalu serius", "Terlalu anak muda", "Terlalu korporat", "Terlalu futuristik",
+                "Terlalu artistik", "Terlalu elegan"],
+    "ai": ["Produk melayang", "Terlalu terlihat buatan", "Kulit terlalu sempurna", "Cahaya berlebihan",
+           "Efek berlebihan", "Refleksi tidak realistis", "Komposisi aneh", "Bentuk produk berubah",
+           "Terlalu seperti render 3D"],
+}
+_BRAND_DONTS_CATEGORY_OF = {item: cat for cat, items in _BRAND_DONTS_BY_CATEGORY.items() for item in items}
+# suasana/latar/tampilan describe mood/background/general style — redundant (or contradictory)
+# with "match the reference photo" once one is attached, since the reference already dictates
+# those. warna/objek/ai stay in force regardless: colors are deliberately remapped away from the
+# reference's own colors, objek is a brand-safety/appropriateness concern, and ai guards against
+# generation artifacts (e.g. "Cahaya berlebihan") the reference has no control over.
+_BRAND_DONTS_SKIP_WHEN_REFERENCE = {"suasana", "latar", "tampilan"}
+
+
+def _filter_brand_donts(brand_donts: list, has_reference: bool) -> list:
+    if not has_reference:
+        return brand_donts
+    return [d for d in brand_donts if _BRAND_DONTS_CATEGORY_OF.get(d) not in _BRAND_DONTS_SKIP_WHEN_REFERENCE]
+
+
 def _build_natural_prompt(json_prompt: dict) -> str:
     """Convert deterministic JSON spec to natural language prompt for gpt-image-1.
     Dispatches to type-specific prompt builders for best results per dashboard."""
     task_type = json_prompt.get("task_type", "")
 
+    if task_type == "reference_layout_product_replacement":
+        # This schema is plain boolean-flag JSON, not the prompt_structure shape the other
+        # builders below expect — the fallback generic path would silently drop almost all of
+        # it. Passing the JSON through as-is matches exactly what was confirmed to work when
+        # pasted into ChatGPT directly (the current production flow for reference-photo mode).
+        return json.dumps(json_prompt, indent=2, ensure_ascii=False)
     if task_type == "instagram_feed_post_generation":
         return _natural_feed(json_prompt)
     elif task_type == "instagram_carousel_slide_generation":
@@ -859,14 +899,26 @@ def _natural_feed(j: dict) -> str:
     auto_headline = j.get("auto_headline", False)
     campaign_goal_key = j.get("campaign_goal_key", "brand_awareness")
 
-    # Opening — commercial product photography framing
-    p = (
-        f"Professional commercial product photography for '{brand_name}'"
-        + (f" featuring '{product_name}'" if product_name != brand_name else "")
-        + ". "
-    )
+    # Opening — system_directive (elite art-director framing + the critical "product is SACRED"
+    # rule when a reference photo is attached) supersedes the plain photography framing whenever
+    # it's present; this field was previously built but never read here at all.
+    system_directive = j.get("system_directive", "")
+    if system_directive:
+        p = system_directive + " "
+    else:
+        p = (
+            f"Professional commercial product photography for '{brand_name}'"
+            + (f" featuring '{product_name}'" if product_name != brand_name else "")
+            + ". "
+        )
     if brief:
         p += f"Creative brief: {brief}. "
+
+    # brand_context carries positioning, personality, archetype, tone, keywords, proof points,
+    # signature phrase, and (category-filtered) brand don'ts — previously built but never read.
+    brand_context = s.get("brand_context", "")
+    if brand_context:
+        p += f"{brand_context} "
 
     # Shot concept
     if concept_block:
@@ -881,56 +933,78 @@ def _natural_feed(j: dict) -> str:
     if variation:
         p += f"Variation: {variation}. "
 
-    if emotional_directive:
+    if emotional_directive and not has_reference:
         p += f"{emotional_directive}. "
 
-    # Lighting and photography style
-    p += "Photorealistic studio photography, sharp product with beautiful soft bokeh. "
-    if lighting:
-        p += f"Lighting: {lighting}. "
-    else:
-        p += "Soft, even studio lighting with gentle natural highlights. "
-    if color_temp:
-        p += f"Color temperature: {color_temp}. "
-    if aesthetic:
-        p += f"Aesthetic: {aesthetic}. "
+    # Lighting and photography style — skipped entirely with a reference photo: its own
+    # lighting/mood is what must be preserved, not a generic studio/bokeh look imposed on top.
+    if not has_reference:
+        p += "Photorealistic studio photography, sharp product with beautiful soft bokeh. "
+        if lighting:
+            p += f"Lighting: {lighting}. "
+        else:
+            p += "Soft, even studio lighting with gentle natural highlights. "
+        if color_temp:
+            p += f"Color temperature: {color_temp}. "
+        if aesthetic:
+            p += f"Aesthetic: {aesthetic}. "
 
-    # Brand color palette — applies to SCENE ONLY, never to the product object itself
-    if p_primary and p_secondary:
-        p += (
-            f"BRAND COLOR PALETTE for SCENE (NOT product): Background, surface, props, and lighting should "
-            f"use tones inspired by brand primary {p_primary} and secondary {p_secondary}. "
-            f"Photographic interpretation — not flat color fill. "
-            f"Do NOT apply these colors to the product itself; the product's own colors are frozen. "
-        )
-    elif p_primary:
-        p += (
-            f"SCENE color palette: Background and props should reflect brand color {p_primary} "
-            f"(photographic, not flat fill). Product's own colors must not change. "
-        )
+        # Brand color palette — applies to SCENE ONLY, never to the product object itself.
+        # Skipped with a reference photo (see below): its own colors must be preserved exactly,
+        # not translated to brand tones — that translation used to happen unconditionally and
+        # directly fought the "recreate the reference exactly" instruction.
+        if p_primary and p_secondary:
+            p += (
+                f"BRAND COLOR PALETTE for SCENE (NOT product): Background, surface, props, and lighting should "
+                f"use tones inspired by brand primary {p_primary} and secondary {p_secondary}. "
+                f"Photographic interpretation — not flat color fill. "
+                f"Do NOT apply these colors to the product itself; the product's own colors are frozen. "
+            )
+        elif p_primary:
+            p += (
+                f"SCENE color palette: Background and props should reflect brand color {p_primary} "
+                f"(photographic, not flat fill). Product's own colors must not change. "
+            )
 
-    # Reference image — adopt composition ONLY, translate colors to brand palette
+    # Reference image — treat it as the final approved composition to recreate as closely as
+    # possible; ONLY the product is swapped in. Colors/lighting/background/props/layout are all
+    # preserved from the reference, not translated to the brand palette (a prior version of this
+    # instruction said to recolor the scene, which fought directly against "recreate the
+    # reference exactly" and was a major, confirmed cause of results drifting from the reference).
     reference_composition = j.get("reference_composition", "")
     if reference_composition:
         p += (
             f"RECREATE THIS COMPOSITION EXACTLY: {reference_composition} "
-            f"Apply this exact physical arrangement but translate ALL colors to brand palette "
-            f"({p_primary} for dominant tones, {p_secondary} for accents). "
-            "Do not copy the reference's colors — only its layout, angles, and staging. "
+            "Preserve its exact colors, lighting, background, props, and layout — do not "
+            "translate anything to the brand palette. Only the product itself is replaced. "
         )
     elif has_reference:
         p += (
-            "A reference/inspiration image was provided. "
-            "Adopt its composition, camera angle, product placement, and staging structure. "
-            f"Translate all colors to brand palette ({p_primary}, {p_secondary}). "
+            "Treat the reference/inspiration image as the FINAL APPROVED composition — recreate "
+            "it as closely as possible (95-100% similarity target). Preserve its exact camera "
+            "angle, framing, composition, background, props, colors, lighting direction, shadows, "
+            "and — if a human model is present in the reference — their pose, expression, and "
+            "identity exactly. The ONLY thing that changes is the product, swapped in from the "
+            "product photo. Do not invent new props, background elements, or a new layout — this "
+            "is a product replacement inside an existing approved scene, not a new design. "
         )
 
-    # Background and scene environment
-    if category_env or ambient_props:
-        env_parts = [x for x in [category_env, ambient_props] if x]
-        p += f"Scene environment: {' '.join(env_parts)}. "
-    elif not has_reference:
-        p += "Background: clean, elegant lifestyle scene with natural props that match the brand palette. "
+    # integration_directive — "product photo is FINAL and LOCKED" compositing rule; previously
+    # built in product_visual_layout but never read here (only composition_style was extracted).
+    integration_directive = layout.get("integration_directive", "")
+    if integration_directive:
+        p += f"{integration_directive} "
+
+    # Background and scene environment — skipped with a reference photo: its own background/props
+    # must be preserved exactly, not overridden with a category-default scene description (this
+    # used to fire unconditionally, e.g. injecting "white marble, botanical accents" regardless
+    # of what the reference actually showed).
+    if not has_reference:
+        if category_env or ambient_props:
+            env_parts = [x for x in [category_env, ambient_props] if x]
+            p += f"Scene environment: {' '.join(env_parts)}. "
+        else:
+            p += "Background: clean, elegant lifestyle scene with natural props that match the brand palette. "
 
     # Composition — skip when a reference photo is present: the "adopt its composition"
     # instruction above (has_reference/reference_composition block) already covers this, and a
@@ -976,22 +1050,43 @@ def _natural_feed(j: dict) -> str:
     else:
         p += "Typography: modern bold sans-serif, clean and readable, intentional negative space. "
 
-    # Human model directive
-    if human_directive:
+    # Human model directive — skipped with a reference photo: if the reference already shows a
+    # person, their identity/pose/expression must be preserved (see reference block above), not
+    # overridden by a separately-configured talent directive.
+    if human_directive and not has_reference:
         p += f"Model and talent direction: {human_directive}. "
 
-    # Product as the absolute hero
-    p += (
-        "The product is the absolute hero — prominently featured, perfectly lit, "
-        "photographic realism with accurate reflections and natural drop shadows. "
-        "Product edges must look natural and photographic, not digitally cut-out. "
-    )
+    # Product as the absolute hero — stronger, explicit non-reinterpretation language when a
+    # reference photo is present (this used to be identical in both cases, which read more like
+    # a generic "make it hero" note than an actual preservation instruction).
+    if has_reference:
+        p += (
+            "The product must remain 100% IDENTICAL to the provided product photo — same shape, "
+            "color, label, texture, and proportions, zero reinterpretation. It is composited into "
+            "the scene, not redrawn. Edges must look natural and photographic, not digitally "
+            "cut-out, with accurate reflections and drop shadows matching the scene's lighting. "
+        )
+    else:
+        p += (
+            "The product is the absolute hero — prominently featured, perfectly lit, "
+            "photographic realism with accurate reflections and natural drop shadows. "
+            "Product edges must look natural and photographic, not digitally cut-out. "
+        )
 
-    # Quality finisher
-    p += (
-        "Final image: photorealistic 8K quality, magazine-grade commercial photography, "
-        "premium Indonesian UMKM brand aesthetic, Instagram-ready, no watermarks, no unintended text artifacts. "
-    )
+    # Quality finisher — when a reference photo exists, anchor quality/finish to the reference
+    # itself rather than a generic "magazine-grade" descriptor; being the LAST instruction in the
+    # prompt, this one carries outsized weight and shouldn't pull the result toward a generic
+    # stock-photo look instead of the reference's specific style.
+    if has_reference:
+        p += (
+            "Final image: match the reference photo's exact photographic quality, finish, and "
+            "realism level — sharp, professional, Instagram-ready. No watermarks, no unintended text artifacts. "
+        )
+    else:
+        p += (
+            "Final image: photorealistic 8K quality, magazine-grade commercial photography, "
+            "premium Indonesian UMKM brand aesthetic, Instagram-ready, no watermarks, no unintended text artifacts. "
+        )
 
     neg = s.get("negative_prompt", "")
     if neg:
@@ -1024,9 +1119,14 @@ def _natural_carousel_slide(j: dict) -> str:
     p_secondary = palette.get("accent_elements", "#FDFBF7")
     cta = brand_el.get("call_to_action_final", "")
 
+    # system_directive carries brand don'ts for carousel slides — built by the caller but never
+    # read here previously, so brand visual restrictions never reached the actual image prompt.
+    system_directive = j.get("system_directive", "")
+
     # ── Base ──────────────────────────────────────────────────────────────────
     p = (
-        f"Create slide {slide_idx:02d} of {slide_total:02d} for an Instagram carousel by '{brand_name}'. "
+        (f"{system_directive} " if system_directive else "")
+        + f"Create slide {slide_idx:02d} of {slide_total:02d} for an Instagram carousel by '{brand_name}'. "
         f"Topic: '{topic}'. Story template: {template}. Target audience: {target}. "
         f"Content goal: {narrative.get('content_goal', 'brand_awareness')}. "
         f"Slide role: {role.upper()} — {directive} "
@@ -1153,8 +1253,12 @@ def _natural_food(j: dict) -> str:
     hero_dish = appetite.get("hero_dish_instruction", "")
     color_temp = appetite.get("color_temperature", "warm")
 
+    # system_directive carries brand don'ts — built by the caller but never read here previously.
+    system_directive = j.get("system_directive", "")
+
     p = (
-        f"Create a professional food photography image for '{brand_name}', "
+        (f"{system_directive} " if system_directive else "")
+        + f"Create a professional food photography image for '{brand_name}', "
         "designed for Instagram posting to drive appetite appeal and restaurant engagement. "
         "This is commercial food photography — the goal is to make viewers CRAVE the food immediately. "
     )
@@ -1241,8 +1345,12 @@ def _natural_marketplace(j: dict) -> str:
     trust_signals = s.get("trust_signals", [])
     photography_style = style.get("photography_style", "pure studio white background")
 
+    # system_directive carries brand don'ts — built by the caller but never read here previously.
+    system_directive = j.get("system_directive", "")
+
     p = (
-        f"Create a high-conversion marketplace product thumbnail for '{product_name}'"
+        (f"{system_directive} " if system_directive else "")
+        + f"Create a high-conversion marketplace product thumbnail for '{product_name}'"
         f"{f' by {brand_name}' if brand_name else ''}. "
         f"Platform context: {platform_ctx} "
         "This thumbnail must maximize click-through rate on a busy marketplace listing page — "
@@ -3928,7 +4036,172 @@ def _pick_concept_variation(concept_key: str) -> dict:
         "variation_picks": picks,
     }
 
+def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Optional[dict], product: Optional[dict] = None) -> dict:
+    """Dedicated JSON schema for reference/inspiration-photo mode — confirmed via direct
+    side-by-side testing to reproduce the reference composition far more faithfully than the
+    normal free-text prompt schema. Uses explicit boolean flags + short repeated rule lists
+    instead of prose, which leaves the model no room to reinterpret "how much" to preserve.
+    Intended for the manual "Lihat Prompt JSON" → ChatGPT hand-off flow (current production
+    flow — Feedify only produces this JSON; the user pastes it + both photos into ChatGPT
+    themselves), but the schema is plain JSON so it degrades gracefully if ever sent to the
+    direct gpt-image-1 API too."""
+    brand = brand or {}
+    product = product or {}
+    color_primary = _extract_hex(brand.get("color_primary", "#0B3D2E"))
+    color_secondary = _extract_hex(brand.get("color_secondary", "#FDFBF7"))
+    brand_name = brand.get("brand_name", payload.product_name or "Brand")
+    brand_archetype = brand.get("archetype", "expert")
+    brand_voice = ARCHETYPE_VOICE.get(brand_archetype, "professional")
+    brand_personality_list = brand.get("brand_personality", []) or []
+
+    category = brand.get("category", "") or product.get("category", "")
+    product_name = payload.product_name or product.get("name", "moisturizer")
+    ingredients = product.get("ingredients", []) or []
+    target_skin = product.get("target_skin", []) or []
+    usp = product.get("usp", "") or payload.description
+
+    return {
+        "task_type": "reference_layout_product_replacement",
+        "version": "2.0",
+        "system_directive": (
+            "You are an Elite Commercial Art Director, Advertising Retoucher, Photoshop "
+            "Compositing Expert, and Luxury Product Photographer. You always receive exactly "
+            "two images. Image 1 is the PRODUCT IMAGE. Image 2 is the MASTER REFERENCE IMAGE. "
+            "Your task is NOT to create a new advertisement. Your task is to recreate the "
+            "reference advertisement as accurately as possible while replacing ONLY the product "
+            "using Image 1. Imagine opening the reference image inside Adobe Photoshop and "
+            "replacing only one Smart Object. Everything else must remain visually identical."
+        ),
+        "priority_order": [
+            "product_integrity", "reference_layout", "reference_subject",
+            "reference_lighting", "brand_dna", "product_knowledge",
+        ],
+        "product": {
+            "image_role": "source_product",
+            "lock_product": True,
+            "replace_only": True,
+            "preserve": {
+                "shape": True, "packaging": True, "label": True, "logo": True,
+                "material": True, "texture": True, "color": True, "reflection": True,
+                "branding": True, "printing": True, "proportion": True,
+            },
+            "allow": {
+                "shadow_matching": True, "lighting_matching": True,
+                "perspective_matching": True, "scale_matching": True,
+            },
+        },
+        "reference": {
+            "image_role": "master_layout",
+            "mode": "layout_lock",
+            "replace_only": ["product"],
+            "copy_exactly": {
+                "camera_angle": True, "composition": True, "crop": True, "framing": True,
+                "background": True, "environment": True, "floor": True, "wall": True,
+                "props": True, "plants": True, "table": True, "tray": True,
+                "lighting": True, "shadow": True, "reflection": True,
+                "depth_of_field": True, "focus": True, "negative_space": True,
+                "color_balance": True, "human_model": True, "facial_expression": True,
+                "pose": True, "hand_position": True, "body_position": True,
+                "hair": True, "clothing": True, "accessories": True,
+                "text_position": True, "graphic_position": True,
+                "spacing": True, "visual_balance": True,
+            },
+        },
+        "brand_dna": {
+            "brand_name": brand_name,
+            "brand_personality": [p.capitalize() for p in brand_personality_list],
+            "brand_archetype": brand_archetype.capitalize(),
+            "brand_voice": brand_voice.capitalize(),
+            "primary_palette": [color_primary, color_secondary],
+            "preserve_brand_identity": True,
+            "use_brand_palette_only_when_it_does_not_change_reference_layout": True,
+            "never_override_reference_layout": True,
+        },
+        "product_knowledge": {
+            "category": category,
+            "product_name": product_name,
+            "key_ingredients": ingredients,
+            "primary_benefit": (payload.features[0] if payload.features else ""),
+            "target_skin": ", ".join(target_skin) if target_skin else "",
+            "usp": usp,
+            "usage_rule": (
+                "Only use product knowledge if the reference already contains text areas or "
+                "ingredient callouts. Never create new badges, icons, stickers, banners, CTA "
+                "buttons, or information panels that are not present in the reference."
+            ),
+        },
+        "composition_rules": {
+            "mode": "copy_reference",
+            "move_product": False, "move_model": False, "move_camera": False,
+            "move_background": False, "move_props": False,
+            "copy_spacing": True, "copy_alignment": True,
+            "copy_visual_weight": True, "copy_scale": True,
+        },
+        "lighting": {
+            "match_reference": True, "blend_product_naturally": True,
+            "maintain_reference_shadow_direction": True,
+            "maintain_reference_highlights": True,
+            "maintain_reference_reflections": True,
+        },
+        "typography": {
+            "mode": "match_reference",
+            "generate_new_layout": False, "generate_new_headline": False,
+            "generate_new_cta": False, "generate_new_badges": False,
+            "preserve_text_positions": True, "replace_text_only_if_requested": True,
+        },
+        "strict_rules": [
+            "The reference image is NOT inspiration.",
+            "The reference image IS the final approved composition.",
+            "Replace ONLY the product.",
+            "Do not redesign the advertisement.",
+            "Do not reinterpret the composition.",
+            "Do not invent a new scene.",
+            "Do not move any object.",
+            "Do not move the model.",
+            "Do not change the pose.",
+            "Do not change facial expression.",
+            "Do not replace the background.",
+            "Do not add leaves.",
+            "Do not add flowers.",
+            "Do not add marble.",
+            "Do not add laboratory glass.",
+            "Do not add water splashes.",
+            "Do not add decorative props.",
+            "Do not add icons.",
+            "Do not add ingredient badges.",
+            "Do not add CTA buttons.",
+            "Do not generate editorial styling.",
+            "Do not generate creative storytelling.",
+            "Do not create a new advertising concept.",
+            "The final output must look like the reference image was edited in Photoshop by replacing only the original product.",
+        ],
+        "negative_prompt": [
+            "new composition", "creative reinterpretation", "different layout",
+            "new camera angle", "different crop", "different background",
+            "different props", "different lighting", "different model", "different pose",
+            "different typography", "new headline", "new CTA", "new badges",
+            "new decorations", "editorial redesign", "campaign redesign",
+            "alternative composition", "invented scene", "artistic freedom",
+            "generic skincare advertisement", "stock photo composition",
+        ],
+        "expected_result": {
+            "layout_similarity": "95-100%",
+            "background_similarity": "95-100%",
+            "human_similarity": "100%",
+            "lighting_similarity": "95-100%",
+            "prop_similarity": "100%",
+            "product_integrity": "100%",
+            "overall_goal": (
+                "The final image should be visually indistinguishable from the reference image "
+                "except that the original product has been replaced by the provided product."
+            ),
+        },
+    }
+
+
 def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product: Optional[dict] = None) -> dict:
+    if payload.reference_image_base64:
+        return _build_reference_replacement_prompt(payload, brand, product)
     brand = brand or {}
     color_primary = _extract_hex(brand.get("color_primary", "#0B3D2E"))
     color_secondary = _extract_hex(brand.get("color_secondary", "#FDFBF7"))
@@ -3946,9 +4219,19 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
     tone_typo = TONE_TYPOGRAPHY.get(brand_personality, TONE_TYPOGRAPHY["professional"])
     audience_mood = AUDIENCE_MOOD.get(target_audience, "")
 
-    # ── Composition concept: user-chosen or random each generate call ──────────
-    concept = _pick_concept_variation(payload.composition_concept or "")
-    variation_hint = _random.choice(VARIATION_ANGLES)
+    # ── Composition concept: user-chosen or random each generate call — but SKIPPED entirely
+    # when a reference photo is attached. The reference itself dictates composition, camera
+    # angle, and lighting; injecting an unrelated random concept on top (e.g. "HERO STUDIO SHOT:
+    # ...oak wood plank...fresnel spotlight...") plus a random variation_directive (e.g. "frame
+    # the product inside a doorway arch") gives the model a highly specific, vivid competing
+    # instruction that reliably wins over the vaguer "match the reference" text — this was
+    # confirmed to be the actual cause of generated images ignoring the reference entirely.
+    if payload.reference_image_base64:
+        concept = {"key": "", "name": "", "directive": "", "camera": "", "variation_picks": {}}
+        variation_hint = ""
+    else:
+        concept = _pick_concept_variation(payload.composition_concept or "")
+        variation_hint = _random.choice(VARIATION_ANGLES)
 
     # Campaign goal resolved early (needed for headline derivation below)
     goal_key = payload.campaign_goal if payload.campaign_goal in CAMPAIGN_GOAL_DIRECTIVES else "brand_awareness"
@@ -4042,7 +4325,10 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
 
     brand_positioning = brand.get("brand_positioning", "")
     brand_personality_list = brand.get("brand_personality", [])
-    brand_donts = brand.get("brand_donts", [])
+    # Mood/background/general-style don'ts are dropped when a reference photo is attached — the
+    # reference itself already dictates those, so keeping them risks contradicting "match the
+    # reference" instead of reinforcing it. Color/object/AI-artifact don'ts always stay.
+    brand_donts = _filter_brand_donts(brand.get("brand_donts", []), bool(payload.reference_image_base64))
 
     brand_context = ""
     if brand_positioning:
@@ -4068,17 +4354,41 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
 
     return {
         "task_type": "instagram_feed_post_generation",
+        # Without this, _natural_feed's has_reference-gated blocks (adopt reference composition,
+        # skip the generic composition preset) were UNREACHABLE — always defaulting to False via
+        # j.get("has_reference", False) since this key was never actually set here. That silently
+        # broke every reference-photo instruction inside _natural_feed itself; the only thing
+        # actually telling ChatGPT to match the reference was the separately-appended
+        # _append_reference_hint() text tacked on after this natural prompt was already built.
+        "has_reference": bool(payload.reference_image_base64),
+        # Reference-photo mode uses a fully different, much stricter "Photoshop compositing"
+        # framing instead of the normal creative-agency framing below — confirmed via direct
+        # side-by-side testing that a soft "art-directed, use reference as blueprint" framing
+        # reliably loses to a hard "recreate the reference exactly, only the product changes"
+        # framing, which produces near-identical layout/background/lighting/color match.
         "system_directive": (
-            "You are an elite Instagram Art Director and Commercial Photographer at a top Indonesian creative agency. "
-            "Create a premium, scroll-stopping Instagram feed post that communicates brand value within 0.3 seconds. "
-            "Every visual decision — color, light, prop, typography weight — must serve the brand DNA and target audience. "
-            "The result must be indistinguishable from content produced by Wunderman Thompson, TBWA, or top Jakarta brand studios. "
-            + (
-                "CRITICAL RULE: A reference/inspiration photo is attached alongside the product photo. "
-                "The product photo is SACRED — render it pixel-perfect with zero changes to its appearance. "
-                "Use the reference ONLY as a layout and lighting blueprint. "
-                "Never replace, alter, or reimagine the product."
-                if payload.reference_image_base64 else ""
+            (
+                "You are an elite Commercial Photo Retoucher and Photoshop Compositing Expert. "
+                "You will receive TWO images: the PRODUCT photo (source product) and a REFERENCE "
+                "photo (the final approved composition). Your task is NOT to create a new design "
+                "— it is to recreate the reference image as accurately as possible while "
+                "replacing ONLY the product with the one from the product photo. Treat the "
+                "reference as the final approved advertisement and the product as a smart object "
+                "being swapped into it at the exact same position, scale, and perspective. "
+                "Everything else — camera angle, framing, composition, background, props, "
+                "colors, lighting, shadows, and any human model's pose and expression — must "
+                "remain visually identical to the reference. "
+                "CRITICAL RULE: The product photo is SACRED — render it pixel-perfect with zero "
+                "changes to its shape, color, label, logo, or proportions. Only adjust realistic "
+                "perspective, lighting, shadow, and reflection so it naturally fits the reference "
+                "scene. Do not apply artistic freedom, do not reinterpret the reference, do not "
+                "invent new props, backgrounds, or layout — this is a product replacement, not a "
+                "redesign."
+                if payload.reference_image_base64 else
+                "You are an elite Instagram Art Director and Commercial Photographer at a top Indonesian creative agency. "
+                "Create a premium, scroll-stopping Instagram feed post that communicates brand value within 0.3 seconds. "
+                "Every visual decision — color, light, prop, typography weight — must serve the brand DNA and target audience. "
+                "The result must be indistinguishable from content produced by Wunderman Thompson, TBWA, or top Jakarta brand studios. "
             )
         ),
         "creative_brief": creative_brief,
@@ -4096,7 +4406,6 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
             "aspect_ratio": payload.aspect_ratio,
             "style_preset": effective_style,
             "quality": "high",
-            "photorealism": "ultra-realistic, 8K, magazine-grade commercial photography",
         },
         "prompt_structure": {
             "subject": f"Instagram feed post for {brand_name} — {effective_style} style, {brand_personality or 'professional'} tone",
@@ -4126,8 +4435,9 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
                     "Product edges must look natural, not cut-out. "
                     f"{'Single product as sole hero subject.' if payload.expected_images_count == 1 else f'Arrange all {payload.expected_images_count} products in unified grouped composition.'}"
                     + (
-                        " The scene, background, and lighting are inspired by the reference photo — "
-                        "but the product itself must look identical to the product photo attached."
+                        " The scene, background, and lighting must be copied EXACTLY from the reference "
+                        "photo, not just loosely inspired by it — only the product itself is replaced, "
+                        "matching the product photo attached."
                         if payload.reference_image_base64 else ""
                     )
                 ),
@@ -6909,8 +7219,14 @@ async def _apply_calendar_reminder(data: dict, user_id: str) -> None:
         data["reminder_at"] = None
         data["reminder_sent"] = False
         return
-    reminder_at = (post_dt - timedelta(hours=reminder_hours)).isoformat()
-    data["reminder_at"] = reminder_at
+    reminder_at_dt = post_dt - timedelta(hours=reminder_hours)
+    data["reminder_at"] = reminder_at_dt.isoformat()
+    if reminder_at_dt <= datetime.now(WIB_TZ):
+        # Reminder time already passed — don't (re-)send. Without this, saving any unrelated
+        # edit (e.g. fixing a typo in the caption) on an entry whose reminder time has since
+        # elapsed would re-fire the notification every time, since this function otherwise runs
+        # unconditionally on every create/update.
+        return
     data["reminder_sent"] = await _send_onesignal_notification(
         user_id,
         f"⏰ Reminder: {data.get('title') or 'Konten'}",

@@ -596,6 +596,18 @@ export default function ContentCalendarPage() {
                       </select>
                       <p className="text-[11px] text-stone-400 mt-1">Kamu akan dapat notifikasi di Feedify sebelum jadwal posting ini.</p>
                     </>
+                  ) : form.reminder_hours_before != null ? (
+                    <>
+                      {/* A reminder was already set (and likely already sent) before the schedule
+                          got this close/passed — show it locked-in rather than implying nothing
+                          was ever configured, which is what the plain "no options" message did. */}
+                      <select className="input text-sm bg-stone-100 text-stone-400 cursor-not-allowed" value={form.reminder_hours_before} disabled data-testid="event-reminder">
+                        <option value={form.reminder_hours_before}>
+                          {REMINDER_OPTIONS.find(o => o.value === form.reminder_hours_before)?.label || `H-${form.reminder_hours_before} jam sebelum`}
+                        </option>
+                      </select>
+                      <p className="text-[11px] text-stone-400 mt-1">Jadwal sudah lewat — pengingat ini terkunci dan tidak bisa diubah lagi.</p>
+                    </>
                   ) : (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                       Jadwal terlalu dekat atau sudah lewat — tidak ada opsi pengingat yang bisa diatur.
