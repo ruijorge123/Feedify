@@ -4060,6 +4060,32 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
     ingredients = product.get("ingredients", []) or []
     target_skin = product.get("target_skin", []) or []
     usp = product.get("usp", "") or payload.description
+    target_audience = brand.get("target_audience", "")
+    cat_visual = CATEGORY_VISUAL.get(category, CATEGORY_VISUAL_DEFAULT)
+
+    # Smart creative brief — same logic as _build_banner_prompt's, so reference-mode carries
+    # the exact same rich "why this product matters to this audience" context. An earlier
+    # version of this schema dropped this entirely in the effort to be a pure "just composite
+    # the product" spec, which threw out product/brand storytelling along with the (correctly
+    # removed) composition/style overrides — those are separable concerns.
+    creative_brief = f"Product '{product_name}' by {brand_name}"
+    if category:
+        creative_brief += f" in the {category} category"
+    if target_audience:
+        creative_brief += f", targeting {target_audience}"
+    if brand_personality_list:
+        creative_brief += f", brand voice is {', '.join(brand_personality_list)}"
+    if cat_visual.get("emotion"):
+        creative_brief += f". The desired emotional response: {cat_visual['emotion']}"
+    if ingredients:
+        creative_brief += f". Key active ingredients: {', '.join(ingredients[:6])}"
+    if target_skin:
+        creative_brief += f". Formulated for: {', '.join(target_skin)} skin"
+    if usp:
+        creative_brief += f". Core promise: {usp}"
+
+    goal_key = payload.campaign_goal if payload.campaign_goal in CAMPAIGN_GOAL_DIRECTIVES else "brand_awareness"
+    goal = CAMPAIGN_GOAL_DIRECTIVES[goal_key]
 
     return {
         "task_type": "reference_layout_product_replacement",
@@ -4077,6 +4103,15 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "product_integrity", "reference_layout", "reference_subject",
             "reference_lighting", "brand_dna", "product_knowledge",
         ],
+        "creative_brief": creative_brief,
+        # Narrative/emotional context ONLY — deliberately excludes goal["visual_directive"],
+        # which prescribes composition/staging choices that would contradict "copy the
+        # reference exactly." What this image is FOR is a separate concern from how it looks.
+        "campaign_context": {
+            "goal": goal_key,
+            "goal_name": goal["name"],
+            "emotional_trigger": goal["emotional_trigger"],
+        },
         "product": {
             "image_role": "source_product",
             "lock_product": True,
@@ -4126,9 +4161,13 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "target_skin": ", ".join(target_skin) if target_skin else "",
             "usp": usp,
             "usage_rule": (
-                "Only use product knowledge if the reference already contains text areas or "
-                "ingredient callouts. Never create new badges, icons, stickers, banners, CTA "
-                "buttons, or information panels that are not present in the reference."
+                "If the reference already has text callouts, badges, or info areas, KEEP their "
+                "exact position, style, shape, and count — but REPLACE their wording with THIS "
+                "product's real specifics: an actual key_ingredient name plus what it does, "
+                "and/or primary_benefit or usp. Do not reuse the reference's original wording "
+                "verbatim, and do not write generic filler — every callout must be rooted in "
+                "the product_knowledge above. Never invent new badges, icons, stickers, banners, "
+                "CTA buttons, or info panels that aren't already present in the reference."
             ),
         },
         "composition_rules": {
