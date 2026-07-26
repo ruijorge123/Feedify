@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { toast } from 'react-toastify';
 import { Link } from "react-router-dom";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { compressImageFile } from "@/lib/imageCompress";
 import {
   CalendarBlank, Plus, X, CaretLeft, CaretRight,
   ImageSquare, Stack, PenNib, ForkKnife, Storefront,
@@ -240,13 +241,20 @@ export default function ContentCalendarPage() {
     setShowModal(true);
   };
 
-  const handlePhotoUpload = (e) => {
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast.error("Foto maksimal 5MB"); return; }
-    const reader = new FileReader();
-    reader.onload = () => setForm(f => ({ ...f, photo_base64: reader.result }));
-    reader.readAsDataURL(file);
+    // Raw cap is generous (compression below shrinks it regardless) — this only guards against
+    // truly absurd files. Actual camera photos (commonly 4-10MB on Android) get downscaled and
+    // re-encoded before ever being set on form state, so the upload stays well under the
+    // backend's request-body size limit regardless of the original photo's resolution.
+    if (file.size > 20 * 1024 * 1024) { toast.error("Foto maksimal 20MB"); return; }
+    try {
+      const compressed = await compressImageFile(file);
+      setForm(f => ({ ...f, photo_base64: compressed }));
+    } catch {
+      toast.error("Gagal memproses foto, coba foto lain");
+    }
   };
 
   const save = async () => {
