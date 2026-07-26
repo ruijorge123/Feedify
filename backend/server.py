@@ -210,6 +210,7 @@ class CarouselPromptIn(BaseModel):
     final_cta: str = ""
 
     # Section 2 — Product
+    product_id: Optional[str] = None        # ID from product library — auto-fills ingredients/benefits/usp
     brand_name: str = ""                    # explicit brand name from frontend form
     product_name: Optional[str] = None      # optional — from brand profile if omitted
 
@@ -322,6 +323,7 @@ class CaptionBundleIn(BaseModel):
 
 
 class MarketplaceIn(BaseModel):
+    product_id: Optional[str] = None  # ID from product library — auto-fills name/ingredients/benefits/usp
     product_name: str = ""
     product_price: str = ""
     original_price: str = ""
@@ -1133,6 +1135,22 @@ def _natural_carousel_slide(j: dict) -> str:
         f"Slide role: {role.upper()} — {directive} "
     )
 
+    # This slide's role is about benefits/proof/solution — this is where real product
+    # knowledge (from the Product Library, if one was picked) belongs instead of generic claims.
+    product_knowledge = j.get("product_knowledge", {})
+    if role in ("benefit", "solution", "credibility") and product_knowledge.get("usage_rule"):
+        pk_parts = []
+        if product_knowledge.get("key_ingredients"):
+            pk_parts.append(f"key ingredients: {', '.join(product_knowledge['key_ingredients'][:6])}")
+        if product_knowledge.get("benefits"):
+            pk_parts.append(f"real benefits: {', '.join(product_knowledge['benefits'][:4])}")
+        if product_knowledge.get("target_skin"):
+            pk_parts.append(f"formulated for: {product_knowledge['target_skin']}")
+        if product_knowledge.get("usp"):
+            pk_parts.append(f"core promise: {product_knowledge['usp']}")
+        if pk_parts:
+            p += f"Product knowledge for this slide — {'; '.join(pk_parts)}. {product_knowledge['usage_rule']} "
+
     # ── Role-specific visual language ─────────────────────────────────────────
     if role == "hook":
         p += (
@@ -1383,6 +1401,9 @@ def _natural_marketplace(j: dict) -> str:
         )
     if trust_signals:
         p += f"Trust signal elements: {'; '.join(trust_signals)}. "
+    product_knowledge = j.get("product_knowledge", {})
+    if product_knowledge.get("usage_rule"):
+        p += f"{product_knowledge['usage_rule']} "
     if cta:
         p += f"Bottom tagline: '{cta}'. "
     p += (
@@ -4696,9 +4717,10 @@ _VALIDATION_RULES = [
 ]
 
 
-def _build_carousel_creative_brief(payload: "CarouselPromptIn", brand: dict) -> dict:
+def _build_carousel_creative_brief(payload: "CarouselPromptIn", brand: dict, product: Optional[dict] = None) -> dict:
     """Build the central creative brief object that drives the entire carousel generation."""
     brand = brand or {}
+    product = product or {}
     effective_goal = payload.content_goal if payload.content_goal in _CONTENT_GOAL_VISUAL else payload.campaign_goal
     effective_cta = payload.final_cta or payload.call_to_action or "Swipe ke kanan!"
     effective_product = payload.product_name or payload.brand_name or brand.get("brand_name", "")
@@ -4720,6 +4742,19 @@ def _build_carousel_creative_brief(payload: "CarouselPromptIn", brand: dict) -> 
         "storytelling": payload.template,
         "slide_count": payload.slide_count,
         "aspect_ratio": payload.aspect_ratio,
+
+        # ── Product knowledge (from Product Library, if product_id was picked) ──
+        "product_knowledge": {
+            "key_ingredients": product.get("ingredients", []) or [],
+            "benefits": product.get("benefits", []) or [],
+            "target_skin": ", ".join(product.get("target_skin", []) or []),
+            "usp": product.get("usp", ""),
+            "usage_rule": (
+                "Whichever slide covers features/benefits/ingredients must use these REAL "
+                "specifics — an actual ingredient name + what it does, or the real usp — not "
+                "generic filler. Do not invent facts not present here."
+            ) if (product.get("ingredients") or product.get("benefits") or product.get("usp")) else "",
+        },
 
         # ── Visual layer ──
         "visual_type": payload.visual_type,
@@ -5010,12 +5045,12 @@ _ROLE_DIRECTIVES = {
 }
 
 
-def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict]) -> dict:
+def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], product: Optional[dict] = None) -> dict:
     """V2 pipeline: CreativeBriefBuilder → ValidationLayer → AIVisualDirector → SlideBuilder."""
     brand = brand or {}
 
     # ── Step 1: Build Creative Brief ──────────────────────────────────────────
-    brief = _build_carousel_creative_brief(payload, brand)
+    brief = _build_carousel_creative_brief(payload, brand, product=product)
 
     # ── Step 2: Creative Validation Layer ─────────────────────────────────────
     brief, validation_warnings = _validate_carousel_brief(brief)
@@ -5058,6 +5093,7 @@ def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict]) ->
             "slide_index": idx,
             "slide_role": role,
             "slide_total": len(roles),
+            "product_knowledge": brief["product_knowledge"],
             "system_directive": (
                 "You are an elite Instagram Carousel Art Director at a top-tier social media creative agency. "
                 f"Create slide {idx} of {len(roles)} for brand '{brand_name}'. "
@@ -5326,7 +5362,8 @@ async def generate_banner(payload: BannerPromptIn, current_user: dict = Depends(
 async def preview_carousel_prompt(payload: CarouselPromptIn, current_user: dict = Depends(get_current_user)):
     """Return structured prompt JSON for all slides without generating images. No credits consumed."""
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
-    prompt_obj = _build_carousel_prompts(payload, brand)
+    product = await _fetch_product_for_payload(payload, current_user)
+    prompt_obj = _build_carousel_prompts(payload, brand, product=product)
     has_reference = bool(payload.reference_image_base64)
     # Inject natural_prompt into each slide so frontend can copy directly.
     # Reference photo (if any) is analyzed by ChatGPT itself at generation time — no vision API call.
@@ -5347,7 +5384,8 @@ async def generate_carousel(payload: CarouselPromptIn, current_user: dict = Depe
     n_slides = payload.slide_count
 
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
-    prompt_obj = _build_carousel_prompts(payload, brand)
+    product = await _fetch_product_for_payload(payload, current_user)
+    prompt_obj = _build_carousel_prompts(payload, brand, product=product)
 
     # Pre-process product image once (background removal is expensive, do it once)
     carousel_product_image = None
@@ -5419,9 +5457,10 @@ async def generate_carousel_stream(payload: CarouselPromptIn, current_user: dict
     n_slides = payload.slide_count
 
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    product = await _fetch_product_for_payload(payload, current_user)
 
     # Build prompt object upfront (pipeline runs synchronously before streaming)
-    prompt_obj = _build_carousel_prompts(payload, brand)
+    prompt_obj = _build_carousel_prompts(payload, brand, product=product)
     carousel_id = str(uuid.uuid4())
     roles = [s["slide_role"] for s in prompt_obj["slides"]]
 
@@ -6416,10 +6455,15 @@ async def generate_food_menu(payload: FoodMenuIn, current_user: dict = Depends(g
 
 
 # ============= MARKETPLACE THUMBNAIL =============
-def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict]) -> dict:
+def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict], product: Optional[dict] = None) -> dict:
     brand = brand or {}
+    product = product or {}
     brand_name = brand.get("brand_name", "")
-    category = brand.get("category", "")
+    category = brand.get("category", "") or product.get("category", "")
+    ingredients = product.get("ingredients", []) or []
+    product_benefits = product.get("benefits", []) or []
+    target_skin = product.get("target_skin", []) or []
+    usp = product.get("usp", "") or payload.tagline or payload.benefit_utama
 
     # Platform-specific design systems
     platform_configs = {
@@ -6505,6 +6549,19 @@ def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict]) -> 
             "quality": "high",
             "photorealism": "professional e-commerce product photography, studio-quality, 8K",
         },
+        "product_knowledge": {
+            "category": category,
+            "key_ingredients": ingredients,
+            "benefits": product_benefits,
+            "target_skin": ", ".join(target_skin) if target_skin else "",
+            "usp": usp,
+            "usage_rule": (
+                "If key_ingredients or benefits are present, work them into the thumbnail as a "
+                "short real feature callout (e.g. a small badge or bullet) — do not write generic "
+                "filler like 'best quality'. Every claim must be rooted in this product_knowledge, "
+                "not invented."
+            ) if (ingredients or product_benefits or usp) else "",
+        },
         "prompt_structure": {
             "subject": f"Marketplace product thumbnail: {payload.product_name}{f' by {brand_name}' if brand_name else ''}",
             "platform_context": platform_cfg["context"],
@@ -6559,7 +6616,8 @@ def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict]) -> 
                     "This price anchoring is critical for Indonesian marketplace conversion."
                 ) if has_strikethrough else "",
             },
-            "trust_signals": platform_cfg["trust_signals"],
+            # Real product benefits take priority over generic platform trust badges when available
+            "trust_signals": (product_benefits[:3] + platform_cfg["trust_signals"]) if product_benefits else platform_cfg["trust_signals"],
             "category_context": f"Product category: {category}" if category else "",
             "thumbnail_style": {
                 "clean":           "Clean & clear: white background, product crystal sharp, minimal text, professional studio feel",
@@ -6588,11 +6646,24 @@ def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict]) -> 
     }
 
 
+async def _fetch_product_for_payload(payload, current_user: dict) -> Optional[dict]:
+    """Fetch product from library if product_id provided, auto-filling product_name if blank."""
+    if not payload.product_id:
+        return None
+    product = await db.products.find_one(
+        {"id": payload.product_id, "user_id": current_user["id"]}, {"_id": 0}
+    )
+    if product and not payload.product_name:
+        payload.product_name = product.get("name", "")
+    return product
+
+
 @api_router.post("/prompt/preview-marketplace")
 async def preview_marketplace_prompt(payload: MarketplaceIn, current_user: dict = Depends(get_current_user)):
     """Return structured prompt JSON for marketplace thumbnail. No credits consumed."""
     brand = await _get_active_brand(current_user["id"])
-    prompt_json = _build_marketplace_prompt(payload, brand)
+    product = await _fetch_product_for_payload(payload, current_user)
+    prompt_json = _build_marketplace_prompt(payload, brand, product=product)
     natural_prompt = _build_natural_prompt(prompt_json)
     natural_prompt = _append_reference_hint(natural_prompt, bool(payload.product_photo_base64))
     return {
@@ -6609,7 +6680,8 @@ async def generate_marketplace(payload: MarketplaceIn, current_user: dict = Depe
 
 
     brand = await _get_active_brand(current_user["id"])
-    prompt_obj = _build_marketplace_prompt(payload, brand)
+    product = await _fetch_product_for_payload(payload, current_user)
+    prompt_obj = _build_marketplace_prompt(payload, brand, product=product)
 
     try:
         natural_prompt = _build_natural_prompt(prompt_obj)
