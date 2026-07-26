@@ -1459,6 +1459,10 @@ def _build_studio_prompt(payload: "StudioIn", shot_focus: str = None) -> dict:
         "model_type": payload.model_type,
         "wearing_product": wearing,
         "shot_focus": shot_focus,
+        # model_type == "no_model" only means "user didn't explicitly configure a talent" — it
+        # must NOT be read as "force no human in the shot" when a reference photo is attached,
+        # since the reference may already show a model that should be kept. See _natural_studio.
+        "has_reference": bool(payload.reference_image_base64),
         "advanced": {
             "background": payload.background,
             "lighting": payload.lighting,
@@ -1491,6 +1495,7 @@ def _natural_studio(j: dict) -> str:
     wearing     = j.get("wearing_product", False)
     adv         = j.get("advanced", {})
     shot        = j.get("shot_focus")
+    has_reference = j.get("has_reference", False)
 
     # ── ROLE + ABSOLUTE PRODUCT PRESERVATION ────────────────────────────────────
     product_preservation = (
@@ -1849,6 +1854,22 @@ def _natural_studio(j: dict) -> str:
         "Natural. Authentic. Grounded in reality. With all the organic imperfections that make photography trustworthy."
     )
 
+    # model_type == "no_model" means "user didn't explicitly configure a talent" — NOT
+    # "force no human in the shot". When a reference photo is attached, a hard "no human
+    # model" instruction here directly overrides/contradicts whatever model the reference
+    # photo actually shows (confirmed: this was the cause of reference models disappearing
+    # even though nothing told the model to remove them — this instruction did, unconditionally).
+    # Defer to the reference instead: keep its model if it has one, stay product-only if it doesn't.
+    if model == "no_model" and has_reference:
+        model_directive = (
+            "MODEL — Follow the reference photo: if the reference photo shows a human model, "
+            "include a person matching the reference's model (pose, framing, general presence) — "
+            "do not remove them. If the reference photo has no human model, keep this product-only. "
+            "No separate talent was explicitly configured, so the reference alone decides this."
+        )
+    else:
+        model_directive = model_map.get(model, model_map["no_model"])
+
     # ── ASSEMBLE PROMPT ──────────────────────────────────────────────────────────
     parts = [
         product_preservation,
@@ -1858,7 +1879,7 @@ def _natural_studio(j: dict) -> str:
         goal_map.get(goal, goal_map["brand_campaign"]),
         style_map.get(style, style_map["commercial"]),
         composition_map.get(composition, composition_map["hero_product"]),
-        model_map.get(model, model_map["no_model"]),
+        model_directive,
     ]
 
     bg = adv.get("background", "auto")
@@ -6874,6 +6895,48 @@ _FEED_TYPE_LABELS: dict = {
     "engagement":   "Engagement / Interaksi",
 }
 
+# Per-content-type creative guidance — mirrors Banner's CAMPAIGN_GOAL_DIRECTIVES/_CONTENT_GOAL_VISUAL
+# pattern. Without this, every content type was differentiated to the LLM by nothing more than a
+# label string (e.g. "content_type: promo"), leaving it to guess what a promo photo vs an
+# awareness photo should actually show or say — this makes that deterministic.
+_FEED_TYPE_GUIDANCE: dict = {
+    "awareness": {
+        "visual_directive": "Brand/lifestyle storytelling shot — the product is present but NOT the sole focus; brand mood, aesthetic, and identity are the hero.",
+        "product_knowledge_usage": "Do NOT show detailed ingredient/spec callouts here — keep it aspirational and identity-driven, not informational.",
+        "text_guidance": "Minimal on-image text — a brand tagline or identity phrase, not feature bullets.",
+    },
+    "soft_selling": {
+        "visual_directive": "Clean, approachable product-hero shot — product shown naturally in use or styled attractively, not hard-pitchy.",
+        "product_knowledge_usage": "Include 1-2 real key ingredients/benefits as soft callouts (small badge or short text near the product).",
+        "text_guidance": "A benefit-oriented headline built from a real product benefit/ingredient (e.g. 'kulit lebih cerah dengan niacinamide'), not an aggressive CTA.",
+    },
+    "promo": {
+        "visual_directive": "Bold, high-contrast, urgency-driven composition — a discount badge or deal framing is a key visual element.",
+        "product_knowledge_usage": "Secondary — price/offer is the visual hero, not ingredient detail.",
+        "text_guidance": "Price/discount number, an urgency phrase (e.g. 'Diskon 30% hari ini!'), and a strong CTA.",
+    },
+    "hard_selling": {
+        "visual_directive": "Similar to promo but even more direct and aggressive — bold sale framing, stock/scarcity visual cues.",
+        "product_knowledge_usage": "Secondary — the deal/urgency is the hero.",
+        "text_guidance": "Direct CTA ('Beli Sekarang', 'Stok Terbatas') with urgency/scarcity language.",
+    },
+    "testimonial": {
+        "visual_directive": "Authentic, UGC-style shot — often includes a real person, framed like a genuine customer moment, not overly polished studio photography.",
+        "product_knowledge_usage": "Supporting role only — can back up the testimonial claim but isn't the visual focus.",
+        "text_guidance": "A short review/testimonial quote as the focal text, styled like a review card or speech bubble.",
+    },
+    "education": {
+        "visual_directive": "Informative, ingredient-focused shot — a clear, well-lit close-up or diagram-like layout that helps explain the product.",
+        "product_knowledge_usage": "Heavy — real ingredients and how they work should be visually explained with clear callouts.",
+        "text_guidance": "Detailed benefit/how-it-works text (ingredient name + what it does), presented clearly and legibly.",
+    },
+    "engagement": {
+        "visual_directive": "Interactive, question-provoking visual designed to invite comments/replies.",
+        "product_knowledge_usage": "Light — used only if it supports the engagement hook.",
+        "text_guidance": "A question or interactive prompt as the main text, encouraging comments/replies.",
+    },
+}
+
 
 @api_router.post("/feed-generator/generate")
 async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = Depends(get_current_user)):
@@ -6905,27 +6968,96 @@ async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = D
     if not ok:
         raise HTTPException(status_code=402, detail=f"Kredit tidak cukup. Generate {count} prompt membutuhkan {count} kredit.")
 
-    # Build brand context
+    # Build brand context — full Brand DNA, same fields Banner's _build_banner_prompt reads.
+    # (Previously read "brand_personalities" (plural), which doesn't exist on BrandProfileIn —
+    # only "brand_personality" (singular) does — so personality always silently fell back to
+    # "friendly" regardless of the user's actual brand profile. Also previously missing
+    # entirely: positioning, archetype, target_audience, brand_donts, words_always,
+    # proof_points, signature_phrase.)
     brand_name = brand.get("brand_name", "Brand Anda")
     visual_style = brand.get("visual_style", "minimal-clean")
     color_primary = brand.get("color_primary", "#000000")
     color_secondary = brand.get("color_secondary", "#ffffff")
-    personalities = ", ".join(brand.get("brand_personalities", []) or []) or "friendly"
-    words_avoid = ", ".join(brand.get("words_avoid", []) or []) or "(tidak ada)"
+    brand_personality_list = brand.get("brand_personality", []) or []
+    brand_archetype = brand.get("archetype", "")
+    brand_positioning = brand.get("brand_positioning", "")
+    target_audience = brand.get("target_audience", "")
+    # No reference photo ever exists on this dashboard, so brand don'ts are never filtered —
+    # unlike Banner's reference-mode, every category always applies here.
+    brand_donts = brand.get("brand_donts", []) or []
+    words_always = brand.get("words_always", []) or []
+    proof_points = brand.get("proof_points", []) or []
+    signature_phrase = brand.get("signature_phrase", "")
 
+    brand_context_parts = []
+    if brand_positioning:
+        brand_context_parts.append(f"Brand positioning: {brand_positioning}")
+    if brand_personality_list:
+        brand_context_parts.append(f"Brand personality: {', '.join(brand_personality_list)}")
+    if brand_archetype:
+        brand_context_parts.append(f"Brand archetype: {brand_archetype}")
+    if target_audience:
+        brand_context_parts.append(f"Target audience: {target_audience}")
+    if words_always:
+        brand_context_parts.append(f"Brand keywords to reflect: {', '.join(words_always)}")
+    if proof_points:
+        brand_context_parts.append(f"Brand proof points: {'; '.join(proof_points)}")
+    if signature_phrase:
+        brand_context_parts.append(f"Brand signature phrase: '{signature_phrase}'")
+    if brand_donts:
+        brand_context_parts.append(f"STRICT VISUAL RESTRICTIONS — do NOT include: {', '.join(brand_donts)}")
+    brand_context = ". ".join(brand_context_parts) or "(tidak ada data brand DNA tambahan)"
+
+    # Product knowledge — real ingredients/benefits/target_skin/usp, same fields Banner reads
+    # (previously only name/category were read, plus a "description" field that doesn't exist
+    # anywhere on the Product model — always empty, always fell back to "(tidak ada)").
     product_name = product.get("name", "Produk")
-    product_desc = product.get("description", "")
     product_category = product.get("category", "general")
+    ingredients = product.get("ingredients", []) or []
+    product_benefits = product.get("benefits", []) or []
+    target_skin = product.get("target_skin", []) or []
+    usp = product.get("usp", "")
 
-    prompts_spec = "\n".join(
-        f'  {i+1}. content_type: "{t}" → {_FEED_TYPE_LABELS.get(t, t)}'
-        for i, t in enumerate(types_mix)
-    )
+    product_knowledge_parts = []
+    if ingredients:
+        product_knowledge_parts.append(f"Key ingredients: {', '.join(ingredients[:6])}")
+    if product_benefits:
+        product_knowledge_parts.append(f"Real benefits: {', '.join(product_benefits[:4])}")
+    if target_skin:
+        product_knowledge_parts.append(f"Formulated for: {', '.join(target_skin)}")
+    if usp:
+        product_knowledge_parts.append(f"Core promise/USP: {usp}")
+    product_knowledge = ". ".join(product_knowledge_parts) or "(tidak ada data product knowledge tambahan)"
+
+    # Per-item spec: since there's no reference/inspiration photo on this dashboard at all, each
+    # item gets a RANDOM composition concept (same CONCEPT_POOLS pool Banner uses when it also
+    # has no reference photo) and a coin-flip on whether a human model appears — this is what
+    # gives auto-mix output visual variety ("kadang ada model kadang tidak") instead of every
+    # item defaulting to the same generic product-only studio shot.
+    item_specs = []
+    for i, t in enumerate(types_mix):
+        guidance = _FEED_TYPE_GUIDANCE.get(t, _FEED_TYPE_GUIDANCE["awareness"])
+        concept = _pick_concept_variation("")
+        include_model = _random.random() < 0.5
+        model_line = (
+            "Include a human model in this shot (auto-choose gender/style/age that fits the brand DNA above)."
+            if include_model else
+            "Product-only shot — no human model in this one."
+        )
+        item_specs.append(
+            f'  {i+1}. content_type: "{t}" ({_FEED_TYPE_LABELS.get(t, t)})\n'
+            f'     Visual direction: {guidance["visual_directive"]}\n'
+            f'     Product knowledge usage: {guidance["product_knowledge_usage"]}\n'
+            f'     On-image text: {guidance["text_guidance"]}\n'
+            f'     Composition inspiration (vary it, don\'t reuse verbatim across items): {concept["directive"]}\n'
+            f'     Talent: {model_line}'
+        )
+    prompts_spec = "\n".join(item_specs)
 
     system = (
         "Kamu adalah Creative Director spesialis konten produk Indonesia. "
         "Tugas: buat daftar prompt foto produk untuk ChatGPT/DALL-E yang KONSISTEN secara visual "
-        "(gaya, palet warna, suasana) tapi BERBEDA tujuan kontennya. "
+        "(gaya, palet warna, suasana) tapi BERBEDA tujuan kontennya sesuai arahan tiap item. "
         "Output HANYA JSON array valid, tanpa markdown fence, tanpa penjelasan."
     )
 
@@ -6933,22 +7065,23 @@ async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = D
 
 Produk:
 - Nama: {product_name}
-- Deskripsi: {product_desc or '(tidak ada)'}
 - Kategori: {product_category}
+- Product knowledge: {product_knowledge}
 
 Brand DNA:
 - Visual style: {visual_style}
 - Palet warna: {color_primary} (primer), {color_secondary} (sekunder)
-- Kepribadian brand: {personalities}
-- Kata yang DIHINDARI: {words_avoid}
+- {brand_context}
 
-Daftar konten yang harus dibuat (WAJIB ikuti urutan):
+Daftar konten yang harus dibuat (WAJIB ikuti urutan DAN arahan visual/teks/product-knowledge per item):
 {prompts_spec}
 
-ATURAN KONSISTENSI VISUAL:
-- Semua prompt harus menggunakan gaya visual yang SAMA (palette, lighting mood, background style)
-- Hanya tujuan/angle cerita yang berbeda per tipe konten
-- Bahasa prompt: Bahasa Inggris (lebih efektif untuk image AI)
+ATURAN:
+- Semua prompt harus menggunakan gaya visual yang SAMA (palette, lighting mood, background style) DAN mengikuti brand DNA di atas
+- Product knowledge (ingredients/benefits/USP) HARUS dipakai sesuai arahan tiap item — jangan pakai klaim generik kalau ada data produk asli, dan jangan tampilkan detail produk kalau arahannya bilang jangan
+- Ikuti arahan komposisi & talent tiap item apa adanya — ini yang bikin tiap foto beda gaya walau brand-nya sama
+- Hormati STRICT VISUAL RESTRICTIONS di atas — jangan pernah munculkan hal yang dilarang
+- Bahasa prompt (`chatgpt_prompt`): Bahasa Inggris (lebih efektif untuk image AI)
 
 Kembalikan JSON array dengan {count} objek, masing-masing:
 {{
