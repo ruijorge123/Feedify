@@ -4107,6 +4107,7 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
 
     goal_key = payload.campaign_goal if payload.campaign_goal in CAMPAIGN_GOAL_DIRECTIVES else "brand_awareness"
     goal = CAMPAIGN_GOAL_DIRECTIVES[goal_key]
+    human_directive = _build_human_directive(payload, brand)
 
     return {
         "task_type": "reference_layout_product_replacement",
@@ -4189,6 +4190,12 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "primary_palette": [color_primary, color_secondary],
             "preserve_brand_identity": True,
         },
+        # Only present when the user explicitly enabled a human/talent model — when it is,
+        # this takes priority over reference.copy_exactly.human_model below: the point of
+        # enabling talent is to specify who appears, not to just clone whoever's in the
+        # reference photo. If this is empty (talent not enabled), keep following the
+        # reference's own model/pose as usual.
+        "human_model_directive": human_directive or None,
         "product_knowledge": {
             "category": category,
             "product_name": product_name,
@@ -4224,7 +4231,6 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "generate_new_headline": True,
             "generate_new_ingredient_badges": True,
             "generate_new_benefit_checklist": True,
-            "generate_new_cta": False,
         },
         "strict_rules": [
             "The reference image sets the MOOD, CAMERA ANGLE, COMPOSITION, and PRODUCT PLACEMENT — not the exact colors or text.",
@@ -4234,6 +4240,7 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "Recolor the background/scene to the brand's primary_palette — do not keep the reference's own colors.",
             "Add a bold headline, ingredient badges, and a benefit checklist using ONLY real product_knowledge/brand_dna data — do not invent facts, and do not reuse the reference's own text verbatim.",
             "Do not add unrelated decorative props (no random flowers/marble/lab glass) beyond what's already in the reference scene.",
+            "If human_model_directive is set (not null), it OVERRIDES reference.copy_exactly.human_model — show a person matching human_model_directive instead of cloning whoever is in the reference photo. Keep the reference's pose/framing/staging as the pose template, but the person's identity follows human_model_directive.",
         ],
         "negative_prompt": [
             "different camera angle", "different crop", "different pose",
