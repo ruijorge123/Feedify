@@ -1461,8 +1461,21 @@ def _build_studio_prompt(payload: "StudioIn", shot_focus: str = None) -> dict:
         "shot_focus": shot_focus,
         # model_type == "no_model" only means "user didn't explicitly configure a talent" — it
         # must NOT be read as "force no human in the shot" when a reference photo is attached,
-        # since the reference may already show a model that should be kept. See _natural_studio.
+        # since the reference may already show a model that should be kept.
         "has_reference": bool(payload.reference_image_base64),
+        # Explicit, self-contained instruction so this is unambiguous even when this raw JSON is
+        # pasted directly into ChatGPT (the "Lihat Prompt JSON" hand-off) — that flow never sees
+        # _natural_studio's text, only this dict, so the disambiguation has to live here too.
+        "model_instruction": (
+            "No separate talent was explicitly configured. Follow the reference photo instead: "
+            "if it shows a human model, include a person matching the reference's model (pose, "
+            "framing, general presence) — do not remove them. If the reference has no human "
+            "model, keep this product-only."
+            if payload.model_type == "no_model" and payload.reference_image_base64 else
+            "No human model — pure product photography, product is the sole subject."
+            if payload.model_type == "no_model" else
+            f"Include a human model matching model_type '{payload.model_type}' (see model_detail below)."
+        ),
         "advanced": {
             "background": payload.background,
             "lighting": payload.lighting,
@@ -6975,7 +6988,17 @@ async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = D
     # entirely: positioning, archetype, target_audience, brand_donts, words_always,
     # proof_points, signature_phrase.)
     brand_name = brand.get("brand_name", "Brand Anda")
-    visual_style = brand.get("visual_style", "minimal-clean")
+    # Translate the visual_style SLUG (e.g. "minimal-korean") into an actual English aesthetic
+    # description before it ever reaches the LLM — same lookup Banner uses. Sending the raw slug
+    # directly (as this used to) let Groq mis-read style names like "Minimal Korean" or "Luxury
+    # Korean" as a literal instruction to add Korean-language text/hangul to the image, instead of
+    # the intended pastel/glass-skin K-beauty PHOTOGRAPHY aesthetic those style names actually mean.
+    resolved_style_key = VISUAL_STYLE_KEY_MAP.get(brand.get("visual_style", ""), "Minimal Clean")
+    style_info = VISUAL_STYLE_DIRECTIVES.get(resolved_style_key, VISUAL_STYLE_DIRECTIVES["Minimal Clean"])
+    visual_style_desc = (
+        f"{style_info['photography']} Typography: {style_info['typography']} "
+        f"Colour use: {style_info['colour_use']} Mood: {style_info['mood']}"
+    )
     color_primary = brand.get("color_primary", "#000000")
     color_secondary = brand.get("color_secondary", "#ffffff")
     brand_personality_list = brand.get("brand_personality", []) or []
@@ -7069,19 +7092,19 @@ Produk:
 - Product knowledge: {product_knowledge}
 
 Brand DNA:
-- Visual style: {visual_style}
-- Palet warna: {color_primary} (primer), {color_secondary} (sekunder)
+- Visual style aesthetic: {visual_style_desc}
+- Palet warna WAJIB (jangan diganti/diterjemahkan ke bahasa/negara manapun): {color_primary} (primer), {color_secondary} (sekunder)
 - {brand_context}
 
 Daftar konten yang harus dibuat (WAJIB ikuti urutan DAN arahan visual/teks/product-knowledge per item):
 {prompts_spec}
 
-ATURAN:
-- Semua prompt harus menggunakan gaya visual yang SAMA (palette, lighting mood, background style) DAN mengikuti brand DNA di atas
+ATURAN — BACA HATI-HATI, INI YANG MEMBEDAKAN CONSISTENT vs BERANTAKAN:
+- SETIAP `chatgpt_prompt` WAJIB secara eksplisit menyebutkan brand hex color {color_primary} dan {color_secondary} — jangan biarkan warna jadi generic/asal, dan jangan pernah ganti ke bahasa/aksara/budaya negara lain (termasuk kalau visual style aesthetic terinspirasi gaya Korea — itu MURNI soal mood foto/pastel/skin-glow, BUKAN instruksi untuk nulis teks bahasa Korea/hangul di gambar)
 - Product knowledge (ingredients/benefits/USP) HARUS dipakai sesuai arahan tiap item — jangan pakai klaim generik kalau ada data produk asli, dan jangan tampilkan detail produk kalau arahannya bilang jangan
-- Ikuti arahan komposisi & talent tiap item apa adanya — ini yang bikin tiap foto beda gaya walau brand-nya sama
+- Yang BOLEH beda antar item: komposisi/angle kamera, talent ada/tidak, angle cerita/purpose. Yang TIDAK BOLEH beda: brand hex color, brand name, product identity — itu semua harus identik di semua {count} prompt
 - Hormati STRICT VISUAL RESTRICTIONS di atas — jangan pernah munculkan hal yang dilarang
-- Bahasa prompt (`chatgpt_prompt`): Bahasa Inggris (lebih efektif untuk image AI)
+- Semua on-image text (headline/badge/CTA) WAJIB Bahasa Indonesia; hanya `chatgpt_prompt` itu sendiri (instruksi teknis ke image AI) yang ditulis Bahasa Inggris
 
 Kembalikan JSON array dengan {count} objek, masing-masing:
 {{
