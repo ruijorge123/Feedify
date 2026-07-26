@@ -1903,11 +1903,11 @@ def _append_reference_hint(prompt: str, has_reference: bool) -> str:
         "(5) background/surface — texture and style of the backdrop; "
         "(6) props — any objects present and their placement; "
         "(7) any visible text or layout style.\n\n"
-        "THEN, in the SAME reply, generate the image — using the exact photographic style, composition, "
-        "camera angle, lighting and mood you just wrote down. Follow the brief below for what to actually "
-        "put in the frame — replace any product/text/branding from the reference with the brand-specific "
-        "elements specified there (keep brand colors, headline text, CTA, and product identity as "
-        "specified), but the *photographic execution* must match your own written analysis precisely.\n\n"
+        "THEN, in the SAME reply, generate the image using the exact photographic style, composition, "
+        "camera angle, lighting, and mood you just wrote down — the *photographic execution* must match "
+        "your own written analysis precisely. Follow the brief below for exactly what belongs in the "
+        "frame (what to keep, replace, or preserve verbatim) — do not add, replace, or invent anything "
+        "the brief doesn't explicitly call for.\n\n"
         "── BRIEF ──\n"
     )
     return step1 + prompt
