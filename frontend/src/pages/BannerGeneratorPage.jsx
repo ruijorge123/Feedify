@@ -32,12 +32,6 @@ const MODEL_AGES = [
   { id: "35-45", label: "35–45 th" },
 ];
 
-const CTA_SUGGESTIONS = [
-  "Pesan Sekarang", "Beli Sekarang", "Coba Gratis",
-  "DM untuk Info", "Klik Link Bio", "Tanya Admin",
-  "Shop Now", "Dapatkan Promo", "Cek Harga", "Lihat Katalog",
-];
-
 const ASPECT_RATIOS = [
   { id: "1:1 (Square Feed)",   label: "1:1",  sub: "Square Feed",  w: 1,  h: 1  },
   { id: "4:5 (Portrait Feed)", label: "4:5",  sub: "Rekomendasi",  w: 4,  h: 5, recommended: true },
@@ -77,10 +71,6 @@ export default function BannerGeneratorPage() {
   const [modelGender, setModelGender]   = useState("wanita");
   const [modelStyle, setModelStyle]     = useState(null);
   const [modelAge, setModelAge]         = useState(null);
-
-  // CTA
-  const [ctaEnabled, setCtaEnabled] = useState(false);
-  const [ctaText, setCtaText]       = useState("");
 
   // Product selection
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -134,7 +124,6 @@ export default function BannerGeneratorPage() {
         reference_image_base64: referenceImg.split(",")[1],
       };
       if (selectedProductId) payload.product_id = selectedProductId;
-      if (ctaEnabled && ctaText.trim()) payload.call_to_action = ctaText.trim();
       if (modelEnabled) {
         payload.human_enabled = true;
         payload.human_mode    = "manual";
@@ -489,62 +478,6 @@ export default function BannerGeneratorPage() {
                   <p className="text-[11px] text-stone-400 bg-stone-50 rounded-lg px-3 py-2">
                     <User size={11} weight="bold" className="inline mr-1" />
                     Tanpa pilihan spesifik, AI otomatis pilih model sesuai Brand DNA kamu.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ⑦ CTA */}
-          <div className="feedify-card p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-heading text-sm font-bold text-brand">Tombol CTA</h3>
-                <p className="text-xs text-stone-500 mt-0.5">Tambahkan ajakan bertindak? (opsional)</p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={ctaEnabled}
-                onClick={() => { setCtaEnabled(v => !v); if (ctaEnabled) setCtaText(""); }}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${ctaEnabled ? "bg-brand" : "bg-stone-200"}`}
-                data-testid="cta-toggle"
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${ctaEnabled ? "translate-x-6" : "translate-x-1"}`} />
-              </button>
-            </div>
-
-            {ctaEnabled && (
-              <div className="space-y-3 animate-fade-up">
-                <div className="flex flex-wrap gap-1.5">
-                  {CTA_SUGGESTIONS.map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setCtaText(s)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                        ctaText === s
-                          ? "bg-brand text-white border-brand"
-                          : "bg-white text-stone-600 border-stone-200 hover:border-brand/50 hover:text-brand"
-                      }`}
-                      data-testid={`cta-chip-${s}`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  value={ctaText}
-                  onChange={e => setCtaText(e.target.value)}
-                  placeholder="Atau ketik CTA sendiri..."
-                  className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
-                  maxLength={40}
-                  data-testid="cta-input"
-                />
-                {!ctaText.trim() && (
-                  <p className="text-[11px] text-amber-600 bg-amber-50 rounded-lg px-3 py-1.5">
-                    Pilih atau ketik CTA dulu, atau matikan toggle kalau tidak mau ada CTA
                   </p>
                 )}
               </div>
