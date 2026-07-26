@@ -216,7 +216,7 @@ class CarouselPromptIn(BaseModel):
 
     # Section 3 — Story Structure
     template: str = "problem-solution"
-    slide_count: int = 5
+    slide_count: int = 3
 
     # Section 4 — Visual Direction
     visual_type: str = "human_product"      # product_only|human_product|human_only|graphic_design|mixed
@@ -939,6 +939,25 @@ def _natural_feed(j: dict) -> str:
     if emotional_directive and not has_reference:
         p += f"{emotional_directive}. "
 
+    # Campaign goal visual directive — previously built (goal["visual_directive"]) but never
+    # read here at all, so the campaign_goal payload field had zero effect on the actual
+    # generated image beyond the auto-derived headline hint. Skipped with a reference photo:
+    # composition/mood there comes from the reference itself, not a generic goal directive.
+    goal_visual_directive = s.get("campaign_goal_directive", {}).get("visual_directive", "")
+    if goal_visual_directive and not has_reference:
+        p += f"{goal_visual_directive} "
+
+    # Product knowledge — real ingredients/benefits/target_skin/usp plus an explicit instruction
+    # on how to weave them in; previously built into the returned dict but never read here
+    # (creative_brief above already surfaces ingredients/target_skin/usp, but not benefits or
+    # this "how to use it" instruction).
+    product_knowledge = j.get("product_knowledge") or {}
+    if product_knowledge and not has_reference:
+        if product_knowledge.get("key_benefits"):
+            p += f"Real product benefits to reflect: {', '.join(product_knowledge['key_benefits'][:4])}. "
+        if product_knowledge.get("chatgpt_instruction"):
+            p += f"{product_knowledge['chatgpt_instruction']} "
+
     # Lighting and photography style — skipped entirely with a reference photo: its own
     # lighting/mood is what must be preserved, not a generic studio/bokeh look imposed on top.
     if not has_reference:
@@ -956,17 +975,30 @@ def _natural_feed(j: dict) -> str:
         # Skipped with a reference photo (see below): its own colors must be preserved exactly,
         # not translated to brand tones — that translation used to happen unconditionally and
         # directly fought the "recreate the reference exactly" instruction.
+        # CRITICAL: this must explicitly override the shot concept's own named colors (e.g. "navy
+        # blue watered silk fabric", "sage green painted plaster wall" — CONCEPT_POOLS' surface/
+        # lighting/atmosphere pools name a specific color purely for texture/mood variety, with zero
+        # awareness of the brand's actual palette) — confirmed via user report that results looked
+        # "random, not matching brand DNA" because that vivid, specific color text (stated earlier,
+        # right after "Shot concept") was winning over the vaguer "inspired by" wording below.
         if p_primary and p_secondary:
             p += (
-                f"BRAND COLOR PALETTE for SCENE (NOT product): Background, surface, props, and lighting should "
-                f"use tones inspired by brand primary {p_primary} and secondary {p_secondary}. "
+                f"BRAND COLOR PALETTE for SCENE (NOT product) — THIS OVERRIDES ANY COLOR NAMED IN THE "
+                f"SHOT CONCEPT ABOVE: if the shot concept's surface/lighting/atmosphere text named a "
+                f"specific color (e.g. 'navy blue', 'sage green', 'gold', 'obsidian black'), treat that "
+                f"only as a MATERIAL/TEXTURE cue (marble veining, wood grain, fabric weave, metal "
+                f"finish) — the actual color rendered must be brand primary {p_primary} and/or "
+                f"secondary {p_secondary}, not the concept's named color. Background, surface, props, "
+                f"and lighting tint must use ONLY brand primary {p_primary} and secondary {p_secondary}. "
                 f"Photographic interpretation — not flat color fill. "
                 f"Do NOT apply these colors to the product itself; the product's own colors are frozen. "
             )
         elif p_primary:
             p += (
-                f"SCENE color palette: Background and props should reflect brand color {p_primary} "
-                f"(photographic, not flat fill). Product's own colors must not change. "
+                f"SCENE color palette — OVERRIDES any color named in the shot concept above: "
+                f"Background and props must reflect brand color {p_primary} (photographic, not flat "
+                f"fill), regardless of any specific color the shot concept's surface/lighting text "
+                f"mentioned — treat that as a material/texture cue only. Product's own colors must not change. "
             )
 
     # Reference image — treat it as the final approved composition to recreate as closely as
@@ -1074,6 +1106,17 @@ def _natural_feed(j: dict) -> str:
             "The product is the absolute hero — prominently featured, perfectly lit, "
             "photographic realism with accurate reflections and natural drop shadows. "
             "Product edges must look natural and photographic, not digitally cut-out. "
+        )
+
+    # Final brand-color reminder — repeated here (not just once, earlier) because being near the
+    # END of the prompt carries outsized weight (see quality finisher note below); this is the
+    # last defense against the shot concept's own named colors winning out, confirmed via user
+    # report that output still looked "random, doesn't match brand DNA" without this reinforcement.
+    if not has_reference and p_primary:
+        p += (
+            f"REMINDER — brand colors are non-negotiable: every surface, background, and prop "
+            f"color in the final image must be {p_primary}{' or ' + p_secondary if p_secondary else ''}, "
+            f"NOT whatever color the shot concept above happened to name. "
         )
 
     # Quality finisher — when a reference photo exists, anchor quality/finish to the reference
@@ -1474,7 +1517,43 @@ def _build_studio_prompt(payload: "StudioIn", shot_focus: str = None) -> dict:
             if payload.model_type == "no_model" and payload.reference_image_base64 else
             "No human model — pure product photography, product is the sole subject."
             if payload.model_type == "no_model" else
-            f"Include a human model matching model_type '{payload.model_type}' (see model_detail below)."
+            (
+                f"Include a human model matching model_type '{payload.model_type}' (see model_detail "
+                "below). IMPORTANT: composite this model INTO the reference photo's own background, "
+                "environment, and lighting (see reference_photo_rule below) — do not invent a "
+                "different scene just because a model is being added, even if the reference photo "
+                "itself shows no model, or a different backdrop would normally be typical for this "
+                "product category."
+                if payload.reference_image_base64 else
+                f"Include a human model matching model_type '{payload.model_type}' (see model_detail below)."
+            )
+        ),
+        # Studio's own reference-matching rule — mirrors Banner's inspiration_photo_rule. Unlike
+        # model_instruction above (which only governs whether/how a person appears), this rule
+        # covers the whole SCENE (background, environment, lighting, camera angle) and applies
+        # regardless of model_type — confirmed necessary because enabling an explicit talent was
+        # otherwise the only case with zero reference-following text at all, letting the image
+        # model fall back to a generic category-default backdrop (e.g. skincare's "ingredient-
+        # inspired backdrop") instead of the reference's actual scene.
+        "reference_photo_rule": (
+            "═══ REFERENCE PHOTO RULE — READ CAREFULLY ═══\n"
+            "The second attached photo is a LAYOUT/COMPOSITION/ENVIRONMENT REFERENCE. This rule "
+            "applies no matter what model_type/model_detail says below.\n\n"
+            "WHAT YOU MUST COPY from the reference photo:\n"
+            "  • Camera angle, framing, and product placement in the frame\n"
+            "  • Background, surface, and environment exactly as shown (whatever it is — studio, "
+            "outdoor, marble, rock, fabric, etc.)\n"
+            "  • Lighting direction and quality, shadow style\n"
+            "  • Overall mood and atmosphere\n\n"
+            "WHAT YOU MUST NEVER DO:\n"
+            "  ✗ Invent a different background/environment/setting just because a human model is "
+            "configured below — if a model is specified, add that model INTO the reference's own "
+            "preserved scene; do not replace the scene with a generic studio or category-default look\n"
+            "  ✗ Change the product itself — render it exactly as provided\n\n"
+            "MENTAL MODEL: The reference photo is the director's approved set — camera, background, "
+            "and light are locked. Only the product (and, if configured, a model added into that "
+            "same set) may differ from the reference."
+            if payload.reference_image_base64 else None
         ),
         "advanced": {
             "background": payload.background,
@@ -1879,6 +1958,19 @@ def _natural_studio(j: dict) -> str:
             "include a person matching the reference's model (pose, framing, general presence) — "
             "do not remove them. If the reference photo has no human model, keep this product-only. "
             "No separate talent was explicitly configured, so the reference alone decides this."
+        )
+    elif has_reference:
+        # A talent WAS explicitly configured even though a reference photo is attached — this was
+        # the only branch with zero reference-following text, so the category-specific backdrop
+        # suggestion above (e.g. skincare's "ingredient-inspired backdrop") would win by default,
+        # confirmed to be the cause of results abandoning the reference's actual background/
+        # environment entirely once a talent was turned on. Explicitly override that here.
+        model_directive = (
+            model_map.get(model, model_map["no_model"]) + " "
+            "IMPORTANT: keep the SAME background, environment, and lighting shown in the reference "
+            "photo — composite this model into that preserved scene. Do not invent a different "
+            "backdrop/setting just because a model is being added, even if a different backdrop "
+            "would normally be typical for this product category."
         )
     else:
         model_directive = model_map.get(model, model_map["no_model"])
@@ -4965,11 +5057,34 @@ def _build_talent_directive_v2(brief: dict) -> str:
     )
 
 
+# Explicit role sequence per template PER slide count (2-4 only) — not a slice of a longer list.
+# Slicing a longer list from the front (the old approach) always drops "cta" — it sits LAST in
+# every template below, so a naive [:slide_count] only ever included it when slide_count matched
+# the full list length. That silently produced carousels with no closing/CTA slide at all for
+# every other count, which became guaranteed (not just possible) once slide_count was capped to
+# 2-4. Each sequence here is hand-picked to preserve the template's narrative arc while always
+# ending in "cta".
 _CAROUSEL_TEMPLATES = {
-    "problem-solution": ["hook", "problem", "agitation", "solution", "benefit", "social-proof", "cta"],
-    "listicle":         ["hook", "intro", "point-1", "point-2", "point-3", "point-4", "cta"],
-    "story":            ["hook", "context", "challenge", "turning-point", "result", "lesson", "cta"],
-    "testimonial":      ["hook", "credibility", "testimonial-1", "testimonial-2", "social-proof", "offer", "cta"],
+    "problem-solution": {
+        2: ["hook", "cta"],
+        3: ["hook", "problem", "cta"],
+        4: ["hook", "problem", "solution", "cta"],
+    },
+    "listicle": {
+        2: ["hook", "cta"],
+        3: ["hook", "point-1", "cta"],
+        4: ["hook", "point-1", "point-2", "cta"],
+    },
+    "story": {
+        2: ["hook", "cta"],
+        3: ["hook", "challenge", "cta"],
+        4: ["hook", "challenge", "turning-point", "cta"],
+    },
+    "testimonial": {
+        2: ["hook", "cta"],
+        3: ["hook", "testimonial-1", "cta"],
+        4: ["hook", "testimonial-1", "testimonial-2", "cta"],
+    },
 }
 
 _ROLE_DIRECTIVES = {
@@ -5112,7 +5227,9 @@ def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], pr
     style_info      = brief["style_info"]
     tone_typo       = brief["tone_typography"]
 
-    roles = _CAROUSEL_TEMPLATES.get(brief["storytelling"], _CAROUSEL_TEMPLATES["problem-solution"])[: brief["slide_count"]]
+    _tmpl_counts = _CAROUSEL_TEMPLATES.get(brief["storytelling"], _CAROUSEL_TEMPLATES["problem-solution"])
+    _count_key = brief["slide_count"] if brief["slide_count"] in _tmpl_counts else min(_tmpl_counts, key=lambda k: abs(k - brief["slide_count"]))
+    roles = _tmpl_counts[_count_key]
     bg_alternator = [color_primary, color_secondary]
 
     brand_frame = {
@@ -5416,8 +5533,8 @@ async def preview_carousel_prompt(payload: CarouselPromptIn, current_user: dict 
 @api_router.post("/prompt/generate-carousel")
 async def generate_carousel(payload: CarouselPromptIn, current_user: dict = Depends(get_current_user)):
     await _block_if_menu_locked("carousel")
-    if payload.slide_count < 3 or payload.slide_count > 7:
-        raise HTTPException(status_code=400, detail="Jumlah slide harus 3-7")
+    if payload.slide_count < 2 or payload.slide_count > 4:
+        raise HTTPException(status_code=400, detail="Jumlah slide harus 2-4")
 
     # Content moderation — before consuming any credit
     _raise_if_banned(payload.topic, payload.product_name, payload.call_to_action, payload.target_audience)
@@ -5490,8 +5607,8 @@ async def generate_carousel_stream(payload: CarouselPromptIn, current_user: dict
     await _block_if_menu_locked("carousel")
     import json as _json
 
-    if payload.slide_count < 3 or payload.slide_count > 7:
-        raise HTTPException(status_code=400, detail="Jumlah slide harus 3-7")
+    if payload.slide_count < 2 or payload.slide_count > 4:
+        raise HTTPException(status_code=400, detail="Jumlah slide harus 2-4")
 
     _raise_if_banned(payload.topic, payload.product_name, payload.call_to_action, payload.target_audience)
 
@@ -6950,6 +7067,21 @@ _FEED_TYPE_GUIDANCE: dict = {
     },
 }
 
+# Maps Feed Generator's content types onto Banner's CAMPAIGN_GOAL_DIRECTIVES keys. Used only to
+# drive the auto-headline hint and general campaign framing inside the reused _build_banner_prompt
+# call below — the actual per-item visual/text direction always comes from _FEED_TYPE_GUIDANCE
+# above (which overrides Banner's generic goal text after the prompt is built), since no single
+# Banner goal maps cleanly onto some of these content types (e.g. "soft_selling").
+_FEED_CONTENT_TYPE_TO_CAMPAIGN_GOAL: dict = {
+    "awareness":    "brand_awareness",
+    "soft_selling": "best_seller",
+    "promo":        "promo",
+    "hard_selling": "promo",
+    "testimonial":  "testimonial",
+    "education":    "edukasi",
+    "engagement":   "brand_awareness",
+}
+
 
 @api_router.post("/feed-generator/generate")
 async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = Depends(get_current_user)):
@@ -6981,196 +7113,165 @@ async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = D
     if not ok:
         raise HTTPException(status_code=402, detail=f"Kredit tidak cukup. Generate {count} prompt membutuhkan {count} kredit.")
 
-    # Build brand context — full Brand DNA, same fields Banner's _build_banner_prompt reads.
-    # (Previously read "brand_personalities" (plural), which doesn't exist on BrandProfileIn —
-    # only "brand_personality" (singular) does — so personality always silently fell back to
-    # "friendly" regardless of the user's actual brand profile. Also previously missing
-    # entirely: positioning, archetype, target_audience, brand_donts, words_always,
-    # proof_points, signature_phrase.)
     brand_name = brand.get("brand_name", "Brand Anda")
-    # Translate the visual_style SLUG (e.g. "minimal-korean") into an actual English aesthetic
-    # description before it ever reaches the LLM — same lookup Banner uses. Sending the raw slug
-    # directly (as this used to) let Groq mis-read style names like "Minimal Korean" or "Luxury
-    # Korean" as a literal instruction to add Korean-language text/hangul to the image, instead of
-    # the intended pastel/glass-skin K-beauty PHOTOGRAPHY aesthetic those style names actually mean.
-    resolved_style_key = VISUAL_STYLE_KEY_MAP.get(brand.get("visual_style", ""), "Minimal Clean")
-    style_info = VISUAL_STYLE_DIRECTIVES.get(resolved_style_key, VISUAL_STYLE_DIRECTIVES["Minimal Clean"])
-    visual_style_desc = (
-        f"{style_info['photography']} Typography: {style_info['typography']} "
-        f"Colour use: {style_info['colour_use']} Mood: {style_info['mood']}"
-    )
-    color_primary = brand.get("color_primary", "#000000")
-    color_secondary = brand.get("color_secondary", "#ffffff")
-    brand_personality_list = brand.get("brand_personality", []) or []
-    brand_archetype = brand.get("archetype", "")
-    brand_positioning = brand.get("brand_positioning", "")
-    target_audience = brand.get("target_audience", "")
-    # No reference photo ever exists on this dashboard, so brand don'ts are never filtered —
-    # unlike Banner's reference-mode, every category always applies here.
-    brand_donts = brand.get("brand_donts", []) or []
-    words_always = brand.get("words_always", []) or []
-    proof_points = brand.get("proof_points", []) or []
-    signature_phrase = brand.get("signature_phrase", "")
-
-    brand_context_parts = []
-    if brand_positioning:
-        brand_context_parts.append(f"Brand positioning: {brand_positioning}")
-    if brand_personality_list:
-        brand_context_parts.append(f"Brand personality: {', '.join(brand_personality_list)}")
-    if brand_archetype:
-        brand_context_parts.append(f"Brand archetype: {brand_archetype}")
-    if target_audience:
-        brand_context_parts.append(f"Target audience: {target_audience}")
-    if words_always:
-        brand_context_parts.append(f"Brand keywords to reflect: {', '.join(words_always)}")
-    if proof_points:
-        brand_context_parts.append(f"Brand proof points: {'; '.join(proof_points)}")
-    if signature_phrase:
-        brand_context_parts.append(f"Brand signature phrase: '{signature_phrase}'")
-    if brand_donts:
-        brand_context_parts.append(f"STRICT VISUAL RESTRICTIONS — do NOT include: {', '.join(brand_donts)}")
-    brand_context = ". ".join(brand_context_parts) or "(tidak ada data brand DNA tambahan)"
-
-    # Product knowledge — real ingredients/benefits/target_skin/usp, same fields Banner reads
-    # (previously only name/category were read, plus a "description" field that doesn't exist
-    # anywhere on the Product model — always empty, always fell back to "(tidak ada)").
     product_name = product.get("name", "Produk")
-    product_category = product.get("category", "general")
     ingredients = product.get("ingredients", []) or []
     product_benefits = product.get("benefits", []) or []
-    target_skin = product.get("target_skin", []) or []
     usp = product.get("usp", "")
 
-    product_knowledge_parts = []
-    if ingredients:
-        product_knowledge_parts.append(f"Key ingredients: {', '.join(ingredients[:6])}")
-    if product_benefits:
-        product_knowledge_parts.append(f"Real benefits: {', '.join(product_benefits[:4])}")
-    if target_skin:
-        product_knowledge_parts.append(f"Formulated for: {', '.join(target_skin)}")
-    if usp:
-        product_knowledge_parts.append(f"Core promise/USP: {usp}")
-    product_knowledge = ". ".join(product_knowledge_parts) or "(tidak ada data product knowledge tambahan)"
-
-    # Per-item spec: since there's no reference/inspiration photo on this dashboard at all, each
-    # item gets a RANDOM composition concept (same CONCEPT_POOLS pool Banner uses when it also
-    # has no reference photo) and a coin-flip on whether a human model appears — this is what
-    # gives auto-mix output visual variety ("kadang ada model kadang tidak") instead of every
-    # item defaulting to the same generic product-only studio shot.
-    item_specs = []
+    # ── Deterministic image-generation prompt per item — reuses Banner's own _build_banner_prompt
+    # / _build_natural_prompt pipeline (real brand DNA + real product knowledge + random
+    # composition + random talent, exactly like Banner/Feed) instead of asking an LLM to freely
+    # author the prompt text. This replaces the earlier Groq-authored `chatgpt_prompt`, which
+    # produced literal Korean text and inconsistent brand colors — the LLM was inventing prompt
+    # content instead of Feedify's own deterministic builder assembling it. Since this dashboard
+    # never has a reference/inspiration photo, _build_banner_prompt always takes its rich
+    # no-reference path: random CONCEPT_POOLS composition (composition_concept="") and a coin-flip
+    # on human_enabled give the auto-mix output visual variety ("kadang ada model kadang tidak").
+    items = []
     for i, t in enumerate(types_mix):
         guidance = _FEED_TYPE_GUIDANCE.get(t, _FEED_TYPE_GUIDANCE["awareness"])
-        concept = _pick_concept_variation("")
         include_model = _random.random() < 0.5
-        model_line = (
-            "Include a human model in this shot (auto-choose gender/style/age that fits the brand DNA above)."
-            if include_model else
-            "Product-only shot — no human model in this one."
+        synthetic_payload = BannerPromptIn(
+            product_name=product_name,
+            campaign_goal=_FEED_CONTENT_TYPE_TO_CAMPAIGN_GOAL.get(t, "brand_awareness"),
+            composition_concept="",  # "" = random, same as Banner's own no-reference random path
+            human_enabled=include_model,
+            human_mode="auto",
+            # "" (not the field's own "Minimal Clean" default) so _build_banner_prompt falls
+            # through to the brand's own stored visual_style instead of silently overriding it —
+            # BannerPromptIn.style_preset defaults to the literal "Minimal Clean", which is itself
+            # a valid VISUAL_STYLE_KEY_MAP key, so leaving it unset would always win over the
+            # brand's real style (e.g. "minimal-korean").
+            style_preset="",
         )
-        item_specs.append(
-            f'  {i+1}. content_type: "{t}" ({_FEED_TYPE_LABELS.get(t, t)})\n'
-            f'     Visual direction: {guidance["visual_directive"]}\n'
-            f'     Product knowledge usage: {guidance["product_knowledge_usage"]}\n'
-            f'     On-image text: {guidance["text_guidance"]}\n'
-            f'     Composition inspiration (vary it, don\'t reuse verbatim across items): {concept["directive"]}\n'
-            f'     Talent: {model_line}'
-        )
-    prompts_spec = "\n".join(item_specs)
-
-    system = (
-        "Kamu adalah Creative Director spesialis konten produk Indonesia. "
-        "Tugas: buat daftar prompt foto produk untuk ChatGPT/DALL-E yang KONSISTEN secara visual "
-        "(gaya, palet warna, suasana) tapi BERBEDA tujuan kontennya sesuai arahan tiap item. "
-        "Output HANYA JSON array valid, tanpa markdown fence, tanpa penjelasan."
-    )
-
-    user_prompt = f"""Buat {count} prompt foto produk untuk brand "{brand_name}".
-
-Produk:
-- Nama: {product_name}
-- Kategori: {product_category}
-- Product knowledge: {product_knowledge}
-
-Brand DNA:
-- Visual style aesthetic: {visual_style_desc}
-- Palet warna WAJIB (jangan diganti/diterjemahkan ke bahasa/negara manapun): {color_primary} (primer), {color_secondary} (sekunder)
-- {brand_context}
-
-Daftar konten yang harus dibuat (WAJIB ikuti urutan DAN arahan visual/teks/product-knowledge per item):
-{prompts_spec}
-
-ATURAN — BACA HATI-HATI, INI YANG MEMBEDAKAN CONSISTENT vs BERANTAKAN:
-- SETIAP `chatgpt_prompt` WAJIB secara eksplisit menyebutkan brand hex color {color_primary} dan {color_secondary} — jangan biarkan warna jadi generic/asal, dan jangan pernah ganti ke bahasa/aksara/budaya negara lain (termasuk kalau visual style aesthetic terinspirasi gaya Korea — itu MURNI soal mood foto/pastel/skin-glow, BUKAN instruksi untuk nulis teks bahasa Korea/hangul di gambar)
-- Product knowledge (ingredients/benefits/USP) HARUS dipakai sesuai arahan tiap item — jangan pakai klaim generik kalau ada data produk asli, dan jangan tampilkan detail produk kalau arahannya bilang jangan
-- Yang BOLEH beda antar item: komposisi/angle kamera, talent ada/tidak, angle cerita/purpose. Yang TIDAK BOLEH beda: brand hex color, brand name, product identity — itu semua harus identik di semua {count} prompt
-- Hormati STRICT VISUAL RESTRICTIONS di atas — jangan pernah munculkan hal yang dilarang
-- Semua on-image text (headline/badge/CTA) WAJIB Bahasa Indonesia; hanya `chatgpt_prompt` itu sendiri (instruksi teknis ke image AI) yang ditulis Bahasa Inggris
-
-Kembalikan JSON array dengan {count} objek, masing-masing:
-{{
-  "index": 1,
-  "content_type": "awareness",
-  "content_type_label": "Awareness / Perkenalan",
-  "purpose": "Tujuan foto ini dalam 1 kalimat pendek (Bahasa Indonesia)",
-  "caption_angle": "Hook atau angle caption yang cocok (Bahasa Indonesia, maks 15 kata)",
-  "chatgpt_prompt": "Prompt lengkap dalam Bahasa Inggris untuk ChatGPT/DALL-E",
-  "tip": "Tip singkat cara pakai prompt ini (Bahasa Indonesia, maks 20 kata)"
-}}"""
-
-    # Use Groq (llama-3.3-70b) — fast, reliable, no image credit cost
-    from groq import AsyncGroq, RateLimitError as _GroqRL
-    _fg_keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
-    if not _fg_keys:
-        await _refund_credit(current_user["id"], count, "Refund feed-generator no keys")
-        raise HTTPException(status_code=500, detail="AI service unavailable")
-    raw = None
-    _fg_last_err = None
-    for _fkey in _fg_keys:
-        if not _fkey:
-            continue
-        try:
-            _fg_client = AsyncGroq(api_key=_fkey)
-            _fg_resp = await _fg_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user_prompt}],
-                max_tokens=4096,
-                temperature=0.7,
+        prompt_json = _build_banner_prompt(synthetic_payload, brand, product=product)
+        # Feed's own per-content-type guidance is more specific than Banner's generic campaign-goal
+        # text for these 7 content types (no Banner goal maps cleanly onto e.g. "soft_selling"), so
+        # it overrides rather than stacks — stacking risked contradicting instructions (e.g.
+        # best_seller's "TERLARIS badge" vs soft_selling's "not hard-pitchy").
+        ps = prompt_json.get("prompt_structure", {})
+        if ps.get("campaign_goal_directive"):
+            ps["campaign_goal_directive"]["visual_directive"] = guidance["visual_directive"]
+        if prompt_json.get("product_knowledge"):
+            prompt_json["product_knowledge"]["chatgpt_instruction"] = (
+                f"{guidance['product_knowledge_usage']} {prompt_json['product_knowledge']['chatgpt_instruction']}"
             )
-            raw = _fg_resp.choices[0].message.content.strip()
-            break
-        except _GroqRL as e:
-            _fg_last_err = e
-            continue
-        except Exception as e:
-            _fg_last_err = e
-            break
-    if raw is None:
-        await _refund_credit(current_user["id"], count, f"Refund feed-generator {count} prompt gagal")
-        raise HTTPException(status_code=500, detail=_ai_error_detail(_fg_last_err, "Gagal generate prompt. Coba lagi."))
+        if ps.get("typography_instructions"):
+            ps["typography_instructions"] = f"{guidance['text_guidance']} {ps['typography_instructions']}"
+        # Strip CONCEPT_POOLS' randomly-picked sub-dimensions (surface/lighting/atmosphere/etc.)
+        # from the composition concept — these pools name a specific color per option purely for
+        # texture/mood variety ("navy blue watered silk fabric", "aged copper patina plate", "sage
+        # green painted plaster wall"), with zero awareness of the brand's actual palette. A textual
+        # "brand color overrides this" instruction elsewhere in the prompt was NOT reliably enough
+        # to beat these vivid, specific, early-appearing color mentions (confirmed via user report
+        # that colors still didn't match brand DNA after that fix) — removing them at the source is
+        # the only fully reliable fix for this dashboard, where brand color consistency is mandatory.
+        # Only the color-neutral "base" framing sentence (before the first bracketed pick) survives,
+        # e.g. "HERO STUDIO SHOT: Product is the undisputed star. Clean premium environment..." —
+        # still gives real compositional variety across items without ever naming an off-brand color.
+        concept_block = prompt_json.get("composition_concept")
+        if concept_block and concept_block.get("directive"):
+            concept_block["directive"] = concept_block["directive"].split(" [")[0]
+        chatgpt_prompt = _build_natural_prompt(prompt_json)
+        items.append({
+            "index": i + 1,
+            "content_type": t,
+            "content_type_label": _FEED_TYPE_LABELS.get(t, t),
+            "chatgpt_prompt": chatgpt_prompt,
+            "purpose": f"Foto {_FEED_TYPE_LABELS.get(t, t).lower()} untuk {product_name}.",
+            "caption_angle": f"{product_name} — {_FEED_TYPE_LABELS.get(t, t)}",
+            "tip": "Salin prompt ke ChatGPT (mode gambar) atau DALL-E untuk generate.",
+        })
 
-    # Strip markdown fences if present
-    raw = raw.strip()
-    if raw.startswith("```"):
-        lines_r = raw.split("\n")
-        raw = "\n".join(lines_r[1:-1]) if lines_r[-1].startswith("```") else "\n".join(lines_r[1:])
-        raw = raw.strip()
+    # ── Caption flavor text — Groq is used ONLY for these lightweight Indonesian-language fields
+    # (purpose/caption_angle/tip), never for the image prompt itself (fully deterministic above).
+    # A Groq failure degrades gracefully to the defaults already set on each item above, instead of
+    # failing the whole generation — unlike before, the LLM is no longer a single point of failure
+    # for the actual image-prompt quality.
+    product_knowledge_summary_parts = []
+    if ingredients:
+        product_knowledge_summary_parts.append(f"Bahan utama: {', '.join(ingredients[:6])}")
+    if product_benefits:
+        product_knowledge_summary_parts.append(f"Manfaat: {', '.join(product_benefits[:4])}")
+    if usp:
+        product_knowledge_summary_parts.append(f"USP: {usp}")
+    product_knowledge_summary = "; ".join(product_knowledge_summary_parts) or "(tidak ada data tambahan)"
 
-    try:
-        prompts = json.loads(raw)
-        if not isinstance(prompts, list):
-            raise ValueError("Expected JSON array")
-    except Exception:
-        start = raw.find("[")
-        end = raw.rfind("]")
-        if start >= 0 and end > start:
+    caption_lines = "\n".join(
+        f'  {i+1}. content_type: "{t}" ({_FEED_TYPE_LABELS.get(t, t)}) — '
+        f'{_FEED_TYPE_GUIDANCE.get(t, _FEED_TYPE_GUIDANCE["awareness"])["visual_directive"]}'
+        for i, t in enumerate(types_mix)
+    )
+    caption_system = (
+        "Kamu adalah social media copywriter Indonesia berpengalaman untuk brand UMKM. "
+        "Tugas: buat teks pendukung (BUKAN prompt gambar — arah visual sudah final) untuk "
+        "beberapa foto produk. Output HANYA JSON array valid, tanpa markdown fence, tanpa penjelasan."
+    )
+    caption_user_prompt = f"""Brand: {brand_name}
+Produk: {product_name}
+Product knowledge: {product_knowledge_summary}
+
+Daftar foto (arah visual sudah final, kamu HANYA buat teks pendukungnya):
+{caption_lines}
+
+Untuk tiap foto buat:
+- purpose: tujuan foto ini, 1 kalimat pendek Bahasa Indonesia
+- caption_angle: hook/angle caption yang cocok, Bahasa Indonesia, maks 15 kata
+- tip: tip singkat cara pakai prompt ini, Bahasa Indonesia, maks 20 kata
+
+Kembalikan JSON array berisi {count} objek: [{{"index": 1, "purpose": "...", "caption_angle": "...", "tip": "..."}}]"""
+
+    captions = []
+    _fg_keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
+    if _fg_keys:
+        from groq import AsyncGroq, RateLimitError as _GroqRL
+        raw = None
+        for _fkey in _fg_keys:
+            if not _fkey:
+                continue
             try:
-                prompts = json.loads(raw[start:end + 1])
+                _fg_client = AsyncGroq(api_key=_fkey)
+                _fg_resp = await _fg_client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "system", "content": caption_system}, {"role": "user", "content": caption_user_prompt}],
+                    max_tokens=2048,
+                    temperature=0.8,
+                )
+                raw = _fg_resp.choices[0].message.content.strip()
+                break
+            except _GroqRL:
+                continue
             except Exception:
-                await _refund_credit(current_user["id"], count, f"Refund feed-generator parse gagal")
-                raise HTTPException(status_code=500, detail="Gagal parse hasil AI. Coba lagi.")
-        else:
-            await _refund_credit(current_user["id"], count, f"Refund feed-generator parse gagal")
-            raise HTTPException(status_code=500, detail="Gagal parse hasil AI. Coba lagi.")
+                break
+        if raw:
+            raw = raw.strip()
+            if raw.startswith("```"):
+                lines_r = raw.split("\n")
+                raw = "\n".join(lines_r[1:-1]) if lines_r[-1].startswith("```") else "\n".join(lines_r[1:])
+                raw = raw.strip()
+            try:
+                parsed = json.loads(raw)
+                captions = parsed if isinstance(parsed, list) else []
+            except Exception:
+                start = raw.find("[")
+                end = raw.rfind("]")
+                if start >= 0 and end > start:
+                    try:
+                        captions = json.loads(raw[start:end + 1])
+                    except Exception:
+                        captions = []
+
+    for cap in captions:
+        idx = cap.get("index") if isinstance(cap, dict) else None
+        if isinstance(idx, int) and 1 <= idx <= len(items):
+            it = items[idx - 1]
+            if cap.get("purpose"):
+                it["purpose"] = cap["purpose"]
+            if cap.get("caption_angle"):
+                it["caption_angle"] = cap["caption_angle"]
+            if cap.get("tip"):
+                it["tip"] = cap["tip"]
 
     saved_id = str(uuid.uuid4())
     await db.generated_prompts.insert_one({
@@ -7179,7 +7280,7 @@ Kembalikan JSON array dengan {count} objek, masing-masing:
         "dashboard_type": "feed_generator",
         "title": f"{product_name} — {count} prompt",
         "input_payload": payload.model_dump(),
-        "prompt_json": {"prompts": prompts, "count": count, "product_name": product_name},
+        "prompt_json": {"prompts": items, "count": count, "product_name": product_name},
         "product": {k: v for k, v in product.items() if k != "photo_base64"},
         "product_photo_base64": product.get("photo_base64"),
         "created_at": now_iso(),
@@ -7188,7 +7289,7 @@ Kembalikan JSON array dengan {count} objek, masing-masing:
     credits_doc = await db.user_credits.find_one({"user_id": current_user["id"]}, {"_id": 0})
     return {
         "id": saved_id,
-        "prompts": prompts,
+        "prompts": items,
         "product_name": product_name,
         "credits": _credits_summary(credits_doc),
     }

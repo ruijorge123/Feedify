@@ -39,53 +39,39 @@ const ASPECT_RATIOS = [
 // Slide roles per story flow × slide count
 const FLOW_ROLES = {
   auto: {
+    2: ["Hook", "Isi + CTA"],
     3: ["Hook", "Isi Utama", "CTA"],
     4: ["Hook", "Point 1", "Point 2", "CTA"],
-    5: ["Hook", "Point 1", "Point 2", "Point 3", "CTA"],
-    6: ["Hook", "Point 1", "Point 2", "Point 3", "Point 4", "CTA"],
-    7: ["Hook", "Point 1", "Point 2", "Point 3", "Point 4", "Point 5", "CTA"],
   },
   problem_solution: {
+    2: ["Hook 🎯", "Solusi + CTA"],
     3: ["Hook 🎯", "Masalah", "Solusi + CTA"],
     4: ["Hook 🎯", "Masalah", "Solusi", "CTA"],
-    5: ["Hook 🎯", "Masalah", "Kenapa?", "Solusi", "CTA"],
-    6: ["Hook 🎯", "Masalah", "Kenapa?", "Dampak", "Solusi", "CTA"],
-    7: ["Hook 🎯", "Masalah", "Kenapa?", "Dampak", "Insight", "Solusi", "CTA"],
   },
   myth_fact: {
+    2: ["Hook 🔍", "Fakta + CTA"],
     3: ["Hook 🔍", "Mitos", "Fakta + CTA"],
     4: ["Hook 🔍", "Mitos 1", "Fakta 1", "CTA"],
-    5: ["Hook 🔍", "Mitos 1", "Fakta 1", "Mitos 2", "CTA"],
-    6: ["Hook 🔍", "Mitos 1", "Fakta 1", "Mitos 2", "Fakta 2", "CTA"],
-    7: ["Hook 🔍", "Mitos 1", "Fakta 1", "Mitos 2", "Fakta 2", "Fakta 3", "CTA"],
   },
   before_after: {
+    2: ["Hook 🔄", "After + CTA"],
     3: ["Hook 🔄", "Before", "After + CTA"],
     4: ["Hook 🔄", "Before", "Proses", "After + CTA"],
-    5: ["Hook 🔄", "Before", "Proses", "After", "CTA"],
-    6: ["Hook 🔄", "Before", "Masalah", "Proses", "After", "CTA"],
-    7: ["Hook 🔄", "Before", "Masalah", "Proses", "Hasil", "After", "CTA"],
   },
   step_by_step: {
+    2: ["Hook 📋", "Step Utama + CTA"],
     3: ["Hook 📋", "Step 1 & 2", "Step 3 + CTA"],
     4: ["Hook 📋", "Step 1", "Step 2", "Step 3 + CTA"],
-    5: ["Hook 📋", "Step 1", "Step 2", "Step 3", "CTA"],
-    6: ["Hook 📋", "Step 1", "Step 2", "Step 3", "Step 4", "CTA"],
-    7: ["Hook 📋", "Step 1", "Step 2", "Step 3", "Step 4", "Step 5", "CTA"],
   },
   listicle: {
+    2: ["Hook 📝", "Tips + CTA"],
     3: ["Hook 📝", "Tips 1–3", "CTA"],
     4: ["Hook 📝", "Tips 1–2", "Tips 3–4", "CTA"],
-    5: ["Hook 📝", "Tip 1", "Tip 2", "Tip 3", "CTA"],
-    6: ["Hook 📝", "Tip 1", "Tip 2", "Tip 3", "Tip 4", "CTA"],
-    7: ["Hook 📝", "Tip 1", "Tip 2", "Tip 3", "Tip 4", "Tip 5", "CTA"],
   },
   story_brand: {
+    2: ["Hook 📖", "Hasil + CTA"],
     3: ["Hook 📖", "Perjalanan", "Hasil + CTA"],
     4: ["Hook 📖", "Problem", "Perubahan", "Hasil + CTA"],
-    5: ["Hook 📖", "Before", "Problem", "Turning Point", "After + CTA"],
-    6: ["Hook 📖", "Before", "Problem", "Turning Point", "After", "CTA"],
-    7: ["Hook 📖", "Before", "Problem", "Turning Point", "Bukti", "After", "CTA"],
   },
 };
 
@@ -105,11 +91,6 @@ const MODEL_AGES = [
   { id: "22-27", label: "22–27 th" },
   { id: "27-35", label: "27–35 th" },
   { id: "35-45", label: "35–45 th" },
-];
-
-const CTA_SUGGESTIONS = [
-  "Pesan Sekarang", "Beli Sekarang", "Coba Gratis",
-  "DM untuk Info", "Klik Link Bio", "Shop Now", "Dapatkan Promo",
 ];
 
 function toBase64(file) {
@@ -147,10 +128,6 @@ export default function CarouselGeneratorPage() {
   const [modelGender, setModelGender]   = useState("wanita");
   const [modelStyle, setModelStyle]     = useState(null);
   const [modelAge, setModelAge]         = useState(null);
-
-  // CTA
-  const [ctaEnabled, setCtaEnabled] = useState(false);
-  const [ctaText, setCtaText]       = useState("");
 
   // Generate state
   const [generating, setGenerating]   = useState(false);
@@ -197,10 +174,6 @@ export default function CarouselGeneratorPage() {
         if (selectedProduct.benefits?.length)
           payload.final_cta = selectedProduct.usp || "";
         payload.product_id = selectedProduct.id;
-      }
-      if (ctaEnabled && ctaText.trim()) {
-        payload.call_to_action = ctaText.trim();
-        payload.final_cta      = ctaText.trim();
       }
       if (modelEnabled) {
         payload.human_enabled  = true;
@@ -535,7 +508,7 @@ export default function CarouselGeneratorPage() {
             <div className="space-y-2">
               <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Jumlah Slide</p>
               <div className="flex gap-1.5">
-                {[3, 4, 5, 6, 7].map(n => (
+                {[2, 3, 4].map(n => (
                   <button key={n} type="button" onClick={() => setSlideCount(n)}
                     className={`relative flex-1 py-2.5 rounded-xl border-2 font-heading font-bold text-sm transition-colors ${
                       slideCount === n ? "border-brand bg-brand text-white" : "border-stone-100 text-stone-600 hover:border-brand/30"
@@ -681,40 +654,6 @@ export default function CarouselGeneratorPage() {
             )}
           </div>
 
-          {/* ⑧ CTA */}
-          <div className="feedify-card p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-heading text-sm font-bold text-brand">Tombol CTA</h3>
-                <p className="text-xs text-stone-500 mt-0.5">Tambahkan ajakan bertindak? (opsional)</p>
-              </div>
-              <button type="button" role="switch" aria-checked={ctaEnabled}
-                onClick={() => { setCtaEnabled(v => !v); if (ctaEnabled) setCtaText(""); }}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${ctaEnabled ? "bg-brand" : "bg-stone-200"}`}
-                data-testid="cta-toggle">
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${ctaEnabled ? "translate-x-6" : "translate-x-1"}`} />
-              </button>
-            </div>
-            {ctaEnabled && (
-              <div className="space-y-3 animate-fade-up">
-                <div className="flex flex-wrap gap-1.5">
-                  {CTA_SUGGESTIONS.map(s => (
-                    <button key={s} type="button" onClick={() => setCtaText(s)}
-                      className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                        ctaText === s ? "bg-brand text-white border-brand" : "bg-white text-stone-600 border-stone-200 hover:border-brand/50 hover:text-brand"
-                      }`}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <input type="text" value={ctaText} onChange={e => setCtaText(e.target.value)}
-                  placeholder="Atau ketik CTA sendiri..."
-                  className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
-                  maxLength={40} data-testid="cta-input" />
-              </div>
-            )}
-          </div>
-
           {/* ChatGPT akan otomatis card */}
           <div className="rounded-2xl border border-green-100 p-4 bg-gradient-to-br from-green-50/60 to-white">
             <div className="flex items-center gap-2 mb-3">
@@ -804,8 +743,7 @@ export default function CarouselGeneratorPage() {
               ["Flow", STORY_FLOWS.find(f => f.id === storyFlow)?.label || "Auto"],
               ["Slide", `${slideCount} slide`],
               ["Format", ar.label],
-              ctaEnabled && ctaText ? ["CTA", ctaText] : null,
-              modelEnabled ? ["Model", `${modelGender === "wanita" ? "Cewek" : "Cowok"}${modelAge ? ` · ${modelAge} th` : ""}${modelStyle ? ` · ${MODEL_STYLES.find(s=>s.id===modelStyle)?.label||""}` : ""}`] : null,
+              modelEnabled ?["Model", `${modelGender === "wanita" ? "Cewek" : "Cowok"}${modelAge ? ` · ${modelAge} th` : ""}${modelStyle ? ` · ${MODEL_STYLES.find(s=>s.id===modelStyle)?.label||""}` : ""}`] : null,
             ].filter(Boolean).map(([label, value]) => (
               <div key={label} className="flex items-center justify-between text-xs gap-2">
                 <span className="text-stone-400 flex-shrink-0">{label}</span>
