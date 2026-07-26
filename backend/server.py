@@ -4091,13 +4091,16 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
         "task_type": "reference_layout_product_replacement",
         "version": "2.0",
         "system_directive": (
-            "You are an Elite Commercial Art Director, Advertising Retoucher, Photoshop "
-            "Compositing Expert, and Luxury Product Photographer. You always receive exactly "
-            "two images. Image 1 is the PRODUCT IMAGE. Image 2 is the MASTER REFERENCE IMAGE. "
-            "Your task is NOT to create a new advertisement. Your task is to recreate the "
-            "reference advertisement as accurately as possible while replacing ONLY the product "
-            "using Image 1. Imagine opening the reference image inside Adobe Photoshop and "
-            "replacing only one Smart Object. Everything else must remain visually identical."
+            "You are an Elite Commercial Art Director, Advertising Retoucher, and Luxury "
+            "Product Photographer. You always receive exactly two images. Image 1 is the "
+            "PRODUCT IMAGE. Image 2 is the REFERENCE IMAGE — it is a mood/composition "
+            "blueprint, not a template to clone pixel-for-pixel. Keep its camera angle, "
+            "composition, product placement, model/pose, and general staging. Replace the "
+            "product with Image 1 exactly (pixel-perfect, zero reinterpretation). Recolor the "
+            "scene to the brand's own palette instead of the reference's colors, and layer in "
+            "real brand/product information (headline, ingredient badges, benefit checklist) "
+            "that communicates this specific product — see color_treatment and "
+            "product_knowledge below for exactly how."
         ),
         "priority_order": [
             "product_integrity", "reference_layout", "reference_subject",
@@ -4127,21 +4130,35 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             },
         },
         "reference": {
-            "image_role": "master_layout",
-            "mode": "layout_lock",
-            "replace_only": ["product"],
+            "image_role": "mood_and_composition_inspiration",
+            "mode": "loose_inspiration",
             "copy_exactly": {
                 "camera_angle": True, "composition": True, "crop": True, "framing": True,
-                "background": True, "environment": True, "floor": True, "wall": True,
+                "environment": True, "floor": True, "wall": True,
                 "props": True, "plants": True, "table": True, "tray": True,
-                "lighting": True, "shadow": True, "reflection": True,
+                "lighting_direction": True, "shadow": True, "reflection": True,
                 "depth_of_field": True, "focus": True, "negative_space": True,
-                "color_balance": True, "human_model": True, "facial_expression": True,
+                "human_model": True, "facial_expression": True,
                 "pose": True, "hand_position": True, "body_position": True,
                 "hair": True, "clothing": True, "accessories": True,
-                "text_position": True, "graphic_position": True,
                 "spacing": True, "visual_balance": True,
             },
+            # Colors and text content are NOT copied from the reference — they come from
+            # brand_dna/product_knowledge instead (see color_treatment and product_knowledge
+            # below). Confirmed by direct comparison: the best real result recolored the scene
+            # to brand green and added brand-new headline/ingredient badges/checklist that
+            # don't exist in the reference at all — the reference is a mood/composition
+            # blueprint, not a pixel-for-pixel template.
+            "do_not_copy": ["background_color", "scene_color_palette", "original_text_content", "original_headline"],
+        },
+        "color_treatment": {
+            "mode": "recolor_to_brand_palette",
+            "rule": (
+                "Background, surfaces, and scene colors should be adapted to the brand's "
+                "primary_palette below (photographic interpretation — tones and gradients, "
+                "not a flat color fill), NOT copied from the reference's own colors. "
+                "The product's own colors are frozen and never recolored."
+            ),
         },
         "brand_dna": {
             "brand_name": brand_name,
@@ -4150,8 +4167,6 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "brand_voice": brand_voice.capitalize(),
             "primary_palette": [color_primary, color_secondary],
             "preserve_brand_identity": True,
-            "use_brand_palette_only_when_it_does_not_change_reference_layout": True,
-            "never_override_reference_layout": True,
         },
         "product_knowledge": {
             "category": category,
@@ -4161,79 +4176,62 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "target_skin": ", ".join(target_skin) if target_skin else "",
             "usp": usp,
             "usage_rule": (
-                "If the reference already has text callouts, badges, or info areas, KEEP their "
-                "exact position, style, shape, and count — but REPLACE their wording with THIS "
-                "product's real specifics: an actual key_ingredient name plus what it does, "
-                "and/or primary_benefit or usp. Do not reuse the reference's original wording "
-                "verbatim, and do not write generic filler — every callout must be rooted in "
-                "the product_knowledge above. Never invent new badges, icons, stickers, banners, "
-                "CTA buttons, or info panels that aren't already present in the reference."
+                "Add real informative content sourced ONLY from this product_knowledge and "
+                "brand_dna — do not invent facts, and do not reuse the reference's own generic "
+                "marketing text verbatim. Typically this means: (1) a bold, prominent headline "
+                "built from primary_benefit or usp (e.g. 'mengandung {key_ingredient}'); "
+                "(2) one small icon badge per key_ingredient, each labeled with that ingredient's "
+                "name; (3) a short checklist of benefits covering target_skin and primary_benefit. "
+                "These are new elements layered onto the reference-inspired composition, not "
+                "things that need to already exist in the reference."
             ),
         },
         "composition_rules": {
-            "mode": "copy_reference",
+            "mode": "inspired_by_reference",
             "move_product": False, "move_model": False, "move_camera": False,
-            "move_background": False, "move_props": False,
             "copy_spacing": True, "copy_alignment": True,
             "copy_visual_weight": True, "copy_scale": True,
         },
         "lighting": {
-            "match_reference": True, "blend_product_naturally": True,
+            "match_reference_direction_and_quality": True, "blend_product_naturally": True,
             "maintain_reference_shadow_direction": True,
             "maintain_reference_highlights": True,
             "maintain_reference_reflections": True,
         },
         "typography": {
-            "mode": "match_reference",
-            "generate_new_layout": False, "generate_new_headline": False,
-            "generate_new_cta": False, "generate_new_badges": False,
-            "preserve_text_positions": True, "replace_text_only_if_requested": True,
+            "mode": "brand_content_on_reference_layout",
+            "generate_new_headline": True,
+            "generate_new_ingredient_badges": True,
+            "generate_new_benefit_checklist": True,
+            "generate_new_cta": False,
         },
         "strict_rules": [
-            "The reference image is NOT inspiration.",
-            "The reference image IS the final approved composition.",
-            "Replace ONLY the product.",
-            "Do not redesign the advertisement.",
-            "Do not reinterpret the composition.",
-            "Do not invent a new scene.",
-            "Do not move any object.",
-            "Do not move the model.",
-            "Do not change the pose.",
-            "Do not change facial expression.",
-            "Do not replace the background.",
-            "Do not add leaves.",
-            "Do not add flowers.",
-            "Do not add marble.",
-            "Do not add laboratory glass.",
-            "Do not add water splashes.",
-            "Do not add decorative props.",
-            "Do not add icons.",
-            "Do not add ingredient badges.",
-            "Do not add CTA buttons.",
-            "Do not generate editorial styling.",
-            "Do not generate creative storytelling.",
-            "Do not create a new advertising concept.",
-            "The final output must look like the reference image was edited in Photoshop by replacing only the original product.",
+            "The reference image sets the MOOD, CAMERA ANGLE, COMPOSITION, and PRODUCT PLACEMENT — not the exact colors or text.",
+            "Replace the product with the one from the product photo — pixel-perfect, zero reinterpretation.",
+            "Do not move the model, change their pose, or change their facial expression.",
+            "Do not reinterpret the composition, camera angle, or framing.",
+            "Recolor the background/scene to the brand's primary_palette — do not keep the reference's own colors.",
+            "Add a bold headline, ingredient badges, and a benefit checklist using ONLY real product_knowledge/brand_dna data — do not invent facts, and do not reuse the reference's own text verbatim.",
+            "Do not add unrelated decorative props (no random flowers/marble/lab glass) beyond what's already in the reference scene.",
         ],
         "negative_prompt": [
-            "new composition", "creative reinterpretation", "different layout",
-            "new camera angle", "different crop", "different background",
-            "different props", "different lighting", "different model", "different pose",
-            "different typography", "new headline", "new CTA", "new badges",
-            "new decorations", "editorial redesign", "campaign redesign",
-            "alternative composition", "invented scene", "artistic freedom",
+            "different camera angle", "different crop", "different pose",
+            "different model", "moved product placement", "invented scene unrelated to reference",
+            "reference's original background colors", "reference's original headline text copied verbatim",
+            "generic filler text not based on product_knowledge",
             "generic skincare advertisement", "stock photo composition",
         ],
         "expected_result": {
-            "layout_similarity": "95-100%",
-            "background_similarity": "95-100%",
+            "composition_similarity": "85-100%",
+            "camera_angle_similarity": "90-100%",
             "human_similarity": "100%",
-            "lighting_similarity": "95-100%",
-            "prop_similarity": "100%",
             "product_integrity": "100%",
+            "color_scheme": "brand primary_palette, not reference's own colors",
             "overall_goal": (
-                "The final image should be visually indistinguishable from the reference image "
-                "except that the original product has been replaced by the provided product."
+                "The final image should feel like the same photoshoot as the reference — same "
+                "mood, camera angle, product placement, and model — but recolored to the brand's "
+                "palette, with the product swapped in exactly, and a headline + ingredient "
+                "badges + benefit checklist added using this product's real data."
             ),
         },
     }
