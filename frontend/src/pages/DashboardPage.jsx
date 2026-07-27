@@ -335,13 +335,13 @@ function AIVisualStudio() {
         style={{ background:"#E5C158", opacity:0.10, top:"-5%", right:"10%" }} />
 
       {/* VIP badge */}
-      <div className="absolute top-5 left-5 z-20" data-testid="dash-visual-studio-vip-badge">
+      <div className="absolute top-3 left-3 sm:top-5 sm:left-5 z-20" data-testid="dash-visual-studio-vip-badge">
         <motion.div
           animate={{ opacity:[0.5,1,0.5], scale:[1,1.08,1] }}
           transition={{ duration:2.5, repeat:Infinity, ease:"easeInOut", delay:1.25 }}
           className="absolute inset-0 rounded-full blur-[10px] pointer-events-none"
           style={{ background:"#E5C158", opacity:0.6 }} />
-        <div className="relative flex items-center gap-1.5 px-4 py-2 rounded-full"
+        <div className="relative flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-4 sm:py-2 rounded-full"
           style={{
             background:"linear-gradient(135deg,rgba(229,193,88,0.25),rgba(245,166,35,0.15))",
             border:"1.5px solid rgba(229,193,88,0.85)",
@@ -354,23 +354,23 @@ function AIVisualStudio() {
               scale:[1,1.15,1],
             }}
             transition={{ duration:2, repeat:Infinity, ease:"easeInOut", delay:1.25 }}
-            className="text-base leading-none">
+            className="text-xs sm:text-base leading-none">
             👑
           </motion.span>
-          <span className="text-[11px] font-black uppercase tracking-widest" style={{ color:"#FFE566", textShadow:"0 0 12px rgba(229,193,88,0.8)" }}>
+          <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-widest" style={{ color:"#FFE566", textShadow:"0 0 12px rgba(229,193,88,0.8)" }}>
             VIP
           </span>
         </div>
       </div>
 
       {/* ∞ Unlimited badge */}
-      <div className="absolute top-5 right-5 z-20">
+      <div className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20">
         <motion.div
           animate={{ opacity:[0.5,1,0.5], scale:[1,1.08,1] }}
           transition={{ duration:2.5, repeat:Infinity, ease:"easeInOut" }}
           className="absolute inset-0 rounded-full blur-[10px] pointer-events-none"
           style={{ background:"#E5C158", opacity:0.6 }} />
-        <div className="relative flex items-center gap-2 px-4 py-2 rounded-full"
+        <div className="relative flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-4 sm:py-2 rounded-full"
           style={{
             background:"linear-gradient(135deg,rgba(229,193,88,0.25),rgba(245,166,35,0.15))",
             border:"1.5px solid rgba(229,193,88,0.85)",
@@ -383,12 +383,13 @@ function AIVisualStudio() {
               scale:[1,1.15,1],
             }}
             transition={{ duration:2, repeat:Infinity, ease:"easeInOut" }}
-            className="font-heading font-black text-xl leading-none"
+            className="font-heading font-black text-sm sm:text-xl leading-none"
             style={{ color:"#FFE566" }}>
             ∞
           </motion.span>
-          <span className="text-[11px] font-black uppercase tracking-widest" style={{ color:"#FFE566", textShadow:"0 0 12px rgba(229,193,88,0.8)" }}>
-            Unlimited Generating
+          <span className="text-[8px] sm:text-[11px] font-black uppercase tracking-widest" style={{ color:"#FFE566", textShadow:"0 0 12px rgba(229,193,88,0.8)" }}>
+            <span className="sm:hidden">Unlimited</span>
+            <span className="hidden sm:inline">Unlimited Generating</span>
           </span>
         </div>
       </div>
