@@ -334,6 +334,35 @@ function AIVisualStudio() {
         className="absolute w-56 h-56 rounded-full blur-[70px] pointer-events-none"
         style={{ background:"#E5C158", opacity:0.10, top:"-5%", right:"10%" }} />
 
+      {/* VIP badge */}
+      <div className="absolute top-5 left-5 z-20" data-testid="dash-visual-studio-vip-badge">
+        <motion.div
+          animate={{ opacity:[0.5,1,0.5], scale:[1,1.08,1] }}
+          transition={{ duration:2.5, repeat:Infinity, ease:"easeInOut", delay:1.25 }}
+          className="absolute inset-0 rounded-full blur-[10px] pointer-events-none"
+          style={{ background:"#E5C158", opacity:0.6 }} />
+        <div className="relative flex items-center gap-1.5 px-4 py-2 rounded-full"
+          style={{
+            background:"linear-gradient(135deg,rgba(229,193,88,0.25),rgba(245,166,35,0.15))",
+            border:"1.5px solid rgba(229,193,88,0.85)",
+            boxShadow:"0 0 18px rgba(229,193,88,0.9), 0 0 40px rgba(245,166,35,0.5), 0 0 70px rgba(229,193,88,0.25), inset 0 0 12px rgba(229,193,88,0.1)",
+            backdropFilter:"blur(10px)",
+          }}>
+          <motion.span
+            animate={{
+              textShadow:["0 0 8px #E5C158","0 0 24px #F5A623, 0 0 48px #E5C158","0 0 8px #E5C158"],
+              scale:[1,1.15,1],
+            }}
+            transition={{ duration:2, repeat:Infinity, ease:"easeInOut", delay:1.25 }}
+            className="text-base leading-none">
+            👑
+          </motion.span>
+          <span className="text-[11px] font-black uppercase tracking-widest" style={{ color:"#FFE566", textShadow:"0 0 12px rgba(229,193,88,0.8)" }}>
+            VIP
+          </span>
+        </div>
+      </div>
+
       {/* ∞ Unlimited badge */}
       <div className="absolute top-5 right-5 z-20">
         <motion.div
