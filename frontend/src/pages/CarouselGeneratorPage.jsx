@@ -14,12 +14,6 @@ import DebugJsonButton from "@/components/DebugJsonButton";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const INTENTS = [
-  { id: "sell",        emoji: "🛒", label: "Jualan",      goal: "promo",   flow: "problem_solution", desc: "Promo, launch, soft selling" },
-  { id: "educate",     emoji: "📚", label: "Edukasi",     goal: "edukasi", flow: "listicle",         desc: "Tips, myth vs fact, how-to" },
-  { id: "storytelling",emoji: "✨", label: "Storytelling", goal: "edukasi", flow: "story_brand",      desc: "Before-after, brand journey" },
-];
-
 const STORY_FLOWS = [
   { id: "auto",             emoji: "✨", label: "Auto",            desc: "AI pilih flow terbaik" },
   { id: "problem_solution", emoji: "⚡", label: "Masalah → Solusi", desc: "" },
@@ -29,6 +23,21 @@ const STORY_FLOWS = [
   { id: "listicle",         emoji: "📝", label: "Listicle",        desc: "" },
   { id: "story_brand",      emoji: "📖", label: "Story Brand",     desc: "" },
 ];
+
+// Content goal is no longer a separate manual choice ("Tujuan Konten") — it's now derived
+// straight from the chosen Story Flow, since each flow already implies a content direction
+// (e.g. Masalah → Solusi is inherently a selling flow, Myth vs Fact is inherently educational).
+// Brand DNA and product knowledge (already always included) supply the rest of the direction.
+const STORY_FLOW_TO_GOAL = {
+  auto:             "brand_awareness",
+  problem_solution: "promo",
+  myth_fact:        "edukasi",
+  before_after:     "testimoni",
+  step_by_step:     "edukasi",
+  listicle:         "edukasi",
+  story_brand:      "brand_awareness",
+};
+const STORY_FLOW_KEYS = STORY_FLOWS.filter(f => f.id !== "auto").map(f => f.id);
 
 const ASPECT_RATIOS = [
   { key: "1:1",  label: "1:1",  sub: "Square",         value: "1:1 (Square Feed)",      w: 1, h: 1 },
@@ -102,6 +111,20 @@ function toBase64(file) {
   });
 }
 
+// Gallery-picked reference photos are static asset URLs (e.g. /gallery/skincare/xxx.png), not
+// base64 — need to fetch + re-encode before they can be sent to the backend as
+// reference_image_base64/reference_images (mirrors BannerGeneratorPage's gallery-select handler).
+function urlToBase64(url) {
+  return fetch(url)
+    .then((r) => r.blob())
+    .then((blob) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }));
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function CarouselGeneratorPage() {
@@ -117,7 +140,6 @@ export default function CarouselGeneratorPage() {
   const [galleryOpen, setGalleryOpen]      = useState(false);
 
   // Content config
-  const [intent, setIntent]         = useState("sell");
   const [storyFlow, setStoryFlow]   = useState("auto");
   const [topic, setTopic]           = useState("");
   const [slideCount, setSlideCount] = useState(3);
@@ -144,20 +166,25 @@ export default function CarouselGeneratorPage() {
   });
   const selectedProduct = products.find(p => p.id === selectedProductId) || null;
 
-  const activeIntent = INTENTS.find(i => i.id === intent) || INTENTS[0];
-
   // ── Generate ──────────────────────────────────────────────────────────────────
 
   const generate = async () => {
     setGenerating(true);
     setPromptResult(null);
     try {
+      // "Auto" story flow picks a random flow per generation for variety (mirrors the same
+      // auto-randomization pattern used elsewhere — Feed Generator's composition concepts, etc.)
+      // instead of silently always resolving to one fixed flow.
+      const effectiveFlow = storyFlow === "auto"
+        ? STORY_FLOW_KEYS[Math.floor(Math.random() * STORY_FLOW_KEYS.length)]
+        : storyFlow;
+      const effectiveGoal = STORY_FLOW_TO_GOAL[effectiveFlow] || "brand_awareness";
       const payload = {
-        topic:        topic.trim() || activeIntent.desc,
-        content_goal: activeIntent.goal,
-        campaign_goal:activeIntent.goal,
-        template:     activeIntent.flow,
-        story_flow:   storyFlow === "auto" ? activeIntent.flow : storyFlow,
+        topic:        topic.trim() || selectedProduct?.usp || selectedProduct?.name || "",
+        content_goal: effectiveGoal,
+        campaign_goal:effectiveGoal,
+        template:     effectiveFlow,
+        story_flow:   effectiveFlow,
         slide_count:  slideCount,
         aspect_ratio: aspectRatio,
         visual_type:  "product_only",
@@ -192,6 +219,18 @@ export default function CarouselGeneratorPage() {
           payload.talent_age_group = ageMap[modelAge] || "young_adult";
         }
       }
+      // Reference/inspiration photo(s) — previously NEVER sent to the backend at all, so the
+      // generated prompts never carried any "match this photo" instruction despite the UI
+      // promising per-slide composition/mood matching. Gallery multi-select gives one photo per
+      // slide (fetched + re-encoded here since gallery photos are static URLs, not base64);
+      // manual single upload reuses the same photo for every slide.
+      if (referenceSlides.length > 0) {
+        const encoded = await Promise.all(referenceSlides.map((p) => urlToBase64(p.url)));
+        payload.reference_images = encoded;
+        payload.reference_image_base64 = encoded[0];
+      } else if (referenceImg) {
+        payload.reference_image_base64 = referenceImg;
+      }
       const { data } = await api.post("/prompt/preview-carousel", payload);
       setPromptResult(data);
       setTimeout(() => promptCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -212,8 +251,9 @@ export default function CarouselGeneratorPage() {
 
   // ── Slide storyboard preview ──────────────────────────────────────────────────
 
-  // Use the active flow key — if "auto", fall back to the intent's default flow
-  const activeFlowKey = storyFlow === "auto" ? activeIntent.flow : storyFlow;
+  // "auto" is itself a valid FLOW_ROLES key (a generic Hook/Isi/CTA preview) — no fallback
+  // resolution needed now that there's no intent to derive a default flow from.
+  const activeFlowKey = storyFlow;
   const slideRoles = (FLOW_ROLES[activeFlowKey] || FLOW_ROLES.auto)[slideCount]
     || (FLOW_ROLES[activeFlowKey] || FLOW_ROLES.auto)[3];
   const ar = ASPECT_RATIOS.find(r => r.value === aspectRatio) || ASPECT_RATIOS[1];
@@ -418,25 +458,24 @@ export default function CarouselGeneratorPage() {
             );
           })()}
 
-          {/* ④ TUJUAN KONTEN */}
+          {/* ④ STORY FLOW */}
           <div className="feedify-card p-5 space-y-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">4</div>
               <div>
-                <h3 className="font-heading text-base font-bold text-brand">Tujuan Konten</h3>
-                <p className="text-xs text-stone-500">Carousel ini dibuat untuk apa?</p>
+                <h3 className="font-heading text-base font-bold text-brand">Story Flow</h3>
+                <p className="text-xs text-stone-500">Arah konten diambil dari brand DNA, product knowledge, dan flow ini</p>
               </div>
             </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {INTENTS.map(item => (
-                <button key={item.id} type="button" onClick={() => { setIntent(item.id); if (storyFlow === "auto") {} }}
-                  className={`flex flex-col items-center gap-1.5 p-3.5 rounded-xl border-2 transition-colors text-center ${
-                    intent === item.id ? "border-brand bg-brand-sand" : "border-stone-100 bg-white hover:border-brand/30"
-                  }`} data-testid={`intent-${item.id}`}>
-                  <span className="text-xl">{item.emoji}</span>
-                  <span className={`text-xs font-bold ${intent === item.id ? "text-brand" : "text-stone-700"}`}>{item.label}</span>
-                  <span className="text-[9px] text-stone-400 leading-tight">{item.desc}</span>
+            <div className="flex flex-wrap gap-1.5">
+              {STORY_FLOWS.map(sf => (
+                <button key={sf.id} type="button" onClick={() => setStoryFlow(sf.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                    storyFlow === sf.id
+                      ? "bg-brand text-white border-brand"
+                      : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
+                  }`} data-testid={`flow-${sf.id}`}>
+                  <span>{sf.emoji}</span> {sf.label}
                 </button>
               ))}
             </div>
@@ -454,23 +493,6 @@ export default function CarouselGeneratorPage() {
                 className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm resize-none focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
                 data-testid="carousel-topic"
               />
-            </div>
-          </div>
-
-          {/* ⑤ STORY FLOW */}
-          <div className="feedify-card p-4 space-y-3">
-            <h3 className="font-heading text-sm font-bold text-brand">Story Flow</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {STORY_FLOWS.map(sf => (
-                <button key={sf.id} type="button" onClick={() => setStoryFlow(sf.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                    storyFlow === sf.id
-                      ? "bg-brand text-white border-brand"
-                      : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                  }`} data-testid={`flow-${sf.id}`}>
-                  <span>{sf.emoji}</span> {sf.label}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -695,6 +717,7 @@ export default function CarouselGeneratorPage() {
                 promptData={promptResult}
                 hasReferenceImage={!!referenceImg || referenceSlides.length > 0}
                 referenceImg={referenceImg || referenceSlides[0]?.url || null}
+                referenceSlides={referenceSlides}
                 productPhoto={selectedProduct?.photo_base64 || null}
                 onReset={() => setPromptResult(null)}
                 dashboardType="carousel"
@@ -739,7 +762,6 @@ export default function CarouselGeneratorPage() {
           <div className="feedify-card p-4 space-y-2">
             <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Creative Brief</p>
             {[
-              ["Tujuan", activeIntent.label],
               ["Flow", STORY_FLOWS.find(f => f.id === storyFlow)?.label || "Auto"],
               ["Slide", `${slideCount} slide`],
               ["Format", ar.label],

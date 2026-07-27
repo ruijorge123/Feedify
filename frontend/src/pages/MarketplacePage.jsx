@@ -40,6 +40,20 @@ const MODEL_AGES = [
   { id: "35-45", label: "35–45 th" },
 ];
 
+// Gallery-picked inspiration photos are static asset URLs (e.g. /gallery/skincare/xxx.png), not
+// base64 — need to fetch + re-encode before they can be sent to the backend as
+// reference_image_base64 (mirrors CarouselGeneratorPage/BannerGeneratorPage's gallery handlers).
+function urlToBase64(url) {
+  return fetch(url)
+    .then((r) => r.blob())
+    .then((blob) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    }));
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function MarketplacePage() {
@@ -122,7 +136,11 @@ export default function MarketplacePage() {
         const b64 = selectedProduct.photo_base64;
         payload.product_photo_base64 = b64.includes(",") ? b64.split(",")[1] : b64;
       }
-      if (photo) payload.inspiration_photo_url = photo;
+      // "Foto Inspirasi" — previously sent as `inspiration_photo_url`, a field the backend schema
+      // never had at all, so it was silently dropped and never reached the prompt builder despite
+      // being marked mandatory in the UI. Also needs fetch+base64 conversion since gallery photos
+      // are static URLs, not embeddable directly.
+      if (photo) payload.reference_image_base64 = await urlToBase64(photo);
       if (selectedProduct) payload.product_id = selectedProduct.id;
       if (modelEnabled) {
         payload.human_enabled   = true;

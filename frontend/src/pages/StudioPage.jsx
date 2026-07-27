@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Check, X, CaretDown,
@@ -12,34 +12,6 @@ import InspirationGallery from "@/components/InspirationGallery";
 import { toast } from "react-toastify";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-const COMPOSITIONS = [
-  { key: "hero_product",    label: "Hero Product",    desc: "Produk sebagai pusat visual, dampak maksimal." },
-  { key: "flat_lay",        label: "Flat Lay",        desc: "Tampilan dari atas, produk tersusun di permukaan." },
-  { key: "floating",        label: "Floating",        desc: "Produk tampak melayang, kesan premium & modern." },
-  { key: "macro_detail",    label: "Macro Detail",    desc: "Close-up ekstrem pada tekstur & detail produk." },
-  { key: "closeup",         label: "Close-up",        desc: "Pengambilan rapat, produk mengisi sebagian besar frame." },
-  { key: "holding_product", label: "Holding Product", desc: "Model memegang produk secara natural." },
-  { key: "splash",          label: "Splash Shot",     desc: "Dinamis dengan percikan cairan atau partikel." },
-  { key: "symmetrical",     label: "Symmetrical",     desc: "Komposisi cermin yang seimbang dan terkesan premium." },
-  { key: "rule_of_thirds",  label: "Rule of Thirds",  desc: "Pembingkaian klasik komersial." },
-  { key: "eye_level",       label: "Eye Level",       desc: "Sudut pandang natural, terasa autentik." },
-  { key: "top_down",        label: "Top Down",        desc: "Tampilan dari atas, seluruh tata letak terlihat." },
-  { key: "45_degree",       label: "45°",             desc: "Sudut klasik menampilkan kedalaman & dimensi." },
-  { key: "low_angle",       label: "Low Angle",       desc: "Sudut rendah, produk tampak megah." },
-  { key: "high_angle",      label: "High Angle",      desc: "Sudut tinggi, kesan editorial yang elegan." },
-];
-
-const FASHION_COMPOSITIONS = [
-  { key: "full_body",      label: "Full Body",      desc: "Tampilan penuh kepala hingga kaki.", recommended: true },
-  { key: "three_quarter",  label: "Three Quarter",  desc: "Kepala hingga bawah lutut." },
-  { key: "lookbook",       label: "Lookbook",       desc: "Model dalam setting lifestyle, editorial." },
-  { key: "detail_texture", label: "Detail Tekstur", desc: "Macro pada kain, jahitan, dan material." },
-  { key: "flat_lay",       label: "Flat Lay",       desc: "Pakaian terbentang dari atas." },
-  { key: "sitting",        label: "Sitting",        desc: "Model duduk natural." },
-  { key: "walking",        label: "Walking",        desc: "Model berjalan, menampilkan flow pakaian." },
-  { key: "eye_level",      label: "Eye Level",      desc: "Sudut pandang natural setara mata." },
-];
 
 const MODEL_STYLES = [
   { id: "hijab",         label: "Hijab",         emoji: "🧕", value: "Berhijab, gaya modest fashion Indonesia" },
@@ -91,9 +63,6 @@ export default function StudioPage() {
   const [referenceImg,   setReferenceImg]   = useState(null);
   const [galleryOpen,    setGalleryOpen]    = useState(false);
 
-  // Photography settings — style now follows the picked inspiration photo, not a manual dropdown
-  const [composition,    setComposition]    = useState("hero_product");
-
   // Model state
   const [modelEnabled,   setModelEnabled]   = useState(false);
   const [modelGender,    setModelGender]    = useState("wanita");
@@ -116,13 +85,6 @@ export default function StudioPage() {
 
   const selectedProduct = products.find((p) => p.id === selectedProductId) || null;
   const isFashion = selectedProduct?.category === "fashion";
-  const activeCompositions = isFashion ? FASHION_COMPOSITIONS : COMPOSITIONS;
-
-  // When product category changes to fashion, default composition to full_body
-  useEffect(() => {
-    if (isFashion) setComposition("full_body");
-    else setComposition("hero_product");
-  }, [isFashion]);
 
   // Derive model_type from toggle/gender/style
   const resolvedModelType = () => {
@@ -142,7 +104,6 @@ export default function StudioPage() {
         product_category:     selectedProduct?.category || "general",
         business_goal:        "brand_campaign",
         reference_image_base64: referenceImg ? referenceImg.split(",")[1] : undefined,
-        composition,
         model_type:           resolvedModelType(),
         wearing_product:      isFashion && modelEnabled,
         model_gender:         modelGender,
@@ -163,7 +124,6 @@ export default function StudioPage() {
   };
 
   const catLabel   = selectedProduct?.category || "general";
-  const compLabel  = activeCompositions.find(c => c.key === composition)?.label || composition;
 
   return (
     <div className="space-y-4 pb-20" data-testid="studio-page">
@@ -314,36 +274,6 @@ export default function StudioPage() {
               <Images size={16} weight="duotone" />
               {referenceImg ? "Ganti dari Gallery Inspirasi" : "Pilih dari Gallery Inspirasi"}
             </button>
-          </div>
-
-          {/* ③ Komposisi */}
-          <div className="feedify-card p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</div>
-              <div>
-                <h3 className="font-heading text-base font-bold text-brand">Komposisi</h3>
-                <p className="text-xs text-stone-500">
-                  {isFashion ? "Sudut & cara pakaian ditampilkan" : "Cara produk ditampilkan dalam frame"}
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {activeCompositions.map((c) => (
-                <button key={c.key} type="button" onClick={() => setComposition(c.key)}
-                  data-testid={`studio-composition-${c.key}`}
-                  className={`relative p-3 rounded-xl border text-left transition-all ${
-                    composition === c.key
-                      ? "border-brand bg-brand/5 shadow-sm"
-                      : "border-stone-100 bg-white hover:border-brand/30"
-                  }`}>
-                  {c.recommended && (
-                    <span className="absolute top-1.5 right-1.5 text-[8px] font-bold px-1 py-0.5 rounded-full bg-brand-gold/20 text-brand">⭐</span>
-                  )}
-                  <div className={`font-semibold text-xs mb-0.5 ${composition === c.key ? "text-brand" : "text-stone-700"}`}>{c.label}</div>
-                  <div className="text-[10px] text-stone-400 leading-snug pr-4">{c.desc}</div>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* ⑤ Model */}
@@ -526,7 +456,6 @@ export default function StudioPage() {
             )}
             {[
               ["Gaya foto", referenceImg ? "Ikuti foto inspirasi" : "Belum pilih foto inspirasi"],
-              ["Komposisi", compLabel],
               ["Model",     modelEnabled ? (modelGender === "wanita" ? "Wanita" : "Pria") + (modelStyle ? ` · ${MODEL_STYLES.find(s=>s.id===modelStyle)?.label}` : "") : "Tanpa model"],
             ].map(([label, value]) => (
               <div key={label} className="flex items-center justify-between text-xs gap-2">

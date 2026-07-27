@@ -20,7 +20,7 @@ function persistPrompt({ idRef, dashboardType, title, promptData, productPhoto, 
 
 // ── Carousel per-slide mode ────────────────────────────────────────────────────
 
-function CarouselPromptCard({ promptData, referenceImg, productPhoto, onReset, dashboardType, title }) {
+function CarouselPromptCard({ promptData, referenceImg, referenceSlides, productPhoto, onReset, dashboardType, title }) {
   const slides     = promptData?.prompt_json?.slides || [];
   const meta       = promptData?.prompt_json?.carousel_meta || {};
   const total      = slides.length;
@@ -28,12 +28,25 @@ function CarouselPromptCard({ promptData, referenceImg, productPhoto, onReset, d
   const [activeIdx, setActiveIdx]   = useState(0);
   const [copied, setCopied]         = useState(new Set());
   const [copying, setCopying]       = useState(false);
+  // Deliberately separate from `copied` — copying the LAST slide alone used to make
+  // `copied.size >= total` true immediately, which skipped straight past that slide's own
+  // "just copied → here's your inspiration photo to download" step and jumped straight to the
+  // all-done summary (which has no PhotoPrepBlock/download button at all). "finished" is now only
+  // set by the user explicitly clicking "Selesai 🎉", so the last slide always gets its own
+  // per-slide view first, same as every other slide.
+  const [finished, setFinished]     = useState(false);
   const savedIdRef = useRef(null);
 
-  const allDone = copied.size >= total;
+  const allDone = finished;
   const slide   = slides[activeIdx] || {};
   const roleLabel = (slide.slide_role || `Slide ${activeIdx + 1}`).replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   const isCopied  = copied.has(activeIdx);
+  // Each slide can have its own inspiration photo when picked via gallery multi-select
+  // (referenceSlides, one entry per slide index) — falls back to the single manually-uploaded
+  // referenceImg (same photo reused for every slide) when multi-select wasn't used. Previously
+  // this always showed/downloaded referenceSlides[0] regardless of which slide tab was active,
+  // so slide 2+ never had their own inspiration photo available to download.
+  const activeReferenceImg = referenceSlides?.[activeIdx]?.url || referenceImg || null;
 
   const handleCopy = async () => {
     if (copying) return;
@@ -45,7 +58,7 @@ function CarouselPromptCard({ promptData, referenceImg, productPhoto, onReset, d
       idRef: savedIdRef,
       dashboardType: dashboardType || "carousel",
       title: title || meta.topic || "Carousel",
-      promptData, productPhoto, referenceImg,
+      promptData, productPhoto, referenceImg: referenceImg || referenceSlides?.[0]?.url || null,
     });
     setTimeout(() => {
       setCopying(false);
@@ -152,7 +165,7 @@ function CarouselPromptCard({ promptData, referenceImg, productPhoto, onReset, d
               <p className="font-bold text-xs">Slide {activeIdx + 1} tersalin! Begini cara generate fotonya:</p>
             </div>
             <ChatGptImageSteps />
-            <PhotoPrepBlock productPhoto={productPhoto} hasReferenceImage={!!referenceImg} referenceImg={referenceImg} />
+            <PhotoPrepBlock productPhoto={productPhoto} hasReferenceImage={!!activeReferenceImg} referenceImg={activeReferenceImg} />
             <div className="grid grid-cols-2 gap-2">
               <button onClick={openChatGPT}
                 className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#10a37f] hover:bg-[#0d8a6c] text-white text-xs font-bold transition-colors"
@@ -166,7 +179,7 @@ function CarouselPromptCard({ promptData, referenceImg, productPhoto, onReset, d
                   Slide {activeIdx + 2} →
                 </button>
               ) : (
-                <button onClick={() => setCopied(new Set([...Array(total).keys()]))}
+                <button onClick={() => setFinished(true)}
                   className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand hover:bg-brand/90 text-white text-xs font-bold transition-colors"
                   data-testid="all-done-btn">
                   Selesai 🎉
@@ -193,6 +206,7 @@ export default function PromptSuccessCard({
   promptData,
   hasReferenceImage,
   referenceImg,
+  referenceSlides,
   productPhoto,
   onReset,
   dashboardType,
@@ -210,6 +224,7 @@ export default function PromptSuccessCard({
       <CarouselPromptCard
         promptData={promptData}
         referenceImg={referenceImg}
+        referenceSlides={referenceSlides}
         productPhoto={productPhoto}
         onReset={onReset}
         dashboardType={dashboardType}

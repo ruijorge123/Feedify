@@ -225,7 +225,8 @@ class CarouselPromptIn(BaseModel):
     visual_priority: str = "balanced"       # product_first|human_first|balanced
 
     # Section 5 — Reference
-    reference_image_base64: Optional[str] = None
+    reference_image_base64: Optional[str] = None  # single shared reference (manual upload — same photo for every slide)
+    reference_images: List[str] = []              # per-slide reference photos (gallery multi-select), index-aligned with slides
 
     # Section 6 — Talent
     human_enabled: bool = False
@@ -335,6 +336,7 @@ class MarketplaceIn(BaseModel):
     thumbnail_style: str = "high_conversion"  # clean|high_conversion|premium|minimal
     creative_direction: str = ""
     product_photo_base64: Optional[str] = None
+    reference_image_base64: Optional[str] = None  # "Foto Inspirasi" (gallery) — style/composition to match
     human_enabled: bool = False
     human_mode: str = "auto"
     model_character: str = ""
@@ -353,7 +355,6 @@ class StudioIn(BaseModel):
     business_goal: str = "brand_campaign"           # marketplace|social_media|brand_campaign|product_launch|website_banner|advertisement|packaging
     reference_image_base64: Optional[str] = None    # inspiration photo picked from gallery — style follows this instead of a manual dropdown
     photography_style: str = "commercial"           # commercial|lifestyle|luxury|editorial|minimal
-    composition: str = "hero_product"               # hero_product|flat_lay|floating|macro_detail|closeup|holding_product|splash|symmetrical|rule_of_thirds|eye_level|top_down|45_degree|low_angle|high_angle|full_body|three_quarter|lookbook|detail_texture|sitting|walking
     model_type: str = "no_model"                   # no_model|female|hijab_female|male|couple|family
     wearing_product: bool = False                   # True for fashion: model wears the garment
     model_gender: str = "wanita"                   # wanita|pria
@@ -897,6 +898,17 @@ def _natural_feed(j: dict) -> str:
     p_primary = palette.get("background_dominant", "")   # brand primary color (e.g. #0B3D2E)
     p_secondary = palette.get("accent_elements", "")      # brand secondary color (e.g. #FDFBF7 or gold)
     has_reference = j.get("has_reference", False)
+    # A picked composition concept (CONCEPT_POOLS — Hero Studio, Flat Lay, Lifestyle Scene, Shadow
+    # Drama, Abstract Brand, Texture & Surface, Nature & Botanical, Urban Context, Cut-Out Pop,
+    # Duotone Mood, Minimal & Type, Behind Glass...) already fully specifies its own mood, setting,
+    # and whether the product is the sole focal point — several of these directly contradict the
+    # generic "photorealistic studio, single hero product, dominant focal point" assumptions below
+    # (e.g. Minimal & Type: "product plays a supporting accent role"; Urban Context: street/concrete,
+    # not studio; Nature & Botanical: organic outdoor, not studio). Confirmed root cause of Feed
+    # Generator output looking "jelek" — Banner's own no-reference path never surfaced this because
+    # its frontend always uses reference mode in practice, so this generic/concept contradiction was
+    # never actually exercised until Feed Generator started picking all 12 concepts at random.
+    has_concept = bool(concept_block.get("directive"))
     brief = j.get("creative_brief", "")
     human_directive = j.get("human_model_directive", "")
     auto_headline = j.get("auto_headline", False)
@@ -958,10 +970,14 @@ def _natural_feed(j: dict) -> str:
         if product_knowledge.get("chatgpt_instruction"):
             p += f"{product_knowledge['chatgpt_instruction']} "
 
-    # Lighting and photography style — skipped entirely with a reference photo: its own
-    # lighting/mood is what must be preserved, not a generic studio/bokeh look imposed on top.
+    # Lighting and photography style — skipped entirely with a reference photo (its own
+    # lighting/mood must be preserved, not a generic studio/bokeh look imposed on top). The
+    # blanket "studio photography" line is ALSO skipped when a concept was picked — several
+    # concepts (Urban Context, Nature & Botanical, Lifestyle Scene, Cut-Out Pop, Duotone Mood...)
+    # are explicitly NOT studio photography, and this line directly contradicted them.
     if not has_reference:
-        p += "Photorealistic studio photography, sharp product with beautiful soft bokeh. "
+        if not has_concept:
+            p += "Photorealistic studio photography, sharp product with beautiful soft bokeh. "
         if lighting:
             p += f"Lighting: {lighting}. "
         else:
@@ -1030,21 +1046,27 @@ def _natural_feed(j: dict) -> str:
     if integration_directive:
         p += f"{integration_directive} "
 
-    # Background and scene environment — skipped with a reference photo: its own background/props
-    # must be preserved exactly, not overridden with a category-default scene description (this
-    # used to fire unconditionally, e.g. injecting "white marble, botanical accents" regardless
-    # of what the reference actually showed).
-    if not has_reference:
+    # Background and scene environment — skipped with a reference photo (its own background/props
+    # must be preserved exactly, not overridden with a category-default scene description) AND
+    # skipped when a concept was picked — a concept already fully specifies its own environment
+    # (e.g. Nature & Botanical, Urban Context, Behind Glass each describe a completely different,
+    # specific setting), and a generic category-default env description stacked on top used to
+    # directly contradict it (e.g. skincare's "white marble, soft botanical accents" contradicting
+    # a randomly-picked Urban Context concept's "concrete, steel, glass, neon, pavement").
+    if not has_reference and not has_concept:
         if category_env or ambient_props:
             env_parts = [x for x in [category_env, ambient_props] if x]
             p += f"Scene environment: {' '.join(env_parts)}. "
         else:
             p += "Background: clean, elegant lifestyle scene with natural props that match the brand palette. "
 
-    # Composition — skip when a reference photo is present: the "adopt its composition"
-    # instruction above (has_reference/reference_composition block) already covers this, and a
-    # generic preset composition line here would contradict it instead of reinforcing it.
-    if composition and not has_reference:
+    # Composition — skip when a reference photo is present (the "adopt its composition"
+    # instruction above already covers this) AND skip when a concept was picked: composition_style
+    # is a fixed generic default ("Single hero product, dominant focal point composition.")
+    # regardless of which of the 12 concepts got randomly picked, so it directly contradicted
+    # concepts like Flat Lay, Abstract Brand, Minimal & Type, or Duotone Mood that are explicitly
+    # NOT single-hero-dominant-focal-point compositions.
+    if composition and not has_reference and not has_concept:
         p += f"Composition: {composition}. "
 
     # Text overlays — brand identity must be visible
@@ -1102,11 +1124,17 @@ def _natural_feed(j: dict) -> str:
             "cut-out, with accurate reflections and drop shadows matching the scene's lighting. "
         )
     else:
+        # "Absolute hero, prominently featured" directly contradicts concepts that deliberately
+        # make the product secondary — Minimal & Type ("product plays a supporting accent role"),
+        # Abstract Brand ("product shares visual weight with the graphic concept") — so that
+        # framing only applies when no concept overrides it. Photorealism/edge-fidelity is
+        # universal regardless of concept, so it always applies.
         p += (
-            "The product is the absolute hero — prominently featured, perfectly lit, "
-            "photographic realism with accurate reflections and natural drop shadows. "
+            "Photographic realism with accurate reflections and natural drop shadows. "
             "Product edges must look natural and photographic, not digitally cut-out. "
         )
+        if not has_concept:
+            p += "The product is the absolute hero — prominently featured, perfectly lit. "
 
     # Final brand-color reminder — repeated here (not just once, earlier) because being near the
     # END of the prompt carries outsized weight (see quality finisher note below); this is the
@@ -1274,6 +1302,14 @@ def _natural_carousel_slide(j: dict) -> str:
     human_directive = j.get("prompt_structure", {}).get("human_model_directive") or j.get("human_model_directive", "")
     if human_directive:
         p += f" --- TALENT DIRECTION: {human_directive} ---"
+
+    # Reference photo rule — near the end so it carries recency weight over the generic AI
+    # Visual Director composition/camera/lighting text above (which has no reference awareness
+    # at all). Read from the same self-contained field the raw-JSON copy flow uses, so both paths
+    # give the same instruction.
+    reference_photo_rule = j.get("reference_photo_rule")
+    if j.get("has_reference") and reference_photo_rule:
+        p += f" {reference_photo_rule}"
 
     # ── Quality lock ─────────────────────────────────────────────────────────
     p += (
@@ -1498,7 +1534,6 @@ def _build_studio_prompt(payload: "StudioIn", shot_focus: str = None) -> dict:
         "product_category": payload.product_category,
         "business_goal": payload.business_goal,
         "photography_style": payload.photography_style,
-        "composition": payload.composition,
         "model_type": payload.model_type,
         "wearing_product": wearing,
         "shot_focus": shot_focus,
@@ -1537,8 +1572,15 @@ def _build_studio_prompt(payload: "StudioIn", shot_focus: str = None) -> dict:
         # inspired backdrop") instead of the reference's actual scene.
         "reference_photo_rule": (
             "═══ REFERENCE PHOTO RULE — READ CAREFULLY ═══\n"
-            "The second attached photo is a LAYOUT/COMPOSITION/ENVIRONMENT REFERENCE. This rule "
-            "applies no matter what model_type/model_detail says below.\n\n"
+            "TWO PHOTOS ARE ATTACHED — identify which is which by CONTENT, not by attachment order "
+            "(the user may have attached them in either order): whichever photo shows a product "
+            f"matching product_category '{payload.product_category}'"
+            + (f" / product_knowledge name '{payload.product_name}'" if payload.product_name else "")
+            + " is the PRODUCT PHOTO — render it exactly, unchanged. The OTHER attached photo is "
+            "the LAYOUT/COMPOSITION/ENVIRONMENT REFERENCE described below. If you genuinely cannot "
+            "tell them apart from content alone, default to: first attached photo = product, "
+            "second attached photo = reference. This rule applies no matter what model_type/"
+            "model_detail says below.\n\n"
             "WHAT YOU MUST COPY from the reference photo:\n"
             "  • Camera angle, framing, and product placement in the frame\n"
             "  • Background, surface, and environment exactly as shown (whatever it is — studio, "
@@ -1578,11 +1620,15 @@ def _build_studio_prompt(payload: "StudioIn", shot_focus: str = None) -> dict:
 
 def _natural_studio(j: dict) -> str:
     """Award-winning commercial photography prompt engine — fully independent of Brand DNA.
-    Inputs: product_category, business_goal, photography_style, composition, model_type, wearing_product, advanced, shot_focus."""
+    Inputs: product_category, business_goal, photography_style, model_type, wearing_product, advanced, shot_focus.
+    Composition is deliberately NOT a configurable input — it's always dictated by the reference
+    photo (see reference_photo_rule/model_directive below), never by a fixed dropdown value. A
+    manual "composition" selector used to exist here and was removed because its text was always
+    injected into the prompt regardless of whether a reference photo was attached, directly
+    contradicting the reference-matching instruction whenever the two didn't happen to agree."""
     category    = j.get("product_category", "general")
     goal        = j.get("business_goal", "brand_campaign")
     style       = j.get("photography_style", "commercial")
-    composition = j.get("composition", "hero_product")
     model       = j.get("model_type", "no_model")
     wearing     = j.get("wearing_product", False)
     adv         = j.get("advanced", {})
@@ -1983,7 +2029,6 @@ def _natural_studio(j: dict) -> str:
         category_map.get(category, category_map["general"]),
         goal_map.get(goal, goal_map["brand_campaign"]),
         style_map.get(style, style_map["commercial"]),
-        composition_map.get(composition, composition_map["hero_product"]),
         model_directive,
     ]
 
@@ -4234,25 +4279,48 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
     goal_key = payload.campaign_goal if payload.campaign_goal in CAMPAIGN_GOAL_DIRECTIVES else "brand_awareness"
     goal = CAMPAIGN_GOAL_DIRECTIVES[goal_key]
     human_directive = _build_human_directive(payload, brand)
+    _category_clause = f", category: '{category}'" if category else ""
 
     return {
         "task_type": "reference_layout_product_replacement",
-        "version": "2.0",
+        "version": "2.1",
         "system_directive": (
             "You are an Elite Commercial Art Director, Advertising Retoucher, and Luxury "
-            "Product Photographer. You always receive exactly two images. Image 1 is the "
-            "PRODUCT IMAGE. Image 2 is the REFERENCE IMAGE — it is a mood/composition "
-            "blueprint, not a template to clone pixel-for-pixel. Keep its camera angle, "
-            "composition, product placement, model/pose, and general staging. Replace the "
-            "product with Image 1 exactly (pixel-perfect, zero reinterpretation). Recolor the "
-            "scene to the brand's own palette instead of the reference's colors, and layer in "
-            "real brand/product information (headline, ingredient badges, benefit checklist) "
-            "that communicates this specific product — see color_treatment and "
-            "product_knowledge below for exactly how."
+            "Product Photographer, working like an Adobe Photoshop Smart Object replacement "
+            "workflow, not a free creative generator. You always receive exactly two images. "
+            "IMPORTANT — identify which is which by CONTENT, not by the order they were "
+            f"attached (the user may have attached them in either order): whichever image shows "
+            f"a product matching product_knowledge below (product_name: '{product_name}'"
+            f"{_category_clause}) is the PRODUCT IMAGE — preserve "
+            "it exactly. The OTHER attached image is the REFERENCE IMAGE. If you genuinely cannot "
+            "tell them apart from content alone, default to: first attached image = product, "
+            "second attached image = reference. "
+            "The REFERENCE IMAGE is the MASTER COMPOSITION, a locked layout, not inspiration to "
+            "riff on. Preserve its layout, framing, object positions, spacing, lighting, "
+            "typography positions, props, decorative elements, and visual hierarchy as accurately "
+            "as possible — the result should look like someone opened the reference's own file "
+            "and swapped only the product smart object. Replace the product with the identified "
+            "PRODUCT IMAGE exactly (pixel-perfect, zero reinterpretation). The ONLY other things "
+            "allowed to differ from the reference are: scene colors (recolored to the brand's own "
+            "palette) and any text content (replaced with real brand/product information — "
+            "headline, ingredient badges, benefit checklist) — see color_treatment and "
+            "product_knowledge below for exactly how. Do not redesign, reinterpret, simplify, "
+            "modernize, or rearrange anything else."
         ),
+        "reference_mode": {
+            "enabled": True,
+            "layout_preservation": "maximum",
+            "camera_preservation": "maximum",
+            "lighting_preservation": "maximum",
+            "object_preservation": "maximum",
+            "typography_position_preservation": "maximum",
+            "creative_freedom": "disabled",
+            "replace_only": "product, scene colors (to brand palette), and text content (to real product data)",
+        },
         "priority_order": [
-            "product_integrity", "reference_layout", "reference_subject",
-            "reference_lighting", "brand_dna", "product_knowledge",
+            "reference_layout", "camera_angle", "object_positions", "reference_lighting",
+            "typography_positions", "product_integrity", "product_replacement",
+            "brand_palette_adaptation", "product_knowledge", "creative_freedom",
         ],
         "creative_brief": creative_brief,
         # Narrative/emotional context ONLY — deliberately excludes goal["visual_directive"],
@@ -4278,25 +4346,31 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             },
         },
         "reference": {
-            "image_role": "mood_and_composition_inspiration",
-            "mode": "loose_inspiration",
+            "image_role": "master_locked_layout",
+            "mode": "locked_master_layout",
             "copy_exactly": {
                 "camera_angle": True, "composition": True, "crop": True, "framing": True,
                 "environment": True, "floor": True, "wall": True,
                 "props": True, "plants": True, "table": True, "tray": True,
+                "pedestal": True, "decorative_elements": True, "graphic_elements": True,
                 "lighting_direction": True, "shadow": True, "reflection": True,
                 "depth_of_field": True, "focus": True, "negative_space": True,
                 "human_model": True, "facial_expression": True,
                 "pose": True, "hand_position": True, "body_position": True,
                 "hair": True, "clothing": True, "accessories": True,
-                "spacing": True, "visual_balance": True,
+                "spacing": True, "visual_balance": True, "alignment": True,
+                "padding": True, "margins": True, "object_positions": True,
+                "typography_positions": True, "badge_positions": True,
+                "icon_positions": True, "text_box_positions": True,
+                "information_hierarchy": True, "visual_weight": True,
             },
-            # Colors and text content are NOT copied from the reference — they come from
-            # brand_dna/product_knowledge instead (see color_treatment and product_knowledge
-            # below). Confirmed by direct comparison: the best real result recolored the scene
-            # to brand green and added brand-new headline/ingredient badges/checklist that
-            # don't exist in the reference at all — the reference is a mood/composition
-            # blueprint, not a pixel-for-pixel template.
+            # Colors and text CONTENT are the only things not copied from the reference — they
+            # come from brand_dna/product_knowledge instead (see color_treatment and
+            # product_knowledge below). Everything else (position, spacing, decorative elements,
+            # graphic elements) is locked. Confirmed by direct comparison: the best real result
+            # recolored the scene to brand green and replaced text with real product data while
+            # keeping the reference's own layout/positions intact — not a pixel-for-pixel color
+            # clone, but also not a free redesign.
             "do_not_copy": ["background_color", "scene_color_palette", "original_text_content", "original_headline"],
         },
         "color_treatment": {
@@ -4341,10 +4415,12 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             ),
         },
         "composition_rules": {
-            "mode": "inspired_by_reference",
+            "mode": "locked_to_reference",
             "move_product": False, "move_model": False, "move_camera": False,
-            "copy_spacing": True, "copy_alignment": True,
-            "copy_visual_weight": True, "copy_scale": True,
+            "resize_objects": False, "reposition_objects": False,
+            "add_new_props_or_decorations": False, "remove_existing_props_or_decorations": False,
+            "copy_spacing": True, "copy_alignment": True, "copy_padding": True, "copy_margins": True,
+            "copy_visual_weight": True, "copy_scale": True, "copy_object_positions": True,
         },
         "lighting": {
             "match_reference_direction_and_quality": True, "blend_product_naturally": True,
@@ -4359,33 +4435,43 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "generate_new_benefit_checklist": True,
         },
         "strict_rules": [
-            "The reference image sets the MOOD, CAMERA ANGLE, COMPOSITION, and PRODUCT PLACEMENT — not the exact colors or text.",
+            "The reference image is a LOCKED master layout — camera angle, composition, crop, framing, object positions, spacing, alignment, margins, decorative elements, graphic elements, and typography/badge positions must all remain exactly as in the reference. The ONLY things allowed to differ are: scene colors (brand palette) and text content (real product data).",
             "Replace the product with the one from the product photo — pixel-perfect, zero reinterpretation.",
             "Do not move the model, change their pose, or change their facial expression.",
-            "Do not reinterpret the composition, camera angle, or framing.",
+            "Do not reinterpret, redesign, simplify, modernize, or rearrange the composition, camera angle, framing, or any object's position.",
+            "Every object, prop, decorative element, and graphic element visible in the reference must remain — do not remove any of them, do not resize them, do not invent new ones not already present.",
             "Recolor the background/scene to the brand's primary_palette — do not keep the reference's own colors.",
-            "Add a bold headline, ingredient badges, and a benefit checklist using ONLY real product_knowledge/brand_dna data — do not invent facts, and do not reuse the reference's own text verbatim.",
+            "Replace text content with a bold headline, ingredient badges, and a benefit checklist using ONLY real product_knowledge/brand_dna data — do not invent facts, and do not reuse the reference's own text verbatim. Reuse the reference's existing text/badge zone positions and sizing for this content; only add a new zone if the reference genuinely has none.",
             "Do not add unrelated decorative props (no random flowers/marble/lab glass) beyond what's already in the reference scene.",
             "If human_model_directive is set (not null), it OVERRIDES reference.copy_exactly.human_model — show a person matching human_model_directive instead of cloning whoever is in the reference photo. Keep the reference's pose/framing/staging as the pose template, but the person's identity follows human_model_directive.",
         ],
         "negative_prompt": [
-            "different camera angle", "different crop", "different pose",
+            "different camera angle", "different crop", "different pose", "different framing",
+            "different perspective", "different lighting", "different object placement",
+            "different icon placement", "different badge placement", "different text placement",
+            "different spacing", "different decorative elements", "creative redesign",
+            "new composition", "different layout", "editorial redesign", "magazine redesign",
+            "modernized advertisement", "AI-generated-looking composition",
             "different model", "moved product placement", "invented scene unrelated to reference",
             "reference's original background colors", "reference's original headline text copied verbatim",
             "generic filler text not based on product_knowledge",
             "generic skincare advertisement", "stock photo composition",
         ],
         "expected_result": {
-            "composition_similarity": "85-100%",
-            "camera_angle_similarity": "90-100%",
+            "composition_similarity": "95-99%",
+            "camera_angle_similarity": "95-100%",
+            "object_and_layout_similarity": "95-100%",
             "human_similarity": "100%",
             "product_integrity": "100%",
             "color_scheme": "brand primary_palette, not reference's own colors",
             "overall_goal": (
-                "The final image should feel like the same photoshoot as the reference — same "
-                "mood, camera angle, product placement, and model — but recolored to the brand's "
-                "palette, with the product swapped in exactly, and a headline + ingredient "
-                "badges + benefit checklist added using this product's real data."
+                "The output must look like the exact same advertisement as the reference — as if "
+                "someone opened the reference's own file and replaced only the product smart "
+                "object. The only noticeable differences should be: the product itself, the scene "
+                "colors (now the brand's palette), and the text content (now real headline/"
+                "ingredient badges/benefit checklist from this product's own data). Everything "
+                "else — layout, camera, objects, props, spacing, typography positions — must "
+                "remain visually identical to the reference."
             ),
         },
     }
@@ -4625,7 +4711,17 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
                     "The product photo provided is FINAL and LOCKED — do not alter its shape, color, finish, or any design element. "
                     "Composite it into the scene with accurate drop shadow and reflection matching the lighting setup. "
                     "Product edges must look natural, not cut-out. "
-                    f"{'Single product as sole hero subject.' if payload.expected_images_count == 1 else f'Arrange all {payload.expected_images_count} products in unified grouped composition.'}"
+                    # "Sole hero subject" contradicts concepts that deliberately make the product
+                    # secondary (Minimal & Type: "supporting accent role"; Abstract Brand: "shares
+                    # visual weight") — only assert it when no concept overrides it (matching the
+                    # same has_concept gating applied in _natural_feed).
+                    + (
+                        (
+                            "Single product as sole hero subject." if payload.expected_images_count == 1
+                            else f"Arrange all {payload.expected_images_count} products in unified grouped composition."
+                        )
+                        if not concept.get("key") else ""
+                    )
                     + (
                         " The scene, background, and lighting must be copied EXACTLY from the reference "
                         "photo, not just loosely inspired by it — only the product itself is replaced, "
@@ -5201,184 +5297,137 @@ _ROLE_DIRECTIVES = {
 }
 
 
+_CAROUSEL_ROLE_TO_CAMPAIGN_GOAL: dict = {
+    "hook": "brand_awareness",
+    "problem": "brand_awareness",
+    "solution": "launch",
+    "cta": "promo",
+    "final-cta": "promo",
+    "point-1": "edukasi",
+    "point-2": "edukasi",
+    "challenge": "brand_awareness",
+    "turning-point": "brand_awareness",
+    "testimonial-1": "testimonial",
+    "testimonial-2": "testimonial",
+}
+
+
 def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], product: Optional[dict] = None) -> dict:
-    """V2 pipeline: CreativeBriefBuilder → ValidationLayer → AIVisualDirector → SlideBuilder."""
+    """V2 pipeline: CreativeBriefBuilder → ValidationLayer → AIVisualDirector → per-slide reuse of
+    Banner's own proven prompt engine (_build_banner_prompt / _build_reference_replacement_prompt)
+    — the exact same schema already confirmed to produce high-quality, reference-matching results
+    for Banner/Feed (recolor to brand palette, camera/composition/lighting copied from the
+    reference, real product-knowledge-driven headline/badges/checklist). Carousel previously
+    maintained its own separate, much weaker visual-director/composition system that had no
+    reference-photo awareness at all — confirmed root cause of generated results not matching the
+    inspiration photo. Carousel-specific concerns (slide role/index, cross-slide consistency lock,
+    CTA text) are layered on top as additional keys rather than reimplemented from scratch."""
     brand = brand or {}
 
-    # ── Step 1: Build Creative Brief ──────────────────────────────────────────
+    # ── Step 1: Build Creative Brief (brand DNA snapshot, product knowledge, talent consistency) ──
     brief = _build_carousel_creative_brief(payload, brand, product=product)
-
-    # ── Step 2: Creative Validation Layer ─────────────────────────────────────
     brief, validation_warnings = _validate_carousel_brief(brief)
-
-    # ── Step 3: AI Visual Director ────────────────────────────────────────────
     brief = _run_ai_visual_director(brief)
 
-    # ── Derived values ────────────────────────────────────────────────────────
     bp = brief["brand_profile"]
-    brand_name      = bp["brand_name"]
-    color_primary   = bp["color_primary"]
-    color_secondary = bp["color_secondary"]
-    brand_personality = bp["personality"]
-    director        = brief["director"]
-    anchor          = director["consistency_anchor"]
-    goal_directive  = brief["campaign_goal_directive"]
-    cat_visual      = brief["cat_visual"]
-    style_info      = brief["style_info"]
-    tone_typo       = brief["tone_typography"]
+    brand_name = bp["brand_name"]
+    anchor = brief["director"]["consistency_anchor"]
 
     _tmpl_counts = _CAROUSEL_TEMPLATES.get(brief["storytelling"], _CAROUSEL_TEMPLATES["problem-solution"])
     _count_key = brief["slide_count"] if brief["slide_count"] in _tmpl_counts else min(_tmpl_counts, key=lambda k: abs(k - brief["slide_count"]))
     roles = _tmpl_counts[_count_key]
-    bg_alternator = [color_primary, color_secondary]
 
-    brand_frame = {
-        "corner_logo_position": anchor["logo_position"],
-        "slide_indicator_position": anchor["slide_indicator"],
-        "header_strip": f"6% height strip at top in {color_primary}",
-        "footer_strip": f"6% height strip at bottom in {color_primary} — slide number + @{brand_name.lower().replace(' ', '')}",
-        "font_consistency": anchor["font_system"],
-    }
+    # Talent consistency computed ONCE — the identical text is applied as an override on every
+    # slide below, so all slides describe the same person/outfit instead of each slide's
+    # _build_banner_prompt call independently auto-deciding a DIFFERENT model.
+    talent_directive = _build_talent_directive_v2(brief) if payload.human_enabled else ""
 
     slides = []
     for idx, role in enumerate(roles, start=1):
-        is_hook = role == "hook"
-        is_cta  = role in ("cta", "final-cta")
-        alt_bg  = bg_alternator[idx % 2]
+        is_cta = role in ("cta", "final-cta")
 
-        slide_prompt = {
-            "task_type": "instagram_carousel_slide_generation",
-            "slide_index": idx,
-            "slide_role": role,
-            "slide_total": len(roles),
-            "product_knowledge": brief["product_knowledge"],
-            "system_directive": (
-                "You are an elite Instagram Carousel Art Director at a top-tier social media creative agency. "
-                f"Create slide {idx} of {len(roles)} for brand '{brand_name}'. "
-                "This slide MUST be visually consistent with all other slides in the carousel — "
-                "same brand frame, same font system, same color rules, same talent identity, same product appearance. "
-                "The carousel must feel like ONE coherent campaign, not a collection of random images. "
-                + (f"Brand positioning: {bp['positioning']}. " if bp.get('positioning') else "")
-                + (f"Brand personality: {', '.join(bp['brand_personality_tags'])}. " if bp.get('brand_personality_tags') else "")
-                + (f"STRICT VISUAL RESTRICTIONS — do NOT include: {', '.join(bp['brand_donts'])}. " if bp.get('brand_donts') else "")
-                + f"Brand tone of voice: {brand_personality}. "
-                + f"Brand archetype: {bp['archetype']}. "
-                + (f"Target audience: {brief['audience']}. " if brief.get('audience') else "")
-                + (f"Brand keywords: {', '.join(bp['words_always'])}. " if bp.get('words_always') else "")
-                + (f"Brand proof points: {'; '.join(bp['proof_points'])}. " if bp.get('proof_points') else "")
-                + (f"Signature phrase: '{bp['signature_phrase']}'. " if bp.get('signature_phrase') else "")
-                + (f"Product reference: {brief['product']}. " if brief.get('product') else "")
-            ),
-            "model_parameters": {
-                "aspect_ratio": brief["aspect_ratio"],
-                "style_preset": brief["style_preset"],
-                "quality": "high",
-                "photorealism": "ultra-realistic 8K, premium Instagram commercial photography",
-            },
-            "prompt_structure": {
-                "subject": f"Slide {idx:02d}/{len(roles):02d} — {role.upper()} — '{brief['topic']}' by {brand_name}",
-                "slide_directive": _ROLE_DIRECTIVES.get(role, f"Brand-consistent content slide #{idx}."),
-                "narrative_context": {
-                    "topic": brief["topic"],
-                    "target_audience": brief["audience"],
-                    "content_goal": brief["content_goal"],
-                    "template_type": brief["storytelling"],
-                    "slide_narrative_position": (
-                        "OPENING — maximum hook energy" if is_hook else
-                        "CLOSING — maximum conversion intent" if is_cta else
-                        f"MIDDLE (slide {idx}/{len(roles)}) — educational flow"
-                    ),
-                },
-                "branding_elements": {
-                    "brand_name": brand_name,
-                    "call_to_action_final": brief["cta"] if is_cta else "",
-                    "show_brand_handle": is_cta or is_hook,
-                    "instagram_handle_hint": f"@{brand_name.lower().replace(' ', '')}",
-                },
-                "brand_frame_elements": brand_frame,
-                "typography_zone_rules": {
-                    "header_height": "6%",
-                    "footer_height": "6%",
-                    "content_zone": "88%",
-                    "slide_indicator": f"{idx:02d}/{len(roles):02d}",
-                    "text_placement": director["text_placement"],
-                    "minimum_font_size": "1/10 of canvas height (mobile readability)",
-                },
-                "color_palette": {
-                    "background_dominant": color_primary,
-                    "accent_elements": color_secondary,
-                    "slide_background": color_primary if is_hook or is_cta else alt_bg,
-                    "alternation_rule": f"Alternate {color_primary}/{color_secondary} per slide. {color_primary} always dominant.",
-                },
-                "ai_visual_director": {
-                    "visual_type": brief["visual_type"],
-                    "visual_type_directive": _VISUAL_TYPE_DIRECTIVES.get(brief["visual_type"], {}).get("composition", ""),
-                    "visual_priority": director["visual_hierarchy"],
-                    "composition": director["composition"],
-                    "camera_angle": director["camera_angle"],
-                    "lighting": director["lighting"],
-                    "focal_point": director["focal_point"],
-                    "mood": director["mood"],
-                    "emotional_tone": director["emotional_tone"],
-                    "prop_recommendation": director["prop_recommendation"],
-                    "photo_style_directive": director["photo_style_directive"],
-                    "cta_emphasis": director["cta_emphasis"] if is_cta else "",
-                    "director_mode": brief["ai_director_mode"],
-                },
-                "consistency_engine": {
-                    "lighting_family": anchor["lighting_family"],
-                    "color_lock": f"STRICT palette: ONLY {color_primary} and {color_secondary}. Never deviate.",
-                    "brand_frame_lock": anchor["brand_frame"],
-                    "font_lock": anchor["font_system"],
-                    "talent_lock": anchor.get("talent_lock", ""),
-                    "rules": [
-                        f"IDENTICAL brand frame on EVERY slide — {anchor['brand_frame']}",
-                        f"IDENTICAL lighting family — {anchor['lighting_family']}",
-                        "IDENTICAL font system throughout",
-                        "IDENTICAL talent: same person, same outfit, same wardrobe across all slides",
-                        "IDENTICAL product: same product, same packaging, same placement logic",
-                        f"IDENTICAL color palette: {color_primary} dominant, {color_secondary} accent",
-                    ],
-                },
-                "visual_style_details": {
-                    "style_name": brief["style_preset"],
-                    "photography": style_info.get("photography", ""),
-                    "typography": style_info.get("typography", ""),
-                    "mood": style_info.get("mood", ""),
-                    "colour_use": style_info.get("colour_use", ""),
-                    "typography_system": tone_typo,
-                    "color_temperature": cat_visual.get("color_temp", "5500K neutral"),
-                    "category_environment": cat_visual.get("environment", ""),
-                },
-                "content_goal_directive": {
-                    "goal": brief["content_goal"],
-                    "name": goal_directive.get("name", ""),
-                    "visual_directive": goal_directive.get("visual_directive", ""),
-                    "emotional_trigger": goal_directive.get("emotional_trigger", ""),
-                    "cta_emphasis": director["cta_emphasis"],
-                },
-                "brand_dna_directives": {
-                    "category_props": cat_visual.get("props", ""),
-                    "emotional_target": cat_visual.get("emotion", "quality, trust"),
-                    "audience_mood": brief["audience_mood"],
-                    "tone": brand_personality,
-                    "brand_snapshot": {
-                        "archetype": bp["archetype"],
-                        "visual_style": bp["visual_style"],
-                        "signature_phrase": bp["signature_phrase"],
-                    },
-                },
-                "negative_prompt": (
-                    "inconsistent talent appearance between slides, different outfit per slide, "
-                    "inconsistent brand colors, broken typography, cluttered layout, "
-                    "mismatched font styles, generic stock photo look, "
-                    "missing slide number, random decorative elements, "
-                    "blurry text, misspelled words, watermarks, low resolution, "
-                    "distorted anatomy, unnatural poses"
-                ),
-                "human_model_directive": _build_talent_directive_v2(brief) or None,
-            },
-        }
+        # Each slide can have its OWN reference/inspiration photo (gallery multi-select, one per
+        # slide index) — falls back to the single shared reference_image_base64 (manual upload,
+        # same photo reused for every slide) when reference_images wasn't sent. Previously NEITHER
+        # field was ever populated by the frontend at all, so no slide ever carried any
+        # reference-photo instruction.
+        slide_reference = None
+        if payload.reference_images and (idx - 1) < len(payload.reference_images):
+            slide_reference = payload.reference_images[idx - 1]
+        elif payload.reference_image_base64:
+            slide_reference = payload.reference_image_base64
+
+        synthetic_payload = BannerPromptIn(
+            product_name=brief["product"] or brand_name,
+            campaign_goal=_CAROUSEL_ROLE_TO_CAMPAIGN_GOAL.get(role, "brand_awareness"),
+            composition_concept="",  # "" = random, same as Banner's own no-reference random path
+            reference_image_base64=slide_reference,
+            aspect_ratio=brief["aspect_ratio"],
+            # "" so the brand's own stored visual_style is honored instead of silently overridden
+            # (BannerPromptIn.style_preset defaults to "Minimal Clean", itself a valid
+            # VISUAL_STYLE_KEY_MAP key — see the same fix applied for Feed Generator).
+            style_preset="",
+            human_enabled=False,  # talent decided once above (talent_directive), not per-slide random
+        )
+        slide_prompt = _build_banner_prompt(synthetic_payload, brand, product=product)
+
+        # ── Carousel-specific overlay: slide identity, cross-slide consistency, CTA ──
+        # Set explicitly rather than trusting the returned dict to carry this key — the
+        # reference-mode schema (_build_reference_replacement_prompt) doesn't set "has_reference"
+        # at all (its own task_type already implies a reference exists), so relying on
+        # slide_prompt.get("has_reference") here would silently read None/False for every
+        # reference-mode slide.
+        slide_prompt["has_reference"] = bool(slide_reference)
+        slide_prompt["slide_index"] = idx
+        slide_prompt["slide_role"] = role
+        slide_prompt["slide_total"] = len(roles)
+        # _ROLE_DIRECTIVES was written for the old from-scratch graphic-design schema, so several
+        # entries prescribe a fixed background/layout (hook: "clean brand color block"; solution/
+        # lesson: "brand primary color as background"; benefit: "split — visual left, text right")
+        # — these directly contradict "match the reference photo exactly" whenever this slide has
+        # one attached. Rather than rewrite ~20 role strings, override the background/layout part
+        # explicitly when a reference is present, keeping only the role's purpose/tone/text intent.
+        role_directive_text = _ROLE_DIRECTIVES.get(role, f"Brand-consistent content slide #{idx}.")
+        if slide_reference:
+            role_directive_text += (
+                " IMPORTANT: any specific background color, layout split, or composition described "
+                "above is a generic default for when there's no reference photo — this slide HAS a "
+                "reference photo, so ignore those background/layout/composition specifics and "
+                "follow the reference's actual background/layout/composition instead (per the "
+                "rules above). Keep only this role's purpose, tone, and text intent."
+            )
+        slide_prompt["slide_directive"] = role_directive_text
+        if talent_directive:
+            slide_prompt["human_model_directive"] = talent_directive
+        if slide_reference:
+            # The reference photo IS the consistency anchor for this slide — it already dictates
+            # layout/camera/lighting via the reference-mode schema's own copy_exactly rules, so no
+            # separate brand-frame/font/lighting claim is layered on top. Forcing a "6% header
+            # strip + 6% footer strip in brand primary color" here — regardless of whether the
+            # reference has any such element — was the confirmed cause of an unwanted brand-colored
+            # bar appearing at the top/bottom of a generated slide whose reference had none at all.
+            consistency_text = (
+                f"This is slide {idx} of {len(roles)} in ONE carousel series. Follow THIS slide's "
+                "own reference photo exactly (per the rules above) — do not add a brand frame, "
+                "header strip, or footer strip unless the reference photo itself already has one."
+            )
+            if talent_directive:
+                consistency_text += " If a talent/model appears, the SAME person, outfit, and wardrobe must be used in every slide."
+            slide_prompt["carousel_consistency_lock"] = consistency_text
+        else:
+            slide_prompt["carousel_consistency_lock"] = (
+                f"CONSISTENCY WITH OTHER SLIDES — this is slide {idx} of {len(roles)} in ONE carousel "
+                f"series, not a standalone image: brand frame position ({anchor.get('brand_frame', '')}), "
+                f"font system ({anchor.get('font_system', '')}), and lighting family "
+                f"({anchor.get('lighting_family', '')}) must be IDENTICAL across every slide. If a talent/"
+                f"model appears, the SAME person, outfit, and wardrobe must be used in every slide."
+            )
+        if is_cta:
+            slide_prompt["carousel_cta_directive"] = (
+                f"THIS IS THE FINAL/CTA SLIDE of the carousel — in addition to everything else in "
+                f"this brief, add a prominent, final call-to-action: \"{brief['cta']}\". This is the "
+                f"strongest conversion moment of the whole series."
+            )
         slides.append(slide_prompt)
 
     return {
@@ -5392,7 +5441,7 @@ def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], pr
             "content_goal": brief["content_goal"],
             "visual_type": brief["visual_type"],
             "ai_director_mode": brief["ai_director_mode"],
-            "brand_personality": brand_personality,
+            "brand_personality": bp["personality"],
             "target_audience": brief["audience"],
             "validation_warnings": validation_warnings,
         },
@@ -5522,11 +5571,12 @@ async def preview_carousel_prompt(payload: CarouselPromptIn, current_user: dict 
     brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
     product = await _fetch_product_for_payload(payload, current_user)
     prompt_obj = _build_carousel_prompts(payload, brand, product=product)
-    has_reference = bool(payload.reference_image_base64)
-    # Inject natural_prompt into each slide so frontend can copy directly.
+    # Inject natural_prompt into each slide so frontend can copy directly. Uses each slide's OWN
+    # has_reference (set per-slide in _build_carousel_prompts, since different slides can carry
+    # different reference photos) rather than a single global flag.
     # Reference photo (if any) is analyzed by ChatGPT itself at generation time — no vision API call.
     for slide in prompt_obj.get("slides", []):
-        slide["natural_prompt"] = _append_reference_hint(_build_natural_prompt(slide), has_reference)
+        slide["natural_prompt"] = _append_reference_hint(_build_natural_prompt(slide), bool(slide.get("has_reference")))
     return {"prompt_json": prompt_obj}
 
 
@@ -6614,14 +6664,16 @@ async def generate_food_menu(payload: FoodMenuIn, current_user: dict = Depends(g
 
 # ============= MARKETPLACE THUMBNAIL =============
 def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict], product: Optional[dict] = None) -> dict:
+    """Reuses Banner's own proven engine (_build_banner_prompt) for the core brand DNA +
+    composition + product-knowledge content — same reuse pattern already applied to Feed
+    Generator and Carousel — instead of Marketplace's own separate, much thinner schema, which
+    read almost none of Banner's Brand DNA depth (no visual_style, personality, positioning,
+    archetype, brand_donts, proof_points, or signature_phrase at all). Marketplace-specific
+    concerns (platform badge, price/discount overlay, trust signals) are layered on top as
+    additional keys rather than reimplemented from scratch."""
     brand = brand or {}
     product = product or {}
-    brand_name = brand.get("brand_name", "")
-    category = brand.get("category", "") or product.get("category", "")
-    ingredients = product.get("ingredients", []) or []
     product_benefits = product.get("benefits", []) or []
-    target_skin = product.get("target_skin", []) or []
-    usp = product.get("usp", "") or payload.tagline or payload.benefit_utama
 
     # Platform-specific design systems
     platform_configs = {
@@ -6635,7 +6687,11 @@ def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict], pro
             ),
             "badge_color": "#EE4D2D",
             "badge_style": "Shopee orange pill badge with white bold text",
-            "trust_signals": ["⭐ rating badge", "Terjual 1rb+ label", "Shopee Mall badge if applicable"],
+            # Deliberately no rating/sales-count labels — Feedify has no real data source for
+            # those, and instructing the model to "add a rating badge" with no actual number gave
+            # it license to invent one (confirmed: generated a fake "4.9" rating and "10RB+
+            # Terjual" out of nowhere). Only include badges that don't imply a fabricated number.
+            "trust_signals": ["Shopee Mall badge if applicable"],
             "bg_color": "#FFFFFF",
             "accent_override": "#EE4D2D",
             "photography_style": "Pure studio white background with slight warm tint, product professionally lit with no harsh shadows",
@@ -6663,7 +6719,8 @@ def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict], pro
             ),
             "badge_color": "#E2323D",
             "badge_style": "High-contrast pill badge",
-            "trust_signals": ["Star rating", "Sales count"],
+            # See the shopee config above — no rating/sales-count labels without real data.
+            "trust_signals": [],
             "bg_color": "#FFFFFF",
             "accent_override": None,
             "photography_style": "Professional studio product photography, white or soft gradient background, 360-quality lighting",
@@ -6671,12 +6728,7 @@ def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict], pro
     }
 
     platform_cfg = platform_configs.get(payload.platform, platform_configs["general"])
-
-    # Use platform accent for badges, brand colors for brand elements
-    color_primary = _extract_hex(brand.get("color_primary", "#1A1A1A"))
-    color_secondary = _extract_hex(brand.get("color_secondary", "#FDFBF7"))
     badge_color = platform_cfg["badge_color"]
-    bg_color = platform_cfg["bg_color"]
 
     discount_text = f"{payload.discount_percent}% OFF" if payload.discount_percent else ""
     has_discount = bool(payload.discount_percent and payload.discount_percent > 0)
@@ -6693,115 +6745,120 @@ def _build_marketplace_prompt(payload: MarketplaceIn, brand: Optional[dict], pro
     else:
         badge_prominence = "No discount badge needed"
 
-    return {
-        "task_type": "marketplace_thumbnail_generation",
-        "system_directive": (
-            "You are an expert Indonesian E-Commerce Conversion Specialist and Product Photographer. "
-            f"Create a high-converting {payload.platform.capitalize()} product thumbnail for '{payload.product_name}'. "
-            "Your goal: maximize click-through rate (CTR) among Indonesian shoppers. "
-            "Study what makes Indonesian marketplace buyers click: clear product, visible savings, trust signals. "
-            "The thumbnail must look professional and trustworthy — not cheap or chaotic."
-        ),
-        "model_parameters": {
-            "aspect_ratio": "1:1 (Square Feed)",
-            "quality": "high",
-            "photorealism": "professional e-commerce product photography, studio-quality, 8K",
-        },
-        "product_knowledge": {
-            "category": category,
-            "key_ingredients": ingredients,
-            "benefits": product_benefits,
-            "target_skin": ", ".join(target_skin) if target_skin else "",
-            "usp": usp,
-            "usage_rule": (
-                "If key_ingredients or benefits are present, work them into the thumbnail as a "
-                "short real feature callout (e.g. a small badge or bullet) — do not write generic "
-                "filler like 'best quality'. Every claim must be rooted in this product_knowledge, "
-                "not invented."
-            ) if (ingredients or product_benefits or usp) else "",
-        },
-        "prompt_structure": {
-            "subject": f"Marketplace product thumbnail: {payload.product_name}{f' by {brand_name}' if brand_name else ''}",
-            "platform_context": platform_cfg["context"],
-            "visual_style_details": {
-                "photography_style": platform_cfg["photography_style"],
-                "aesthetic_keywords": "high-conversion, product-hero, e-commerce-professional, trust-building",
-                "color_palette": {
-                    "background": bg_color,
-                    "brand_dominant": color_primary,
-                    "brand_accent": color_secondary,
-                    "platform_badge_color": badge_color,
-                },
-                "lighting_setup": (
-                    "Professional 3-point studio lighting: key light front-left, fill light front-right, "
-                    "rim/hair light from behind to separate product from background. "
-                    "Result: product looks expensive, sharp, and premium."
-                ),
-            },
-            "branding_elements": {
-                "brand_name": brand_name,
-                "headline": payload.product_name,
-                "call_to_action": payload.tagline or "",
-            },
-            "product_visual_layout": {
-                "product_frame_rule": (
-                    "Product occupies 65-75% of the 1:1 square frame. "
-                    "Show product from its BEST ANGLE — the angle that clearly shows the key feature. "
-                    "If possible, show 2-3 angles/variants arranged in appealing composition. "
-                    "Product must be PERFECTLY SHARP — maximum focus on product, slight background softness."
-                ),
-                "composition_style": "Product centered-slightly-above center, leaving room for price badge at bottom",
-                "placement_rule": "Top 70%: product hero. Bottom 30%: pricing and badge zone.",
-            },
-            "price_overlay": {
-                "sale_price": payload.product_price,
-                "original_price": payload.original_price,
-                "discount_badge": discount_text,
-                "promo_label": payload.promo_label,
+    synthetic_payload = BannerPromptIn(
+        product_name=payload.product_name,
+        campaign_goal="promo" if has_discount else "best_seller",
+        composition_concept="",  # "" = random, same as Banner's own no-reference random path
+        aspect_ratio="1:1 (Square Feed)",
+        # "" so the brand's own stored visual_style is honored instead of silently overridden
+        # (BannerPromptIn.style_preset defaults to "Minimal Clean", itself a valid
+        # VISUAL_STYLE_KEY_MAP key — see the same fix applied for Feed Generator/Carousel).
+        style_preset="",
+        # "Foto Inspirasi" (gallery, ★ Wajib in the UI) — previously sent by the frontend under a
+        # field name (inspiration_photo_url) that doesn't exist on MarketplaceIn at all, so
+        # FastAPI silently dropped it and this mandatory photo never once reached the prompt
+        # builder. Passing it through here dispatches _build_banner_prompt to the exact same
+        # proven reference_layout_product_replacement schema (v2.0) Banner/Feed already use —
+        # reference as master layout, product-only replacement, recolor to brand palette.
+        reference_image_base64=payload.reference_image_base64,
+        human_enabled=payload.human_enabled,
+        human_mode=payload.human_mode,
+        model_character=payload.model_character,
+        model_age=payload.model_age,
+        interaction_style=payload.interaction_style,
+        composition_style_human=payload.composition_style_human,
+        outfit_style=payload.outfit_style,
+        expression_style=payload.expression_style,
+    )
+    prompt_json = _build_banner_prompt(synthetic_payload, brand, product=product)
+
+    # ── Marketplace-specific overlay: platform badge, price/discount, trust signals ──
+    # Layered on top of Banner's own dict rather than reimplemented — this is what actually
+    # reaches ChatGPT (the "Lihat Prompt JSON" hand-off copies prompt_json directly, same as
+    # Banner/Carousel), so these keys living here (not just in natural_prompt) is what matters.
+    prompt_json["marketplace_platform_context"] = platform_cfg["context"]
+    # Confirmed via ChatGPT's own analysis of a generated result: when sale_price/original_price/
+    # discount_percent are all empty, the image model still saw an "Add the price/discount badge"
+    # instruction and a badge_design spec, and filled in a plausible-looking but entirely made-up
+    # discount (fake "Rp149.000 → Rp89.000", "HEMAT 40%") to satisfy it. An empty-valued overlay
+    # dict isn't read as "skip this" by the model — it needs to be told explicitly not to show
+    # any price element at all when no real price was provided.
+    has_any_price_data = bool(payload.product_price or payload.original_price or has_discount)
+    if has_any_price_data:
+        prompt_json["marketplace_price_overlay"] = {
+            "enabled": True,
+            "sale_price": payload.product_price,
+            "original_price": payload.original_price,
+            "discount_badge": discount_text,
+            "promo_label": payload.promo_label,
+            "badge_color": badge_color,
+            "badge_design": {
+                "shape": "rounded rectangle or pill badge",
                 "badge_color": badge_color,
-                "badge_design": {
-                    "shape": "rounded rectangle or pill badge",
-                    "badge_color": badge_color,
-                    "text_color": "#FFFFFF",
-                    "price_font_style": f"bold, large, high-contrast on {badge_color} background",
-                    "position": "bottom-left corner OR top-left corner of image",
-                },
-                "discount_badge_prominence": badge_prominence,
-                "strikethrough_price": has_strikethrough,
-                "price_psychology": (
-                    f"Display '{payload.original_price}' with clear red strikethrough (coret), "
-                    f"then '{payload.product_price}' in large bold text below. "
-                    "This price anchoring is critical for Indonesian marketplace conversion."
-                ) if has_strikethrough else "",
+                "text_color": "#FFFFFF",
+                "price_font_style": f"bold, large, high-contrast on {badge_color} background",
+                "position": "bottom-left corner OR top-left corner of image",
             },
-            # Real product benefits take priority over generic platform trust badges when available
-            "trust_signals": (product_benefits[:3] + platform_cfg["trust_signals"]) if product_benefits else platform_cfg["trust_signals"],
-            "category_context": f"Product category: {category}" if category else "",
-            "thumbnail_style": {
-                "clean":           "Clean & clear: white background, product crystal sharp, minimal text, professional studio feel",
-                "high_conversion": "High conversion: bold discount badge, strong contrast, product + price as dual heroes, eye-catching",
-                "premium":         "Premium & luxury: dark or textured background, gold/silver accents, sophisticated typography, editorial feel",
-                "minimal":         "Minimal: maximum whitespace, single focal point, no badge unless necessary, refined and quiet",
-            }.get(getattr(payload, "thumbnail_style", "high_conversion"), "High conversion"),
-            "creative_direction": getattr(payload, "creative_direction", "") or None,
-            "composition_rules": [
-                "Product must be the undisputed visual hero — all other elements are supporting cast",
-                "Price/discount must be INSTANTLY readable at 200x200px thumbnail size",
-                "Zero visual clutter — every element has purpose",
-                "Background must be clean: pure white, very light gradient, or soft brand color",
-                f"Discount badge: {badge_prominence}",
-                "Brand name: small but visible, bottom area",
-                "Text contrast ratio minimum 4.5:1 for all price text",
-            ],
-            "negative_prompt": (
-                "cluttered background, multiple competing visual centers, text too small to read at thumbnail, "
-                "dark background (unless luxury product), watermarks, competitor logos, "
-                "blurry product, poorly lit product, crowded chaotic layout, "
-                "fake reviews, misleading imagery, low resolution"
+            "discount_badge_prominence": badge_prominence,
+            "strikethrough_price": has_strikethrough,
+            "price_psychology": (
+                f"Display '{payload.original_price}' with clear red strikethrough (coret), "
+                f"then '{payload.product_price}' in large bold text below. "
+                "This price anchoring is critical for Indonesian marketplace conversion."
+            ) if has_strikethrough else "",
+            "instruction": (
+                "Add the price/discount badge above as a UI overlay element on top of the "
+                "composition described below — position per badge_design.position, using ONLY "
+                "the exact sale_price/original_price/discount_badge values given here. Never "
+                "invent or adjust any of these numbers."
             ),
-            "human_model_directive": _build_human_directive(payload, brand) or None,
-        },
+        }
+    else:
+        prompt_json["marketplace_price_overlay"] = {
+            "enabled": False,
+            "instruction": (
+                "No price data was provided for this generation. Do NOT invent, display, or "
+                "imply any price, discount percentage, discount badge, or 'hemat X%' element — "
+                "omit this element entirely."
+            ),
+        }
+    # Real product benefits take priority over generic platform trust badges when available
+    prompt_json["marketplace_trust_signals"] = {
+        "signals": (product_benefits[:3] + platform_cfg["trust_signals"]) if product_benefits else platform_cfg["trust_signals"],
+        "instruction": (
+            "Only display the signals listed above, if any — these are either real product "
+            "benefits or generic platform feature badges that don't require a specific number. "
+            "Never invent or display a star rating (e.g. '4.9'), review count, sales count "
+            "(e.g. 'Terjual 1000+' / '10RB+ Terjual'), or any other number or claim that isn't "
+            "explicitly provided here. If the list above is empty, show no trust signal at all."
+        ),
     }
+    prompt_json["marketplace_thumbnail_style"] = {
+        "clean":           "Clean & clear: white background, product crystal sharp, minimal text, professional studio feel",
+        "high_conversion": "High conversion: bold discount badge, strong contrast, product + price as dual heroes, eye-catching",
+        "premium":         "Premium & luxury: dark or textured background, gold/silver accents, sophisticated typography, editorial feel",
+        "minimal":         "Minimal: maximum whitespace, single focal point, no badge unless necessary, refined and quiet",
+    }.get(getattr(payload, "thumbnail_style", "high_conversion"), "High conversion")
+    prompt_json["marketplace_creative_direction"] = getattr(payload, "creative_direction", "") or None
+    # Generic frame rule dictates its OWN layout (top 70%/bottom 30%, 65-75% product size) — when a
+    # reference photo is attached, this would directly contradict "match the reference's own
+    # layout" (the exact class of conflict the reference schema's own strict_rules already resolve
+    # in favor of the reference). Deferring here instead of stacking a competing composition rule.
+    prompt_json["marketplace_frame_rule"] = (
+        "MUST be exactly 1:1 square — marketplace platforms (Shopee/Tokopedia/Instagram Shop) crop "
+        "and display thumbnails as squares. Product placement, scale, and angle follow the "
+        "reference photo exactly (see reference.copy_exactly above) — do NOT impose a generic "
+        "layout that conflicts with the reference's own composition. Position the "
+        "marketplace_price_overlay badge wherever the reference's own layout has natural negative "
+        "space for it."
+        if payload.reference_image_base64 else
+        "MUST be exactly 1:1 square — marketplace platforms (Shopee/Tokopedia/Instagram Shop) crop "
+        "and display thumbnails as squares. Product occupies 65-75% of the frame, shown from its "
+        "BEST ANGLE (the angle that clearly shows the key feature), perfectly sharp with slight "
+        "background softness. Top 70%: product hero. Bottom 30%: pricing and badge zone "
+        "(per marketplace_price_overlay above)."
+    )
+    return prompt_json
 
 
 async def _fetch_product_for_payload(payload, current_user: dict) -> Optional[dict]:
@@ -7173,7 +7230,30 @@ async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = D
         concept_block = prompt_json.get("composition_concept")
         if concept_block and concept_block.get("directive"):
             concept_block["directive"] = concept_block["directive"].split(" [")[0]
-        chatgpt_prompt = _build_natural_prompt(prompt_json)
+        # Neutralize raw-dict fields that hardcode a generic single-hero-studio composition —
+        # these fields exist independently of composition_concept and directly contradict several
+        # of the 12 concepts (e.g. Minimal & Type: "product plays a supporting accent role" vs
+        # composition_style's "Single hero product, dominant focal point"; Urban Context: street
+        # setting vs category_environment's generic "clean professional product display
+        # environment"). _natural_feed already gates these when converting to prose, but Feed
+        # Generator now sends the raw dict directly (bypassing that conversion entirely), so the
+        # same gating has to be applied here at the field level instead.
+        pvl = ps.get("product_visual_layout")
+        if pvl and concept_block and concept_block.get("directive"):
+            pvl["composition_style"] = ""
+        vsd = ps.get("visual_style_details")
+        if vsd and concept_block and concept_block.get("directive"):
+            vsd["category_environment"] = ""
+        # Send the raw structured JSON dict directly — exactly like Banner/Marketplace/Carousel's
+        # "Lihat Prompt JSON" hand-off does for reference-mode (json.dumps, not flattened prose).
+        # Previously this went through _build_natural_prompt → _natural_feed, which collapses the
+        # whole structured dict into one long prose paragraph; ChatGPT parses a clearly-labeled
+        # JSON object (task_type, system_directive, brand_dna, product_knowledge, composition_concept,
+        # etc. as distinct fields) far more reliably than trying to extract the same information
+        # from a single wall of text — this is the actual structural difference between Feed
+        # Generator's output and Feed & Banner/Marketplace's, independent of the reference-photo
+        # question (Feed Generator never has one, by design).
+        chatgpt_prompt = json.dumps(prompt_json, indent=2, ensure_ascii=False)
         items.append({
             "index": i + 1,
             "content_type": t,
