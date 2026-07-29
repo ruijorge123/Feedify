@@ -296,7 +296,7 @@ function MarqueeRow({ chips, reverse = false, speed = 28 }) {
 // ── Section 2: AI Visual Studio ────────────────────────────────────────────────
 
 function AIVisualStudio() {
-  const STUDIO_URL = "https://share.gemini.google/oappNqItDCrZ";
+  const STUDIO_URL = "https://share.gemini.google/Wdc4s77CC0xc";
 
   return (
     <motion.div

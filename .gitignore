@@ -90,3 +90,6 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+
+# Claude Code project instructions (local-only)
+CLAUDE.md
