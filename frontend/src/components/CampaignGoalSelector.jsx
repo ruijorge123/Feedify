@@ -8,11 +8,17 @@ const GOALS = [
   { id: "restock",         emoji: "♻️", name: "Restok",         desc: "Umumkan stok kembali tersedia, ciptakan urgensi." },
 ];
 
-export default function CampaignGoalSelector({ value, onChange, defaultValue = "brand_awareness" }) {
+export default function CampaignGoalSelector({
+  value,
+  onChange,
+  defaultValue = "brand_awareness",
+  goals = GOALS,
+  columnsClassName = "grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3",
+}) {
   const selected = value || defaultValue;
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-2">
-      {GOALS.map(g => (
+    <div className={`grid ${columnsClassName} gap-2`}>
+      {goals.map(g => (
         <button
           key={g.id}
           type="button"

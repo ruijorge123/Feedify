@@ -264,6 +264,13 @@ class CarouselPromptIn(BaseModel):
     expression_style: str = ""
 
 
+class CarouselOutlineIn(BaseModel):
+    story_flow: str = "problem_solution"
+    slide_count: int = 3
+    product_id: Optional[str] = None
+    topic_hint: str = ""
+
+
 class CopywritingIn(BaseModel):
     product_name: str
     product_description: str
@@ -414,6 +421,7 @@ class ProductCreate(BaseModel):
     benefits: List[str] = []
     target_skin: List[str] = []
     usp: str = ""
+    how_to_use: str = ""  # usage steps — drives Carousel's Step by Step flow when filled in
 
 
 class ProductUpdate(BaseModel):
@@ -424,6 +432,7 @@ class ProductUpdate(BaseModel):
     benefits: Optional[List[str]] = None
     target_skin: Optional[List[str]] = None
     usp: Optional[str] = None
+    how_to_use: Optional[str] = None
 
 
 # ============= HELPERS =============
@@ -1645,6 +1654,12 @@ def _natural_studio(j: dict) -> str:
         "illustrations, barcode placement, reflections, textures, printing quality, proportions, stitching, patterns. "
         "Product identity is the supreme priority. "
         "Intelligently isolate the product while maintaining realistic contact shadows and natural edge fidelity. "
+        "LIGHTING CONTINUITY — the product must look physically present in the scene, not composited: its "
+        "lighting direction, color temperature, and shadow softness MUST exactly match the light source "
+        "illuminating everything else (model, background, props). Never a separately-lit studio product shot "
+        "pasted onto a different scene. Any dynamic elements in the scene (water splashes, steam, smoke, "
+        "falling petals, etc.) must interact physically with the product surface — droplets landing, clinging, "
+        "and dripping with correct refraction and wetness — not floating around it as a decorative graphic overlay. "
     )
 
     # ── PHOTOGRAPHY QUALITY (natural, NOT over-processed) ───────────────────────
@@ -1656,18 +1671,23 @@ def _natural_studio(j: dict) -> str:
         "Slight optical vignetting toward frame edges. "
         "Natural chromatic micro-aberration at high-contrast edges. "
         "Colors: natural, slightly muted, true to real-world light — NOT digitally saturated or boosted. "
-        "Skin: visible pore texture, natural warmth in cheeks, slight subsurface scattering — never smoothed or airbrushed. "
+        "Skin: visible pore texture, natural warmth in cheeks, slight subsurface scattering, faint under-eye "
+        "shadow, minor tonal unevenness — never smoothed, airbrushed, or beauty-filtered. NO glossy/glass-skin "
+        "finish, NO FaceTune/influencer-filter look, NO symmetric doll-like proportions — real faces are "
+        "slightly asymmetric on every axis (eye size, brow height, nostril shape, smile curve). "
         "Hair: individual strands, natural flyaways, realistic sheen — not plastic or uniform. "
-        "Eyes: natural catchlights, slightly asymmetric, real iris texture. "
+        "Eyes: natural catchlights, slightly asymmetric, real iris texture — not the generic wide-eyed "
+        "AI-beautiful-face look. "
         "Hands and fingers: correct anatomy, natural knuckle texture, realistic fingernail detail. "
         "Surfaces: micro-texture, natural wear, slight dust or imperfection — nothing looks CGI-clean. "
         "Shadows: soft falloff with ambient fill, not hard-edged, natural directionality. "
         "Every product or object touching a surface must have a convincing contact shadow. "
         "Background: realistic environmental depth, slight motion or atmospheric blur — not a smoothed-out AI bokeh disk. "
         "Depth of field: optical, with slight focus micro-oscillation at the plane edges. "
-        "Strictly forbidden: plastic skin, perfectly uniform lighting, floating objects without shadows, "
-        "oversaturated colors, impossibly perfect symmetry, CGI sheen on surfaces, over-processed background blur, "
-        "hallucinated product changes, distorted anatomy, artificial-looking eyes. "
+        "Strictly forbidden: plastic skin, glass-skin/glossy beauty-filter finish, generic symmetric AI-beautiful "
+        "face, perfectly uniform lighting, floating objects without shadows, oversaturated colors, impossibly "
+        "perfect symmetry, CGI sheen on surfaces, over-processed background blur, hallucinated product changes, "
+        "distorted anatomy, artificial-looking eyes. "
     )
 
     # ── PHOTOGRAPHIC REALISM (anti-AI section) ───────────────────────────────────
@@ -1871,23 +1891,31 @@ def _natural_studio(j: dict) -> str:
     model_map = {
         "no_model": "MODEL — Product Only: No human model. Pure product photography. Product is the sole subject.",
         "female": (
-            "MODEL — Indonesian/Asian Female: Real-looking Indonesian or Asian female. "
-            "Natural commercial appearance — not overly glamorous, not plastic-perfect. "
-            "Visible skin pores and natural skin texture. Slight asymmetry in face and pose (as real humans have). "
-            "Natural expression — genuine, not forced-smile. Real hair with natural movement and flyaways. "
+            "MODEL — Indonesian/Asian Female: Real-looking Indonesian or Asian female, like a real person "
+            "photographed, not a beauty-app render. Natural commercial appearance — not overly glamorous, not "
+            "plastic-perfect, NOT the generic 'AI-beautiful K-beauty' face (glossy glass skin, overly symmetric "
+            "features, doll-like proportions). Visible skin pores, natural skin texture, faint tonal unevenness, "
+            "a hint of real-life imperfection (light under-eye shadow, natural blush rather than airbrushed "
+            "flush). Slight asymmetry in face and pose (as real humans have). "
+            "Natural expression — genuine, not forced-smile, not a filtered-influencer look. Real hair with "
+            "natural movement and flyaways, not a glossy CGI sheen. "
             "Anatomically correct hands with natural finger joints and nails. "
             "Natural weight distribution — not a rigid pose. " + wearing_note + "Product remains the visual hero."
         ),
         "hijab_female": (
-            "MODEL — Indonesian Hijab Female: Real-looking Indonesian female wearing hijab. "
-            "Hijab draped naturally with realistic fabric folds and slight imperfections in arrangement. "
-            "Natural skin visible on face and hands — pores, warmth, real texture. "
-            "Genuine expression, not posed. Slight pose asymmetry. Anatomically correct hands. "
-            "Modest styling that looks genuinely worn, not studio-styled. " + wearing_note + "Product remains the visual hero."
+            "MODEL — Indonesian Hijab Female: Real-looking Indonesian female wearing hijab, like a real person "
+            "photographed, not a beauty-app render. Hijab draped naturally with realistic fabric folds and "
+            "slight imperfections in arrangement. Natural skin visible on face and hands — pores, warmth, real "
+            "texture, faint tonal unevenness — NOT glossy glass-skin or beauty-filtered. "
+            "Genuine expression, not posed, not filtered-influencer look. Slight pose asymmetry. Anatomically "
+            "correct hands. Modest styling that looks genuinely worn, not studio-styled. "
+            + wearing_note + "Product remains the visual hero."
         ),
         "male": (
-            "MODEL — Indonesian/Asian Male: Real-looking Indonesian or Asian male. "
-            "Natural commercial appearance. Visible skin texture, natural stubble or grooming as appropriate. "
+            "MODEL — Indonesian/Asian Male: Real-looking Indonesian or Asian male, like a real person "
+            "photographed, not a beauty-app render. Natural commercial appearance — not the generic "
+            "'AI-handsome' face. Visible skin texture, natural stubble or grooming as appropriate, faint tonal "
+            "unevenness — NOT glossy or airbrushed. "
             "Slight pose asymmetry. Genuine expression. Real hair. Anatomically correct hands. "
             + wearing_note + "Product remains the visual hero."
         ),
@@ -3080,6 +3108,7 @@ async def create_product(payload: ProductCreate, current_user: dict = Depends(ge
         "benefits": payload.benefits,
         "target_skin": payload.target_skin,
         "usp": payload.usp,
+        "how_to_use": payload.how_to_use,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.products.insert_one(product)
@@ -3353,6 +3382,20 @@ VISUAL_STYLE_DIRECTIVES = {
 CAMPAIGN_GOAL_DIRECTIVES = {
     "launch": {
         "name": "Launch",
+        # heavy = ingredients/benefits rendered as visible on-image badges + full creative-brief
+        # detail; minimal = ingredients kept out of the visible image but still inform brand/USP
+        # context; none = product-knowledge detail skipped entirely. See _build_banner_prompt's
+        # features_detail/creative_brief construction — this is what stopped every goal from
+        # getting the same ingredient-badge treatment regardless of whether it fit the mood.
+        "product_knowledge_usage": "none",
+        # Text-only rule (does NOT touch composition/lighting/mood — see visual_directive below
+        # for that): what informative text is ALLOWED to appear on the image for this goal.
+        "on_image_text_rule": (
+            "The ONLY informative text allowed on this image is launch-related: new-arrival/reveal "
+            "messaging (e.g. 'HADIR SEKARANG', 'Baru Diluncurkan'), the headline, and the CTA. "
+            "Do NOT render ingredient lists, benefit badges, testimonial quotes, or promo/discount "
+            "text — anything not directly about this being a new launch must be left out of the image."
+        ),
         "visual_directive": (
             "NEW LAUNCH ENERGY: This is a product REVEAL moment — the first impression that must stop the scroll. "
             "Communicate excitement, newness, and anticipation. Bold 'unveil' composition — product emerging dramatically. "
@@ -3365,6 +3408,16 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     },
     "promo": {
         "name": "Promo",
+        "product_knowledge_usage": "none",
+        "on_image_text_rule": (
+            "Promo-specific informative text MUST be prominent and dominant on this image: the "
+            "discount amount or offer detail, what's included/free (e.g. bonus item, free shipping), "
+            "and urgency language (e.g. 'Hari Ini Saja', 'Stok Terbatas'). Pull this from the "
+            "headline/subheadline/description/CTA the user provided and present it boldly as the "
+            "visual hero text — bigger and bolder than in other goals. Do NOT render ingredient "
+            "lists or generic brand storytelling — every piece of text on this image should serve "
+            "the promo offer."
+        ),
         "visual_directive": (
             "CONVERSION PROMO: This image MUST drive immediate purchase. "
             "Price or offer information is a key visual element — not an afterthought. "
@@ -3378,6 +3431,14 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     },
     "testimonial": {
         "name": "Testimonial",
+        "product_knowledge_usage": "none",
+        "on_image_text_rule": (
+            "The ONLY informative text allowed on this image is testimonial/social-proof related: "
+            "a review quote, star rating, or customer trust language — drawn from the "
+            "headline/subheadline the user provided. Do NOT render ingredient lists, benefit "
+            "badges, promo/discount text, or launch messaging — anything not directly reinforcing "
+            "trust and social proof must be left out of the image."
+        ),
         "visual_directive": (
             "SOCIAL PROOF CONTENT: Authentic, human, trustworthy energy. "
             "Avoid overly polished studio look — slightly warmer, more candid atmosphere. "
@@ -3391,6 +3452,7 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     },
     "edukasi": {
         "name": "Edukasi",
+        "product_knowledge_usage": "heavy",
         "visual_directive": (
             "EDUCATIONAL CONTENT: Clear, informative, trust-building. "
             "Clean well-organised visual hierarchy — information has a clear reading order. "
@@ -3405,6 +3467,7 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     },
     "best_seller": {
         "name": "Best Seller",
+        "product_knowledge_usage": "minimal",
         "visual_directive": (
             "BEST SELLER PROOF: This image radiates popularity, proven quality, and social trust. "
             "'TERLARIS' badge, sales numbers, or ranking must be a prominent visual element. "
@@ -3418,6 +3481,13 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     },
     "brand_awareness": {
         "name": "Brand Awareness",
+        "product_knowledge_usage": "heavy",
+        "on_image_text_rule": (
+            "Product knowledge (key ingredients, benefits, USP) MUST be represented as "
+            "informative text/badges on this image — this is required, not optional. Combine it "
+            "with brand identity messaging so the image communicates both what the brand stands "
+            "for AND what makes this specific product credible."
+        ),
         "visual_directive": (
             "BRAND STORYTELLING: This image is about WHO the brand IS, not just what it sells. "
             "Values, personality, and emotional identity are the hero. "
@@ -3432,6 +3502,7 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     },
     "restock": {
         "name": "Restok",
+        "product_knowledge_usage": "minimal",
         "visual_directive": (
             "RESTOCK URGENCY: Communicate 'IT'S BACK — don't miss it again'. "
             "FOMO of the previous sellout is the emotional engine. "
@@ -4255,6 +4326,14 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
     target_audience = brand.get("target_audience", "")
     cat_visual = CATEGORY_VISUAL.get(category, CATEGORY_VISUAL_DEFAULT)
 
+    goal_key = payload.campaign_goal if payload.campaign_goal in CAMPAIGN_GOAL_DIRECTIVES else "brand_awareness"
+    goal = CAMPAIGN_GOAL_DIRECTIVES[goal_key]
+    # How much clinical product-knowledge detail (ingredients/target skin) belongs in this
+    # goal's creative brief — "heavy" goals like Edukasi want it, "none" goals like Launch/Brand
+    # Awareness don't, so it stops leaking in as visible ingredient callouts on every image
+    # regardless of the chosen goal (see product_knowledge_usage on CAMPAIGN_GOAL_DIRECTIVES).
+    pk_usage = goal.get("product_knowledge_usage", "minimal")
+
     # Smart creative brief — same logic as _build_banner_prompt's, so reference-mode carries
     # the exact same rich "why this product matters to this audience" context. An earlier
     # version of this schema dropped this entirely in the effort to be a pure "just composite
@@ -4269,15 +4348,12 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
         creative_brief += f", brand voice is {', '.join(brand_personality_list)}"
     if cat_visual.get("emotion"):
         creative_brief += f". The desired emotional response: {cat_visual['emotion']}"
-    if ingredients:
+    if ingredients and pk_usage == "heavy":
         creative_brief += f". Key active ingredients: {', '.join(ingredients[:6])}"
-    if target_skin:
+    if target_skin and pk_usage in ("heavy", "minimal"):
         creative_brief += f". Formulated for: {', '.join(target_skin)} skin"
     if usp:
         creative_brief += f". Core promise: {usp}"
-
-    goal_key = payload.campaign_goal if payload.campaign_goal in CAMPAIGN_GOAL_DIRECTIVES else "brand_awareness"
-    goal = CAMPAIGN_GOAL_DIRECTIVES[goal_key]
     human_directive = _build_human_directive(payload, brand)
     _category_clause = f", category: '{category}'" if category else ""
 
@@ -4330,6 +4406,7 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "goal": goal_key,
             "goal_name": goal["name"],
             "emotional_trigger": goal["emotional_trigger"],
+            "on_image_text_rule": goal.get("on_image_text_rule", ""),
         },
         "product": {
             "image_role": "source_product",
@@ -4399,20 +4476,35 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
         "product_knowledge": {
             "category": category,
             "product_name": product_name,
-            "key_ingredients": ingredients,
+            "key_ingredients": ingredients if pk_usage == "heavy" else [],
             "primary_benefit": (payload.features[0] if payload.features else ""),
-            "target_skin": ", ".join(target_skin) if target_skin else "",
+            "target_skin": ", ".join(target_skin) if target_skin and pk_usage in ("heavy", "minimal") else "",
             "usp": usp,
-            "usage_rule": (
-                "Add real informative content sourced ONLY from this product_knowledge and "
-                "brand_dna — do not invent facts, and do not reuse the reference's own generic "
-                "marketing text verbatim. Typically this means: (1) a bold, prominent headline "
-                "built from primary_benefit or usp (e.g. 'mengandung {key_ingredient}'); "
-                "(2) one small icon badge per key_ingredient, each labeled with that ingredient's "
-                "name; (3) a short checklist of benefits covering target_skin and primary_benefit. "
-                "These are new elements layered onto the reference-inspired composition, not "
-                "things that need to already exist in the reference."
-            ),
+            # Same goal-aware gating as creative_brief above (pk_usage) — a goal like Launch or
+            # Brand Awareness shouldn't get the same ingredient-badge treatment as Edukasi.
+            "usage_rule": {
+                "heavy": (
+                    "Add real informative content sourced ONLY from this product_knowledge and "
+                    "brand_dna — do not invent facts, and do not reuse the reference's own generic "
+                    "marketing text verbatim. Typically this means: (1) a bold, prominent headline "
+                    "built from primary_benefit or usp (e.g. 'mengandung {key_ingredient}'); "
+                    "(2) one small icon badge per key_ingredient, each labeled with that ingredient's "
+                    "name; (3) a short checklist of benefits covering target_skin and primary_benefit. "
+                    "These are new elements layered onto the reference-inspired composition, not "
+                    "things that need to already exist in the reference."
+                ),
+                "minimal": (
+                    "Use primary_benefit or usp ONLY as inspiration for the headline/subheadline copy. "
+                    "Do NOT add ingredient icon badges or a benefits checklist as separate visual "
+                    "elements — this goal's mood is not about clinical product detail, so keep the "
+                    "visual clean and let the reference's own layout carry the design."
+                ),
+                "none": (
+                    "Do not add any product-knowledge callouts, icon badges, or benefit checklists "
+                    "to the image at all. product_knowledge here is background context for "
+                    "understanding the product, not something to visualize."
+                ),
+            }[pk_usage],
         },
         "composition_rules": {
             "mode": "locked_to_reference",
@@ -4540,6 +4632,14 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
         }
         effective_subheadline = tone_sub_hints.get(brand_personality, "")
 
+    # Campaign goal directive (goal_key resolved earlier)
+    goal = CAMPAIGN_GOAL_DIRECTIVES[goal_key]
+    # How much clinical product-knowledge detail (ingredients/target skin/feature badges)
+    # belongs in this goal's prompt — "heavy" goals like Edukasi want it visualized, "none"
+    # goals like Launch/Brand Awareness don't, so it stops leaking into every image regardless
+    # of the chosen goal (see product_knowledge_usage on CAMPAIGN_GOAL_DIRECTIVES).
+    pk_usage = goal.get("product_knowledge_usage", "minimal")
+
     # Smart creative brief: the 'why this product matters to this audience'
     creative_brief = f"Product '{product_name}' by {brand_name}"
     if category:
@@ -4550,11 +4650,11 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
         creative_brief += f", brand voice is {brand_personality}"
     if cat_visual.get("emotion"):
         creative_brief += f". The desired emotional response: {cat_visual['emotion']}"
-    # Enrich creative brief with product-specific knowledge
+    # Enrich creative brief with product-specific knowledge — gated by pk_usage (see above)
     if product:
-        if product.get("ingredients"):
+        if product.get("ingredients") and pk_usage == "heavy":
             creative_brief += f". Key active ingredients: {', '.join(product['ingredients'][:6])}"
-        if product.get("target_skin"):
+        if product.get("target_skin") and pk_usage in ("heavy", "minimal"):
             target_skin_str = ", ".join(product["target_skin"])
             creative_brief += f". Formulated for: {target_skin_str} skin"
         if product.get("usp"):
@@ -4564,9 +4664,6 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
     resolved_style = VISUAL_STYLE_KEY_MAP.get(brand.get("visual_style", ""), "Minimal Clean")
     effective_style = VISUAL_STYLE_KEY_MAP.get(payload.style_preset, resolved_style)
     style_info = VISUAL_STYLE_DIRECTIVES.get(effective_style, VISUAL_STYLE_DIRECTIVES["Minimal Clean"])
-
-    # Campaign goal directive (goal_key resolved earlier)
-    goal = CAMPAIGN_GOAL_DIRECTIVES[goal_key]
 
     placement_rules = {
         "center": (
@@ -4596,10 +4693,16 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
 
     cta_text = payload.call_to_action or ""
 
+    # Gated by pk_usage: only goals that actually want ingredient/benefit detail rendered ON
+    # the image (currently just Edukasi) get told to draw them as floating badges — everything
+    # else either drops them ("none") or keeps them as brief supporting text instead of a
+    # visual callout ("minimal"), so Launch/Promo/Testimonial etc. don't get cluttered with
+    # ingredient badges that don't fit the goal's mood.
     features_detail = ""
-    if payload.features:
-        feat_lines = [f"• {f}" for f in payload.features]
+    if payload.features and pk_usage == "heavy":
         features_detail = "Features to callout as floating UI badges: " + ", ".join(payload.features)
+    elif payload.features and pk_usage == "minimal":
+        features_detail = "Features (supporting context only, do NOT render as a visible badge or callout): " + ", ".join(payload.features)
 
     brand_positioning = brand.get("brand_positioning", "")
     brand_personality_list = brand.get("brand_personality", [])
@@ -4702,6 +4805,9 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
                 "visual_directive": goal["visual_directive"],
                 "emotional_trigger": goal["emotional_trigger"],
                 "cta_style_hint": goal["cta_style"],
+                # Text-content rule, separate from visual_directive above — governs what
+                # informative text/badges are allowed to appear on the image for this goal.
+                "on_image_text_rule": goal.get("on_image_text_rule", ""),
             },
             "product_visual_layout": {
                 "expected_images_count": payload.expected_images_count,
@@ -4731,7 +4837,12 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
                 ),
             },
             "information_layout": {
-                "features_to_highlight": payload.features,
+                # Empty when pk_usage == "none" — this is the field ChatGPT/gpt-image actually
+                # reads (via the raw prompt_json hand-off), so gating features_display alone
+                # isn't enough: an un-gated features_to_highlight list here would still visually
+                # leak ingredient/benefit badges into Launch/Brand Awareness images regardless
+                # of what features_display says.
+                "features_to_highlight": payload.features if pk_usage != "none" else [],
                 "features_display": features_detail,
                 "cta_directive": (
                     f"Add a prominent CTA element with text: '{cta_text}'. "
@@ -4820,20 +4931,37 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
             {
                 "product_name": product.get("name", ""),
                 "product_category": product.get("category", ""),
-                "key_ingredients": product.get("ingredients", []),
-                "key_benefits": product.get("benefits", []),
-                "target_skin_type": product.get("target_skin", []),
+                # Gated by pk_usage — heavy-only goals (Edukasi) get the full ingredient/benefit
+                # list; everything else keeps the dict present (Feed Generator's own
+                # per-content-type post-processing at ~7261 relies on this key existing whenever
+                # a product is attached) but with the clinical detail stripped out, so it doesn't
+                # instruct the model to badge-render ingredients that don't fit the goal's mood.
+                "key_ingredients": product.get("ingredients", []) if pk_usage == "heavy" else [],
+                "key_benefits": product.get("benefits", []) if pk_usage == "heavy" else [],
+                "target_skin_type": product.get("target_skin", []) if pk_usage in ("heavy", "minimal") else [],
                 "unique_selling_point": product.get("usp", ""),
                 "how_to_use": product.get("how_to_use", "") or "",
-                "chatgpt_instruction": (
-                    "IMPORTANT — use the product knowledge above to make the visual highly specific to this exact product. "
-                    "Do NOT use generic beauty/skincare imagery. Instead: "
-                    "(1) Reference actual key_ingredients (e.g. niacinamide brightening badge, retinol renew badge) as text overlay callouts on the design. "
-                    "(2) Let key_benefits drive the headline and emotional tone of the visual. "
-                    "(3) Use target_skin_type to inform the mood and audience feel (e.g. for oily skin: fresh, clean, matte texture cues). "
-                    "(4) unique_selling_point should be the core message — the most prominent visual promise. "
-                    "Every design decision must be rooted in THIS product's specific identity, not a template."
-                ),
+                "chatgpt_instruction": {
+                    "heavy": (
+                        "IMPORTANT — use the product knowledge above to make the visual highly specific to this exact product. "
+                        "Do NOT use generic beauty/skincare imagery. Instead: "
+                        "(1) Reference actual key_ingredients (e.g. niacinamide brightening badge, retinol renew badge) as text overlay callouts on the design. "
+                        "(2) Let key_benefits drive the headline and emotional tone of the visual. "
+                        "(3) Use target_skin_type to inform the mood and audience feel (e.g. for oily skin: fresh, clean, matte texture cues). "
+                        "(4) unique_selling_point should be the core message — the most prominent visual promise. "
+                        "Every design decision must be rooted in THIS product's specific identity, not a template."
+                    ),
+                    "minimal": (
+                        "Use unique_selling_point only as light inspiration for the headline/copy tone. "
+                        "Do NOT add ingredient badges, benefit checklists, or any clinical product-detail "
+                        "callouts to the visual — this goal is about mood and emotion, not product facts."
+                    ),
+                    "none": (
+                        "This product knowledge is background context only. Do NOT visualize any of "
+                        "it — no ingredient badges, no benefit text, no product-detail callouts of any "
+                        "kind. This goal's image is about brand story/mood, not product facts."
+                    ),
+                }[pk_usage],
             }
             if product else None
         ),
@@ -5161,25 +5289,34 @@ def _build_talent_directive_v2(brief: dict) -> str:
 # 2-4. Each sequence here is hand-picked to preserve the template's narrative arc while always
 # ending in "cta".
 _CAROUSEL_TEMPLATES = {
-    "problem-solution": {
+    # Keys MUST match the frontend's STORY_FLOWS ids (CarouselGeneratorPage.jsx) exactly — they're
+    # sent as-is in payload.template. A previous hyphen/underscore mismatch ("problem-solution" here
+    # vs "problem_solution" from the frontend) meant every non-Problem-Solution flow silently fell
+    # back to the Problem-Solution structure below, regardless of which flow the user picked.
+    "problem_solution": {
         2: ["hook", "cta"],
         3: ["hook", "problem", "cta"],
         4: ["hook", "problem", "solution", "cta"],
     },
-    "listicle": {
+    "myth_fact": {
         2: ["hook", "cta"],
-        3: ["hook", "point-1", "cta"],
-        4: ["hook", "point-1", "point-2", "cta"],
+        3: ["hook", "myth", "fact-cta"],
+        4: ["hook", "myth", "fact", "cta"],
     },
-    "story": {
+    "before_after": {
+        2: ["hook", "cta"],
+        3: ["hook", "before", "after-cta"],
+        4: ["hook", "before", "process", "after-cta"],
+    },
+    "step_by_step": {
+        2: ["hook", "cta"],
+        3: ["hook", "step-1-2", "step-cta"],
+        4: ["hook", "step-1", "step-2", "step-cta"],
+    },
+    "story_brand": {
         2: ["hook", "cta"],
         3: ["hook", "challenge", "cta"],
         4: ["hook", "challenge", "turning-point", "cta"],
-    },
-    "testimonial": {
-        2: ["hook", "cta"],
-        3: ["hook", "testimonial-1", "cta"],
-        4: ["hook", "testimonial-1", "testimonial-2", "cta"],
     },
 }
 
@@ -5294,13 +5431,79 @@ _ROLE_DIRECTIVES = {
         "CTA text dominant on slide. Brand logo and Instagram handle visible. "
         "Product image supporting — not competing. Clean, bold, zero clutter."
     ),
+
+    # ── Myth vs Fact ─────────────────────────────────────────────────────────
+    "myth": (
+        "MYTH SLIDE — State a common misconception the target audience actually believes, framed "
+        "as a question or a bold false statement (e.g. 'Katanya X bikin Y...'). "
+        "Skeptical/questioning visual tone — muted or desaturated color treatment to signal "
+        "'this is the wrong belief', not the brand's own claim. "
+        "Text: the myth itself, short and punchy, 1-2 sentences."
+    ),
+    "fact": (
+        "FACT SLIDE — Correct the myth with the REAL fact, grounded in this product's actual "
+        "key_ingredients/how it works (from product_knowledge) — never a made-up or generic claim. "
+        "Visual shifts to brand-confident, clear, credible tone — bright contrast against the "
+        "muted myth slide. Text: the real fact stated plainly, citing the specific ingredient or "
+        "mechanism where relevant."
+    ),
+    "fact-cta": (
+        "FACT + CTA SLIDE — Same as FACT SLIDE (correct the myth using this product's real "
+        "product_knowledge — ingredients/how it works, never generic) AND close with a clear CTA. "
+        "Brand-confident, credible tone. Text: the real fact, then the CTA."
+    ),
+
+    # ── Before / After ───────────────────────────────────────────────────────
+    "before": (
+        "BEFORE SLIDE — Show/describe the customer's situation BEFORE using the product, as a "
+        "testimonial framing (not a clinical product-knowledge callout). Relatable, slightly "
+        "muted or dull visual treatment — this is the 'old problem' moment. "
+        "Text: short first-person or customer-quote style description of the 'before' state."
+    ),
+    "process": (
+        "PROCESS SLIDE — The transition/using-the-product moment, bridging before and after. "
+        "Warmer, more hopeful visual tone than the before slide. "
+        "Text: brief description of the product being used or the change taking effect."
+    ),
+    "after-cta": (
+        "AFTER + CTA SLIDE — Show/describe the customer's situation AFTER using the product, as a "
+        "testimonial payoff (trust and result-focused, not a clinical ingredient breakdown). "
+        "Bright, confident, aspirational visual tone — clear contrast against the before slide. "
+        "Text: the 'after' result in testimonial voice, then a closing CTA."
+    ),
+
+    # ── Step by Step ─────────────────────────────────────────────────────────
+    "step-1": (
+        "STEP 1 SLIDE — The FIRST step of using this product. Pull the actual step from "
+        "product_knowledge's how_to_use when available — never invent a usage instruction that "
+        "contradicts it. Number '01' large, brand accent color. Clear instructional visual (product "
+        "being used, not just sitting still). Text: the step itself, concrete and actionable."
+    ),
+    "step-2": (
+        "STEP 2 SLIDE — The SECOND step of using this product, continuing from step 1. Pull from "
+        "product_knowledge's how_to_use when available. Number '02' prominent, same instructional "
+        "layout as step-1 for visual rhythm. Text: the step itself, concrete and actionable."
+    ),
+    "step-1-2": (
+        "STEP 1 & 2 SLIDE — Cover the FIRST TWO usage steps together (compact layout, shorter "
+        "carousel). Pull from product_knowledge's how_to_use when available. Numbered '01' and '02' "
+        "in one slide, split layout. Text: both steps, concise."
+    ),
+    "step-cta": (
+        "FINAL STEP + CTA SLIDE — The LAST usage step (pull from product_knowledge's how_to_use "
+        "when available) plus a closing CTA. Number continues the sequence from prior step slides. "
+        "Text: the final step, then the CTA."
+    ),
 }
 
 
 _CAROUSEL_ROLE_TO_CAMPAIGN_GOAL: dict = {
     "hook": "brand_awareness",
     "problem": "brand_awareness",
-    "solution": "launch",
+    # Was "launch" (product_knowledge_usage="none") — Problem-Solution's solution/cta slides should
+    # still be able to intersperse a little product knowledge (not be product-knowledge-driven, but
+    # not zero either), which matches "best_seller"'s "minimal" level, not "none".
+    "solution": "best_seller",
     "cta": "promo",
     "final-cta": "promo",
     "point-1": "edukasi",
@@ -5309,7 +5512,39 @@ _CAROUSEL_ROLE_TO_CAMPAIGN_GOAL: dict = {
     "turning-point": "brand_awareness",
     "testimonial-1": "testimonial",
     "testimonial-2": "testimonial",
+    # Myth vs Fact — facts must be grounded in real product_knowledge (heavy usage = "edukasi").
+    "myth": "edukasi",
+    "fact": "edukasi",
+    "fact-cta": "edukasi",
+    # Before/After — transformation testimonial framing, not clinical ingredient detail.
+    "before": "testimonial",
+    "process": "testimonial",
+    "after-cta": "testimonial",
+    # Step by Step — heavy usage so how_to_use can actually surface.
+    "step-1": "edukasi",
+    "step-2": "edukasi",
+    "step-1-2": "edukasi",
+    "step-cta": "edukasi",
 }
+
+
+def _parse_slide_outline(topic: str, slide_count: int) -> Optional[List[str]]:
+    """Parse a "Slide 1: ...\\nSlide 2: ..." outline (as produced by POST /carousel/outline, or
+    hand-edited by the user afterwards) into one content string per slide. Returns None unless the
+    text contains EXACTLY one "Slide N: ..." line for every N from 1 to slide_count — callers fall
+    back to using the whole topic string as general context instead, so a free-typed or edited-away
+    topic never breaks generation."""
+    if not topic:
+        return None
+    pattern = _re.compile(r"^\s*slide\s*(\d+)\s*[:.\-]\s*(.+)$", _re.IGNORECASE)
+    parsed: dict = {}
+    for line in topic.splitlines():
+        m = pattern.match(line)
+        if m:
+            parsed[int(m.group(1))] = m.group(2).strip()
+    if set(parsed.keys()) != set(range(1, slide_count + 1)):
+        return None
+    return [parsed[i] for i in range(1, slide_count + 1)]
 
 
 def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], product: Optional[dict] = None) -> dict:
@@ -5333,7 +5568,7 @@ def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], pr
     brand_name = bp["brand_name"]
     anchor = brief["director"]["consistency_anchor"]
 
-    _tmpl_counts = _CAROUSEL_TEMPLATES.get(brief["storytelling"], _CAROUSEL_TEMPLATES["problem-solution"])
+    _tmpl_counts = _CAROUSEL_TEMPLATES.get(brief["storytelling"], _CAROUSEL_TEMPLATES["problem_solution"])
     _count_key = brief["slide_count"] if brief["slide_count"] in _tmpl_counts else min(_tmpl_counts, key=lambda k: abs(k - brief["slide_count"]))
     roles = _tmpl_counts[_count_key]
 
@@ -5342,9 +5577,16 @@ def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], pr
     # _build_banner_prompt call independently auto-deciding a DIFFERENT model.
     talent_directive = _build_talent_directive_v2(brief) if payload.human_enabled else ""
 
+    # Per-slide outline (from POST /carousel/outline, reviewed/edited by the user in "Spesifikasi
+    # Tambahan") — when it parses cleanly into one line per slide, each slide gets its OWN specific
+    # content instead of every slide sharing the same generic role directive + whole-topic context.
+    slide_outline = _parse_slide_outline(brief["topic"], len(roles))
+
     slides = []
     for idx, role in enumerate(roles, start=1):
-        is_cta = role in ("cta", "final-cta")
+        # role.endswith("-cta") covers the combined content+CTA roles used by shorter carousels
+        # (fact-cta, after-cta, step-cta) — the last content beat and the closing CTA share one slide.
+        is_cta = role in ("cta", "final-cta") or role.endswith("-cta")
 
         # Each slide can have its OWN reference/inspiration photo (gallery multi-select, one per
         # slide index) — falls back to the single shared reference_image_base64 (manual upload,
@@ -5397,6 +5639,11 @@ def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], pr
                 "rules above). Keep only this role's purpose, tone, and text intent."
             )
         slide_prompt["slide_directive"] = role_directive_text
+        if slide_outline:
+            slide_prompt["slide_specific_content"] = (
+                f"THIS SLIDE'S SPECIFIC CONTENT (user-reviewed, follow this over generic role text "
+                f"where they'd conflict): {slide_outline[idx - 1]}"
+            )
         if talent_directive:
             slide_prompt["human_model_directive"] = talent_directive
         if slide_reference:
@@ -5563,6 +5810,112 @@ async def generate_banner(payload: BannerPromptIn, current_user: dict = Depends(
         "prompt_json": prompt_obj,
         "credits": _credits_summary(credits_doc),
     }
+
+
+@api_router.post("/carousel/outline")
+async def generate_carousel_outline(payload: CarouselOutlineIn, current_user: dict = Depends(get_current_user)):
+    """Generate a per-slide content outline ("Slide 1: ...\\nSlide 2: ...") for the Story Flow's
+    "Spesifikasi Tambahan" field, grounded in the user's real product/brand data — the user reviews
+    and edits this before generating. Text-only via Groq, no image cost, no credits consumed."""
+    slide_count = max(2, min(4, payload.slide_count))
+
+    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0}) or {}
+    brand_name = brand.get("brand_name", "brand Anda")
+
+    product = None
+    if payload.product_id:
+        product = await db.products.find_one({"id": payload.product_id, "user_id": current_user["id"]}, {"_id": 0})
+    product_name = (product or {}).get("name") or "produk ini"
+    category = (product or {}).get("category") or brand.get("category", "")
+    ingredients = ", ".join((product or {}).get("ingredients", []) or []) or "(tidak ada data)"
+    benefits = ", ".join((product or {}).get("benefits", []) or []) or "(tidak ada data)"
+    usp = (product or {}).get("usp") or "(tidak ada data)"
+    how_to_use = (product or {}).get("how_to_use") or "(tidak ada data)"
+
+    flow_briefs = {
+        "problem_solution": (
+            "Masalah → Solusi: slide awal bahas masalah/keresahan yang dialami target audiens, "
+            "slide berikutnya kasih solusi yaitu produk ini. Product knowledge (ingredients/benefit) "
+            "boleh diselipkan sedikit tapi JANGAN jadi fokus utama — fokus tetap di masalah dan solusinya."
+        ),
+        "myth_fact": (
+            "Myth vs Fact: slide bahas mitos yang sering dipercaya soal kategori produk ini, lalu "
+            "slide berikutnya membongkar mitos itu dengan FAKTA yang WAJIB berdasarkan data produk "
+            "asli di bawah (ingredients/cara kerja) — jangan mengarang fakta yang gak nyambung ke data."
+        ),
+        "before_after": (
+            "Before After: gaya testimoni transformasi — slide 'before' gambarkan kondisi/keluhan "
+            "pelanggan sebelum pakai produk, slide 'after' gambarkan hasilnya setelah pakai. Nada "
+            "testimoni personal, bukan penjelasan klinis kandungan."
+        ),
+        "step_by_step": (
+            "Step by Step: tiap slide adalah SATU langkah cara pakai produk ini, berurutan. WAJIB "
+            "pakai data 'Cara pakai' di bawah kalau tersedia — jangan mengarang langkah yang beda."
+        ),
+        "story_brand": (
+            "Story Brand: narasi storytelling brand — slide demi slide membangun satu cerita "
+            "(mulai dari masalah/perjalanan, lalu perubahan/titik balik, lalu hasil), bukan daftar poin lepas."
+        ),
+    }
+    flow_brief = flow_briefs.get(payload.story_flow, flow_briefs["problem_solution"])
+
+    system = (
+        "Kamu adalah Content Strategist Indonesia spesialis Instagram carousel untuk UMKM. "
+        "Tugasmu: bikin outline singkat per-slide sebagai draft awal — user akan revisi sendiri "
+        "sebelum generate gambar, jadi tulis natural dan actionable, bukan draft final yang kaku. "
+        "WAJIB: output PERSIS satu baris per slide, format 'Slide N: <isi>', tanpa penjelasan lain, "
+        "tanpa markdown, tanpa nomor/bullet tambahan."
+    )
+    user_prompt = f"""Brand: {brand_name}
+Produk: {product_name}{f' (kategori: {category})' if category else ''}
+Ingredients: {ingredients}
+Manfaat: {benefits}
+USP: {usp}
+Cara pakai: {how_to_use}
+{f'Catatan tambahan dari user: {payload.topic_hint}' if payload.topic_hint.strip() else ''}
+
+Story flow yang dipilih: {flow_brief}
+
+Buat outline PERSIS {slide_count} slide untuk story flow ini. Output HANYA {slide_count} baris, format:
+Slide 1: <isi slide 1>
+Slide 2: <isi slide 2>
+...dst sampai Slide {slide_count}"""
+
+    from groq import AsyncGroq, RateLimitError as _GroqRateLimit
+    _keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
+    if not _keys:
+        raise HTTPException(status_code=500, detail="AI service unavailable")
+
+    response = None
+    _last_err = None
+    for _key in _keys:
+        if not _key:
+            continue
+        try:
+            _groq = AsyncGroq(api_key=_key)
+            _msg = await _groq.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=600,
+                temperature=0.8,
+            )
+            response = _msg.choices[0].message.content
+            break
+        except _GroqRateLimit as e:
+            _last_err = e
+            continue
+        except Exception as e:
+            _last_err = e
+            break
+
+    if response is None:
+        logger.error(f"Groq carousel outline call failed: {_last_err}")
+        raise HTTPException(status_code=500, detail=_ai_error_detail(_last_err, "Gagal generate outline. Coba lagi."))
+
+    return {"topic": response.strip()}
 
 
 @api_router.post("/prompt/preview-carousel")

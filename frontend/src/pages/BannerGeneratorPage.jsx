@@ -12,7 +12,11 @@ import BrandDnaCard from "@/components/BrandDnaCard";
 import InspirationGallery from "@/components/InspirationGallery";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
 import DebugJsonButton from "@/components/DebugJsonButton";
-import CampaignGoalSelector from "@/components/CampaignGoalSelector";
+import CampaignGoalSelector, { GOALS as CAMPAIGN_GOALS } from "@/components/CampaignGoalSelector";
+
+// Banner hanya pakai 4 tujuan konten inti — Edukasi, Best Seller, dan Restock disembunyikan
+// dari halaman ini (masih ada di CampaignGoalSelector buat halaman lain, mis. Food Menu).
+const BANNER_GOALS = CAMPAIGN_GOALS.filter(g => ["launch", "promo", "testimonial", "brand_awareness"].includes(g.id));
 
 const MODEL_STYLES = [
   { id: "hijab",         label: "Hijab",         emoji: "🧕", value: "Berhijab, gaya modest fashion Indonesia" },
@@ -361,7 +365,7 @@ export default function BannerGeneratorPage() {
           <div className="feedify-card p-4 space-y-2.5">
             <h3 className="font-heading text-sm font-bold text-brand">Tujuan Konten</h3>
             <p className="text-xs text-stone-500">Mempengaruhi tone visual dan suasana keseluruhan foto.</p>
-            <CampaignGoalSelector value={campaignGoal} onChange={setCampaignGoal} />
+            <CampaignGoalSelector value={campaignGoal} onChange={setCampaignGoal} goals={BANNER_GOALS} columnsClassName="grid-cols-2" />
           </div>
 
           {/* ⑤ FORMAT */}

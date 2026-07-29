@@ -20,7 +20,6 @@ const STORY_FLOWS = [
   { id: "myth_fact",        emoji: "🔍", label: "Myth vs Fact",    desc: "" },
   { id: "before_after",     emoji: "🔄", label: "Before After",    desc: "" },
   { id: "step_by_step",     emoji: "📋", label: "Step by Step",    desc: "" },
-  { id: "listicle",         emoji: "📝", label: "Listicle",        desc: "" },
   { id: "story_brand",      emoji: "📖", label: "Story Brand",     desc: "" },
 ];
 
@@ -34,7 +33,6 @@ const STORY_FLOW_TO_GOAL = {
   myth_fact:        "edukasi",
   before_after:     "testimoni",
   step_by_step:     "edukasi",
-  listicle:         "edukasi",
   story_brand:      "brand_awareness",
 };
 const STORY_FLOW_KEYS = STORY_FLOWS.filter(f => f.id !== "auto").map(f => f.id);
@@ -71,11 +69,6 @@ const FLOW_ROLES = {
     2: ["Hook 📋", "Step Utama + CTA"],
     3: ["Hook 📋", "Step 1 & 2", "Step 3 + CTA"],
     4: ["Hook 📋", "Step 1", "Step 2", "Step 3 + CTA"],
-  },
-  listicle: {
-    2: ["Hook 📝", "Tips + CTA"],
-    3: ["Hook 📝", "Tips 1–3", "CTA"],
-    4: ["Hook 📝", "Tips 1–2", "Tips 3–4", "CTA"],
   },
   story_brand: {
     2: ["Hook 📖", "Hasil + CTA"],
@@ -144,6 +137,7 @@ export default function CarouselGeneratorPage() {
   const [topic, setTopic]           = useState("");
   const [slideCount, setSlideCount] = useState(3);
   const [aspectRatio, setAspectRatio] = useState("4:5 (Portrait Feed)");
+  const [outlineLoading, setOutlineLoading] = useState(false);
 
   // Model
   const [modelEnabled, setModelEnabled] = useState(false);
@@ -165,6 +159,28 @@ export default function CarouselGeneratorPage() {
     queryFn: async () => { const { data } = await api.get("/products"); return data; },
   });
   const selectedProduct = products.find(p => p.id === selectedProductId) || null;
+
+  // Picking a Story Flow auto-fills "Spesifikasi Tambahan" with a per-slide outline grounded in
+  // the selected product — user reviews/edits it before generating. Requires a product to already
+  // be picked (gated in the UI below) so the outline actually knows what it's writing about.
+  const handleStoryFlowClick = async (flowId) => {
+    setStoryFlow(flowId);
+    if (!selectedProductId || flowId === "auto") return;
+    setOutlineLoading(true);
+    try {
+      const { data } = await api.post("/carousel/outline", {
+        story_flow: flowId,
+        slide_count: slideCount,
+        product_id: selectedProductId,
+        topic_hint: topic,
+      });
+      if (data?.topic) setTopic(data.topic);
+    } catch {
+      toast.error("Gagal menyusun outline otomatis — isi Spesifikasi Tambahan manual aja.");
+    } finally {
+      setOutlineLoading(false);
+    }
+  };
 
   // ── Generate ──────────────────────────────────────────────────────────────────
 
@@ -458,45 +474,8 @@ export default function CarouselGeneratorPage() {
             );
           })()}
 
-          {/* ④ STORY FLOW */}
-          <div className="feedify-card p-5 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">4</div>
-              <div>
-                <h3 className="font-heading text-base font-bold text-brand">Story Flow</h3>
-                <p className="text-xs text-stone-500">Arah konten diambil dari brand DNA, product knowledge, dan flow ini</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {STORY_FLOWS.map(sf => (
-                <button key={sf.id} type="button" onClick={() => setStoryFlow(sf.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                    storyFlow === sf.id
-                      ? "bg-brand text-white border-brand"
-                      : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                  }`} data-testid={`flow-${sf.id}`}>
-                  <span>{sf.emoji}</span> {sf.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Optional topic */}
-            <div>
-              <label className="text-[10px] uppercase tracking-widest font-bold text-stone-400 block mb-1.5">
-                Spesifikasi tambahan <span className="normal-case font-normal">(opsional)</span>
-              </label>
-              <textarea
-                value={topic}
-                onChange={e => setTopic(e.target.value)}
-                rows={2}
-                placeholder={`Contoh: bahas 5 mitos skincare yang sering dipercaya target wanita 20–30 tahun`}
-                className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm resize-none focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
-                data-testid="carousel-topic"
-              />
-            </div>
-          </div>
-
-          {/* ⑥ FORMAT & SLIDE */}
+          {/* ④ FORMAT & JUMLAH SLIDE — moved before Story Flow: the outline auto-fill (Story Flow
+              section below) needs to know how many slides to draft before a flow is picked. */}
           <div className="feedify-card p-4 space-y-4">
             <h3 className="font-heading text-sm font-bold text-brand">Format & Jumlah Slide</h3>
 
@@ -542,6 +521,53 @@ export default function CarouselGeneratorPage() {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+
+          {/* ⑤ STORY FLOW */}
+          <div className="feedify-card p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">5</div>
+              <div>
+                <h3 className="font-heading text-base font-bold text-brand">Story Flow</h3>
+                <p className="text-xs text-stone-500">Arah konten diambil dari brand DNA, product knowledge, dan flow ini</p>
+              </div>
+            </div>
+            {!selectedProductId && (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Pilih Product Knowledge dulu di atas — outline tiap slide butuh tahu produknya apa.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {STORY_FLOWS.map(sf => (
+                <button key={sf.id} type="button"
+                  disabled={!selectedProductId}
+                  onClick={() => handleStoryFlowClick(sf.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                    storyFlow === sf.id
+                      ? "bg-brand text-white border-brand"
+                      : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
+                  } ${!selectedProductId ? "opacity-40 cursor-not-allowed" : ""}`} data-testid={`flow-${sf.id}`}>
+                  <span>{sf.emoji}</span> {sf.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Optional topic — auto-filled with a per-slide outline when a flow is picked (see
+                handleStoryFlowClick), user can freely edit before generating. */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest font-bold text-stone-400 block mb-1.5">
+                Spesifikasi tambahan <span className="normal-case font-normal">(opsional — otomatis terisi outline per slide saat pilih flow)</span>
+              </label>
+              <textarea
+                value={topic}
+                onChange={e => setTopic(e.target.value)}
+                rows={slideCount + 1}
+                disabled={outlineLoading}
+                placeholder={outlineLoading ? "Menyusun outline per slide..." : `Contoh: bahas 5 mitos skincare yang sering dipercaya target wanita 20–30 tahun`}
+                className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm resize-none focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20 disabled:opacity-60"
+                data-testid="carousel-topic"
+              />
             </div>
 
             {/* Storyboard preview */}

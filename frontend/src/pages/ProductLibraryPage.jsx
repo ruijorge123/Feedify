@@ -286,7 +286,7 @@ function getCategoryConfig(category) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const EMPTY_FORM = {
   name: "", category: "", photo_base64: null,
-  ingredients: [], benefits: [], target_skin: [], usp: "",
+  ingredients: [], benefits: [], target_skin: [], usp: "", how_to_use: "",
 };
 
 function toBase64(file) {
@@ -367,7 +367,9 @@ function ProductCard({ product, onEdit, onDelete }) {
 
 // ── ProductForm (add / edit) ──────────────────────────────────────────────────
 function ProductForm({ initial = EMPTY_FORM, onSave, onCancel, loading }) {
-  const [form, setForm] = useState(initial);
+  // Merge over EMPTY_FORM so fields added after older products were saved (e.g. how_to_use)
+  // don't come back as undefined and turn the textarea into an uncontrolled input.
+  const [form, setForm] = useState({ ...EMPTY_FORM, ...initial });
   const [removingBg, setRemovingBg] = useState(false);
   const photoRef = useRef(null);
 
@@ -479,6 +481,21 @@ function ProductForm({ initial = EMPTY_FORM, onSave, onCancel, loading }) {
           placeholder="Apa yang membuat produk ini unik?"
           rows={2}
           data-testid="product-usp-input"
+        />
+      </div>
+
+      {/* Cara pakai — drives Carousel's Step by Step story flow when filled in */}
+      <div>
+        <label className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-500 mb-2 block">
+          Cara Pakai <span className="normal-case font-normal text-stone-400">(opsional)</span>
+        </label>
+        <textarea
+          value={form.how_to_use}
+          onChange={(e) => set("how_to_use", e.target.value)}
+          className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/60 resize-none"
+          placeholder="Langkah pakai produk ini, mis: 1) Bersihkan wajah 2) Aplikasikan 2-3 tetes 3) Pijat lembut"
+          rows={2}
+          data-testid="product-how-to-use-input"
         />
       </div>
 
