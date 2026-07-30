@@ -1,10 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { copyToClipboard, openChatGPT } from "@/lib/chatgpt";
 import ChatGptImageSteps from "@/components/ChatGptImageSteps";
 import PhotoPrepBlock from "@/components/PhotoPrepBlock";
 import DebugJsonButton from "@/components/DebugJsonButton";
+import ModelTalentPicker from "@/components/ModelTalentPicker";
+import { MODEL_STYLES } from "@/lib/modelOptions";
 import {
   SquaresFour,
   Package,
@@ -24,6 +26,7 @@ import {
   CaretDown,
   CheckCircle,
   Confetti,
+  User,
 } from "@phosphor-icons/react";
 
 // ── Content type config ────────────────────────────────────────────────
@@ -218,6 +221,12 @@ export default function FeedGeneratorPage() {
   const [count, setCount] = useState(5);
   const [typeMode, setTypeMode] = useState("auto");   // "auto" | "manual"
   const [manualTypes, setManualTypes] = useState([]);
+  const [manualTypeModels, setManualTypeModels] = useState({}); // { [typeId]: boolean } — manual mode only
+  // Shared talent identity for whichever manual content types have their model toggle on —
+  // Auto Mix never shows this (gender/age/style stay AI-auto-decided per item, as before).
+  const [modelGender, setModelGender] = useState(null);
+  const [modelStyle, setModelStyle]   = useState(null);
+  const [modelAge, setModelAge]       = useState(null);
 
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState(null);
@@ -234,13 +243,31 @@ export default function FeedGeneratorPage() {
 
   const selectedProduct = products.find((p) => p.id === productId) || null;
 
+  // If the user lowers "Berapa Prompt" below the number of types already selected, trim the
+  // selection down to fit — the cap in toggleManualType only blocks adding new ones going forward.
+  useEffect(() => {
+    setManualTypes((prev) => (prev.length > count ? prev.slice(0, count) : prev));
+  }, [count]);
+
+  // Can't select more distinct types than there are prompts — no point having a type that never
+  // gets used. Deselecting is always allowed; selecting a new one is capped at `count`.
   const toggleManualType = (id) => {
-    setManualTypes((prev) =>
-      prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
-    );
+    setManualTypes((prev) => {
+      if (prev.includes(id)) return prev.filter((t) => t !== id);
+      if (prev.length >= count) return prev;
+      return [...prev, id];
+    });
   };
 
-  const canGenerate = !!productId && (typeMode === "auto" || manualTypes.length > 0);
+  const toggleManualTypeModel = (id) => {
+    setManualTypeModels((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Manual mode + at least one selected type has its model toggle on → gender/age/style required.
+  const anyManualTypeWantsModel = typeMode === "manual" && manualTypes.some((id) => manualTypeModels[id]);
+  const canGenerate = !!productId
+    && (typeMode === "auto" || manualTypes.length > 0)
+    && (!anyManualTypeWantsModel || (!!modelGender && !!modelStyle && !!modelAge));
 
   const generate = useCallback(async () => {
     if (!canGenerate) return;
@@ -252,6 +279,12 @@ export default function FeedGeneratorPage() {
         product_id: productId,
         count,
         content_types: typeMode === "auto" ? [] : manualTypes,
+        content_type_models: typeMode === "auto" ? {} : manualTypeModels,
+        ...(anyManualTypeWantsModel ? {
+          model_character: modelGender === "wanita" ? "Wanita Indonesia" : "Pria Indonesia",
+          model_age: modelAge,
+          outfit_style: MODEL_STYLES.find((s) => s.id === modelStyle)?.value || modelStyle,
+        } : {}),
       });
       setResult(data);
     } catch (err) {
@@ -260,7 +293,7 @@ export default function FeedGeneratorPage() {
     } finally {
       setGenerating(false);
     }
-  }, [canGenerate, productId, count, typeMode, manualTypes]);
+  }, [canGenerate, productId, count, typeMode, manualTypes, manualTypeModels, anyManualTypeWantsModel, modelGender, modelStyle, modelAge]);
 
   // ── Result view ────────────────────────────────────────────────────
   if (result) {
@@ -450,24 +483,28 @@ export default function FeedGeneratorPage() {
 
           {typeMode === "auto" ? (
             <p className="text-xs text-stone-500 bg-stone-50 rounded-xl px-4 py-3">
-              Feedify otomatis pilih campuran terbaik: Awareness, Soft Selling, Testimoni, Promo, Edukasi sesuai jumlah prompt.
+              Feedify otomatis pilih campuran terbaik: Awareness, Soft Selling, Testimoni, Promo, Edukasi sesuai jumlah prompt. Model/talent juga otomatis dicampur — gak selalu ada orangnya di tiap foto.
             </p>
           ) : (
             <div>
-              <p className="text-xs text-stone-400 mb-3">Pilih minimal 1 tipe (urutan berulang jika jumlah prompt &gt; pilihan)</p>
-              <div className="flex flex-wrap gap-2">
+              <p className="text-xs text-stone-400 mb-3">
+                Pilih minimal 1, maksimal {count} tipe (sesuai jumlah prompt) — urutan berulang kalau jumlah prompt lebih banyak dari tipe yang dipilih
+              </p>
+              <div className="flex flex-wrap gap-2 mb-3">
                 {CONTENT_TYPES.map((t) => {
                   const Icon = t.icon;
                   const active = manualTypes.includes(t.id);
+                  const disabled = !active && manualTypes.length >= count;
                   return (
                     <button
                       key={t.id}
                       onClick={() => toggleManualType(t.id)}
+                      disabled={disabled}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
                         active
                           ? "bg-brand text-white border-brand"
                           : "bg-white text-stone-600 border-stone-200 hover:border-brand/30"
-                      }`}
+                      } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
                     >
                       <Icon size={12} weight={active ? "fill" : "regular"} />
                       {t.label}
@@ -475,6 +512,44 @@ export default function FeedGeneratorPage() {
                   );
                 })}
               </div>
+
+              {manualTypes.length > 0 && (
+                <div className="space-y-1.5 border-t border-stone-100 pt-3">
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400 mb-2">Pakai model/talent?</p>
+                  {manualTypes.map((id) => {
+                    const t = TYPE_MAP[id];
+                    const on = !!manualTypeModels[id];
+                    return (
+                      <div key={id} className="flex items-center justify-between gap-2 py-1">
+                        <span className="text-xs text-stone-600 flex items-center gap-1.5">
+                          <User size={13} className="text-stone-400" /> {t?.label || id}
+                        </span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={on}
+                          onClick={() => toggleManualTypeModel(id)}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${on ? "bg-brand" : "bg-stone-200"}`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : "translate-x-1"}`} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {anyManualTypeWantsModel && (
+                <div className="border-t border-stone-100 pt-3 mt-3">
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400 mb-2">Model/Talent-nya siapa?</p>
+                  <ModelTalentPicker
+                    gender={modelGender} onGenderChange={setModelGender}
+                    style={modelStyle} onStyleChange={setModelStyle}
+                    age={modelAge} onAgeChange={setModelAge}
+                    testidPrefix="feed-model"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -5,12 +5,14 @@ import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext";
 import {
   Sparkle, CircleNotch, CheckCircle, X,
-  Images, Package, CaretDown, DownloadSimple, User,
+  Images, Package, CaretDown, DownloadSimple,
 } from "@phosphor-icons/react";
 import BrandDnaCard from "@/components/BrandDnaCard";
 import InspirationGallery from "@/components/InspirationGallery";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
 import DebugJsonButton from "@/components/DebugJsonButton";
+import ModelTalentPicker from "@/components/ModelTalentPicker";
+import { MODEL_STYLES } from "@/lib/modelOptions";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -77,24 +79,6 @@ const FLOW_ROLES = {
   },
 };
 
-const MODEL_STYLES = [
-  { id: "hijab",         label: "Hijab",        emoji: "🧕", value: "Berhijab, gaya modest fashion Indonesia" },
-  { id: "hijab-modern",  label: "Hijab Modern", emoji: "✨", value: "Hijab modern kontemporer, hijab trendy" },
-  { id: "korean",        label: "Korean",        emoji: "🌸", value: "Korean beauty style, K-beauty aesthetic" },
-  { id: "natural",       label: "Natural",       emoji: "🌿", value: "Penampilan natural, minimal makeup" },
-  { id: "sporty",        label: "Sporty",        emoji: "⚡", value: "Sporty casual, athleisure" },
-  { id: "kasual",        label: "Kasual",        emoji: "👕", value: "Kasual sehari-hari" },
-  { id: "elegan",        label: "Elegan",        emoji: "💎", value: "Elegan dan sophisticated" },
-  { id: "profesional",   label: "Profesional",   emoji: "👔", value: "Profesional, business attire" },
-];
-
-const MODEL_AGES = [
-  { id: "18-22", label: "18–22 th" },
-  { id: "22-27", label: "22–27 th" },
-  { id: "27-35", label: "27–35 th" },
-  { id: "35-45", label: "35–45 th" },
-];
-
 function toBase64(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -138,12 +122,18 @@ export default function CarouselGeneratorPage() {
   const [slideCount, setSlideCount] = useState(3);
   const [aspectRatio, setAspectRatio] = useState("4:5 (Portrait Feed)");
   const [outlineLoading, setOutlineLoading] = useState(false);
+  // Tracks whether the current `topic` text was written by the auto-fill call (true) or the
+  // user typed/edited it themselves (false) — auto re-fills (on product/slide-count change)
+  // only overwrite while this is true, so a user's manual edits are never clobbered.
+  const [topicAutoFilled, setTopicAutoFilled] = useState(false);
 
-  // Model
+  // Model — one shared identity (talent consistency across slides), but which slides actually
+  // include it is per-slide (slideModelEnabled, index-aligned with the current slideRoles).
   const [modelEnabled, setModelEnabled] = useState(false);
-  const [modelGender, setModelGender]   = useState("wanita");
+  const [modelGender, setModelGender]   = useState(null);
   const [modelStyle, setModelStyle]     = useState(null);
   const [modelAge, setModelAge]         = useState(null);
+  const [slideModelEnabled, setSlideModelEnabled] = useState([true, true, true]);
 
   // Generate state
   const [generating, setGenerating]   = useState(false);
@@ -153,6 +143,16 @@ export default function CarouselGeneratorPage() {
   // Clear gallery slides when slide count changes
   useEffect(() => { setReferenceSlides([]); }, [slideCount]);
 
+  // Keep the per-slide model toggles array in sync with slide count — new slides default to
+  // "on" (matches the old all-slides-get-the-model behavior), shrinking just truncates.
+  useEffect(() => {
+    setSlideModelEnabled((prev) => {
+      if (prev.length === slideCount) return prev;
+      if (prev.length > slideCount) return prev.slice(0, slideCount);
+      return [...prev, ...Array(slideCount - prev.length).fill(true)];
+    });
+  }, [slideCount]);
+
   // Products
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products"],
@@ -160,27 +160,50 @@ export default function CarouselGeneratorPage() {
   });
   const selectedProduct = products.find(p => p.id === selectedProductId) || null;
 
-  // Picking a Story Flow auto-fills "Spesifikasi Tambahan" with a per-slide outline grounded in
-  // the selected product — user reviews/edits it before generating. Requires a product to already
-  // be picked (gated in the UI below) so the outline actually knows what it's writing about.
-  const handleStoryFlowClick = async (flowId) => {
-    setStoryFlow(flowId);
-    if (!selectedProductId || flowId === "auto") return;
+  // Builds "Spesifikasi Tambahan" — a per-slide outline grounded in the selected product —
+  // for the given flow. Shared by the explicit flow-click handler below AND the auto-fill
+  // effect that fires once a product + slide count are ready, since "Auto" is the default
+  // selected flow and never gets an explicit click to hang a fetch off of otherwise.
+  const fetchOutlineFor = async (flowId) => {
+    if (!selectedProductId) return;
+    // "Auto" itself isn't a real flow on the backend — resolve it to one concrete flow now so
+    // the outline isn't left blank. generate() re-rolls its own random flow independently at
+    // generate time, so the previewed outline's flow may occasionally differ from the one
+    // actually used — acceptable, the alternative (leaving it empty) was the actual complaint.
+    const effectiveFlowId = flowId === "auto"
+      ? STORY_FLOW_KEYS[Math.floor(Math.random() * STORY_FLOW_KEYS.length)]
+      : flowId;
     setOutlineLoading(true);
     try {
       const { data } = await api.post("/carousel/outline", {
-        story_flow: flowId,
+        story_flow: effectiveFlowId,
         slide_count: slideCount,
         product_id: selectedProductId,
         topic_hint: topic,
       });
-      if (data?.topic) setTopic(data.topic);
+      if (data?.topic) { setTopic(data.topic); setTopicAutoFilled(true); }
     } catch {
       toast.error("Gagal menyusun outline otomatis — isi Spesifikasi Tambahan manual aja.");
     } finally {
       setOutlineLoading(false);
     }
   };
+
+  const handleStoryFlowClick = (flowId) => {
+    setStoryFlow(flowId);
+    fetchOutlineFor(flowId);
+  };
+
+  // Auto-fill as soon as a product + slide count are ready — covers "Auto" being the default
+  // selected flow from page load, which never fires a click on the flow button itself. Only
+  // overwrites topic while it's empty or still holds a previous auto-fill (never a user's own
+  // manually-typed text), and re-fires if the user later changes product or slide count.
+  useEffect(() => {
+    if (selectedProductId && (topic === "" || topicAutoFilled)) {
+      fetchOutlineFor(storyFlow);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProductId, slideCount]);
 
   // ── Generate ──────────────────────────────────────────────────────────────────
 
@@ -223,6 +246,10 @@ export default function CarouselGeneratorPage() {
         payload.visual_type    = "human_product";
         payload.talent_gender  = modelGender === "wanita" ? "female" : "male";
         payload.model_character = modelGender === "wanita" ? "Wanita Indonesia" : "Pria Indonesia";
+        // Per-slide on/off — same talent identity above, but only on the slides the user
+        // actually toggled on. Sliced to the real slide count in case slideModelEnabled hasn't
+        // caught up yet (state update is async relative to a rapid slideCount change + Generate).
+        payload.slide_human_enabled = slideModelEnabled.slice(0, slideCount);
         if (modelStyle) {
           const s = MODEL_STYLES.find(x => x.id === modelStyle);
           payload.outfit_style   = s?.value || modelStyle;
@@ -553,15 +580,16 @@ export default function CarouselGeneratorPage() {
               ))}
             </div>
 
-            {/* Optional topic — auto-filled with a per-slide outline when a flow is picked (see
-                handleStoryFlowClick), user can freely edit before generating. */}
+            {/* Optional topic — auto-filled with a per-slide outline as soon as a product + slide
+                count are ready, and again whenever the flow/product/slide count changes (see
+                fetchOutlineFor / the effect above). User can freely edit before generating. */}
             <div>
               <label className="text-[10px] uppercase tracking-widest font-bold text-stone-400 block mb-1.5">
                 Spesifikasi tambahan <span className="normal-case font-normal">(opsional — otomatis terisi outline per slide saat pilih flow)</span>
               </label>
               <textarea
                 value={topic}
-                onChange={e => setTopic(e.target.value)}
+                onChange={e => { setTopic(e.target.value); setTopicAutoFilled(false); }}
                 rows={slideCount + 1}
                 disabled={outlineLoading}
                 placeholder={outlineLoading ? "Menyusun outline per slide..." : `Contoh: bahas 5 mitos skincare yang sering dipercaya target wanita 20–30 tahun`}
@@ -635,69 +663,42 @@ export default function CarouselGeneratorPage() {
 
             {modelEnabled && (
               <div className="space-y-4 animate-fade-up">
-                {/* Gender */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Gender</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: "wanita", label: "Cewek", emoji: "👩" },
-                      { id: "pria",   label: "Cowok", emoji: "👨" },
-                    ].map(g => (
-                      <button key={g.id} type="button" onClick={() => setModelGender(g.id)}
-                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
-                          modelGender === g.id ? "border-brand bg-brand-sand text-brand" : "border-stone-100 text-stone-600 hover:border-brand/30"
-                        }`} data-testid={`model-gender-${g.id}`}>
-                        <span className="text-base">{g.emoji}</span> {g.label}
-                      </button>
-                    ))}
+                <ModelTalentPicker
+                  gender={modelGender} onGenderChange={setModelGender}
+                  style={modelStyle} onStyleChange={setModelStyle}
+                  age={modelAge} onAgeChange={setModelAge}
+                  testidPrefix="model"
+                />
+
+                {/* Per-slide on/off — same talent identity above, applied only to the slides
+                    toggled on here. Defaults to every slide on (old behavior). */}
+                <div className="space-y-1.5 border-t border-stone-100 pt-3">
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Pakai model di slide mana?</p>
+                  <div className="space-y-1.5">
+                    {slideRoles.map((name, i) => {
+                      const on = slideModelEnabled[i] ?? true;
+                      return (
+                        <div key={i} className="flex items-center justify-between gap-2 py-1">
+                          <span className="text-xs text-stone-600">Slide {i + 1} — {name}</span>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={on}
+                            onClick={() => setSlideModelEnabled(prev => {
+                              const next = [...prev];
+                              next[i] = !on;
+                              return next;
+                            })}
+                            className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${on ? "bg-brand" : "bg-stone-200"}`}
+                            data-testid={`model-slide-toggle-${i}`}
+                          >
+                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${on ? "translate-x-4" : "translate-x-1"}`} />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-
-                {/* Style / Penampilan */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Penampilan</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {MODEL_STYLES.filter(s => modelGender === "pria"
-                      ? !["hijab", "hijab-modern"].includes(s.id)
-                      : true
-                    ).map(s => (
-                      <button key={s.id} type="button"
-                        onClick={() => setModelStyle(v => v === s.id ? null : s.id)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                          modelStyle === s.id
-                            ? "bg-brand text-white border-brand"
-                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                        }`} data-testid={`model-style-${s.id}`}>
-                        {s.emoji} {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Age range */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Kisaran Usia</p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {MODEL_AGES.map(a => (
-                      <button key={a.id} type="button"
-                        onClick={() => setModelAge(v => v === a.id ? null : a.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                          modelAge === a.id
-                            ? "bg-brand text-white border-brand"
-                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                        }`} data-testid={`model-age-${a.id}`}>
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {!modelStyle && !modelAge && (
-                  <p className="text-[11px] text-stone-400 bg-stone-50 rounded-lg px-3 py-2">
-                    <User size={11} weight="bold" className="inline mr-1" />
-                    Tanpa pilihan spesifik, AI otomatis pilih model sesuai Brand DNA kamu.
-                  </p>
-                )}
               </div>
             )}
           </div>
@@ -727,7 +728,7 @@ export default function CarouselGeneratorPage() {
             </p>
 
             {/* Generate — nempel dengan card ini (semua viewport) */}
-            <button onClick={generate} disabled={generating || (!referenceImg && referenceSlides.length === 0)}
+            <button onClick={generate} disabled={generating || (!referenceImg && referenceSlides.length === 0) || (modelEnabled && (!modelGender || !modelStyle || !modelAge))}
               className="mt-3 w-full h-12 bg-brand hover:bg-brand/90 text-brand-cream rounded-full font-heading font-bold text-sm btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-md transition-colors tracking-wide"
               data-testid="generate-carousel-btn">
               {generating

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -6,12 +6,14 @@ import { toast } from "react-toastify";
 import {
   Storefront, Sparkle, CircleNotch, Images,
   Crown, Minus, CheckCircle, Package, CaretDown,
-  X, Lightning, User, Info,
+  X, Lightning, Info,
 } from "@phosphor-icons/react";
 import BrandDnaCard from "@/components/BrandDnaCard";
 import InspirationGallery from "@/components/InspirationGallery";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
 import DebugJsonButton from "@/components/DebugJsonButton";
+import ModelTalentPicker from "@/components/ModelTalentPicker";
+import { MODEL_STYLES } from "@/lib/modelOptions";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -20,24 +22,6 @@ const THUMBNAIL_STYLES = [
   { id: "high_conversion", label: "High Conversion",   desc: "Kontras tinggi, badge kuat, cocok untuk iklan", Icon: Lightning, color: "text-amber-600", bg: "bg-amber-50", recommended: true },
   { id: "premium",         label: "Premium",            desc: "Elegan & mewah",                    Icon: Crown,      color: "text-violet-600",   bg: "bg-violet-50" },
   { id: "minimal",         label: "Minimal",            desc: "Tanpa elemen berlebihan",           Icon: Minus,      color: "text-stone-500",    bg: "bg-stone-100" },
-];
-
-const MODEL_STYLES = [
-  { id: "hijab",        label: "Hijab",        emoji: "🧕", value: "Berhijab, gaya modest fashion Indonesia" },
-  { id: "hijab-modern", label: "Hijab Modern", emoji: "✨", value: "Hijab modern kontemporer, hijab trendy" },
-  { id: "korean",       label: "Korean",        emoji: "🌸", value: "Korean beauty style, K-beauty aesthetic" },
-  { id: "natural",      label: "Natural",       emoji: "🌿", value: "Penampilan natural, minimal makeup" },
-  { id: "sporty",       label: "Sporty",        emoji: "⚡", value: "Sporty casual, athleisure" },
-  { id: "kasual",       label: "Kasual",        emoji: "👕", value: "Kasual sehari-hari" },
-  { id: "elegan",       label: "Elegan",        emoji: "💎", value: "Elegan dan sophisticated" },
-  { id: "profesional",  label: "Profesional",   emoji: "👔", value: "Profesional, business attire" },
-];
-
-const MODEL_AGES = [
-  { id: "18-22", label: "18–22 th" },
-  { id: "22-27", label: "22–27 th" },
-  { id: "27-35", label: "27–35 th" },
-  { id: "35-45", label: "35–45 th" },
 ];
 
 // Gallery-picked inspiration photos are static asset URLs (e.g. /gallery/skincare/xxx.png), not
@@ -65,15 +49,13 @@ export default function MarketplacePage() {
 
   // Form fields
   const [photo, setPhoto] = useState(null);
-  const [benefitUtama, setBenefitUtama] = useState("");
   const [productPrice, setProductPrice] = useState("");
   const [originalPrice, setOriginalPrice] = useState("");
   const [thumbnailStyle, setThumbnailStyle] = useState("high_conversion");
-  const [creativeDirection, setCreativeDirection] = useState("");
 
   // Model / Talent
   const [modelEnabled, setModelEnabled] = useState(false);
-  const [modelGender, setModelGender]   = useState("wanita");
+  const [modelGender, setModelGender]   = useState(null);
   const [modelStyle, setModelStyle]     = useState(null);
   const [modelAge, setModelAge]         = useState(null);
 
@@ -91,19 +73,6 @@ export default function MarketplacePage() {
   });
   const selectedProduct = products.find(p => p.id === selectedProductId) || null;
 
-  // Auto-fill benefit_utama from product knowledge when product changes
-  useEffect(() => {
-    if (!selectedProduct) return;
-    const benefits = selectedProduct.benefits || [];
-    const usp = selectedProduct.usp || "";
-    const autoFill = [
-      ...benefits.slice(0, 5).map(b => `• ${b}`),
-      ...(usp ? [`• ${usp}`] : []),
-    ].join("\n");
-    if (autoFill) setBenefitUtama(autoFill);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProductId]);
-
   // Discount preview
   const origNum = parseFloat((originalPrice || "").replace(/[^0-9]/g, ""));
   const saleNum = parseFloat((productPrice || "").replace(/[^0-9]/g, ""));
@@ -114,19 +83,15 @@ export default function MarketplacePage() {
   // ── Generate ──────────────────────────────────────────────────────────────────
 
   const generate = async () => {
-    if (!benefitUtama.trim()) { toast.error("Benefit utama wajib diisi"); return; }
     setGenerating(true);
     setPromptResult(null);
     try {
       const payload = {
         product_name:        selectedProduct?.name || "",
-        benefit_utama:       benefitUtama,
-        tagline:             benefitUtama,
         product_price:       productPrice,
         original_price:      originalPrice,
         discount_percent:    discountPct,
         thumbnail_style:     thumbnailStyle,
-        creative_direction:  creativeDirection,
         platform:            "general",
         promo_label:         "",
         include_model:       modelEnabled,
@@ -293,36 +258,14 @@ export default function MarketplacePage() {
             </button>
           </div>
 
-          {/* ④ BENEFIT UTAMA */}
+          {/* ④ HARGA (opsional) */}
           <div className="feedify-card p-5 space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">4</div>
-              <div className="flex-1">
-                <h3 className="font-heading text-base font-bold text-brand">Benefit Utama</h3>
-                <p className="text-xs text-stone-500">
-                  {selectedProduct ? "Otomatis terisi dari product knowledge — kamu bisa edit" : "Tuliskan manfaat yang paling membuat orang membeli"}
-                </p>
-              </div>
-              {selectedProduct && (
-                <span className="text-[9px] bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full flex-shrink-0">Auto-filled</span>
-              )}
-            </div>
-            <textarea
-              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm resize-none focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20 leading-relaxed"
-              rows={5}
-              value={benefitUtama}
-              onChange={e => setBenefitUtama(e.target.value)}
-              placeholder={"• SPF50 PA++++\n• Anti Whitecast\n• Waterproof 12 Jam\n• Bebas Paraben\n• Dermatologically Tested"}
-              data-testid="mp-benefit"
-            />
-          </div>
-
-          {/* ⑤ HARGA */}
-          <div className="feedify-card p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">5</div>
               <div>
-                <h3 className="font-heading text-base font-bold text-brand">Harga</h3>
+                <h3 className="font-heading text-base font-bold text-brand">
+                  Harga <span className="text-xs font-normal normal-case text-stone-400">(opsional)</span>
+                </h3>
                 <p className="text-xs text-stone-500">Isi harga coret untuk otomatis membuat badge diskon</p>
               </div>
             </div>
@@ -348,10 +291,10 @@ export default function MarketplacePage() {
             )}
           </div>
 
-          {/* ⑥ GAYA THUMBNAIL */}
+          {/* ⑤ GAYA THUMBNAIL */}
           <div className="feedify-card p-5 space-y-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">6</div>
+              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">5</div>
               <div>
                 <h3 className="font-heading text-base font-bold text-brand">Gaya Thumbnail</h3>
                 <p className="text-xs text-stone-500">Pilih tujuan thumbnail — bukan style desain</p>
@@ -383,26 +326,7 @@ export default function MarketplacePage() {
             </div>
           </div>
 
-          {/* ⑦ AI CREATIVE DIRECTION */}
-          <div className="feedify-card p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-brand text-white text-xs font-bold flex items-center justify-center flex-shrink-0">7</div>
-              <div>
-                <h3 className="font-heading text-base font-bold text-brand">AI Creative Direction</h3>
-                <p className="text-xs text-stone-500">Opsional — kalau kosong, AI pilih arahan terbaik otomatis</p>
-              </div>
-            </div>
-            <textarea
-              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm resize-none focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
-              rows={3}
-              value={creativeDirection}
-              onChange={e => setCreativeDirection(e.target.value)}
-              placeholder={"mis. background hijau fresh\nNuansa premium, warna emas hitam\nEstetik skincare · vibe clean laboratory"}
-              data-testid="mp-creative-direction"
-            />
-          </div>
-
-          {/* ⑧ MODEL / TALENT */}
+          {/* ⑥ MODEL / TALENT */}
           <div className="feedify-card p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -418,69 +342,13 @@ export default function MarketplacePage() {
             </div>
 
             {modelEnabled && (
-              <div className="space-y-4 animate-fade-up">
-                {/* Gender */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Gender</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: "wanita", label: "Cewek", emoji: "👩" },
-                      { id: "pria",   label: "Cowok", emoji: "👨" },
-                    ].map(g => (
-                      <button key={g.id} type="button" onClick={() => setModelGender(g.id)}
-                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
-                          modelGender === g.id ? "border-brand bg-brand-sand text-brand" : "border-stone-100 text-stone-600 hover:border-brand/30"
-                        }`} data-testid={`mp-model-gender-${g.id}`}>
-                        <span className="text-base">{g.emoji}</span> {g.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Penampilan */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Penampilan</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {MODEL_STYLES.filter(s => modelGender === "pria"
-                      ? !["hijab", "hijab-modern"].includes(s.id) : true
-                    ).map(s => (
-                      <button key={s.id} type="button"
-                        onClick={() => setModelStyle(v => v === s.id ? null : s.id)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                          modelStyle === s.id
-                            ? "bg-brand text-white border-brand"
-                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                        }`} data-testid={`mp-model-style-${s.id}`}>
-                        {s.emoji} {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Usia */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Kisaran Usia</p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {MODEL_AGES.map(a => (
-                      <button key={a.id} type="button"
-                        onClick={() => setModelAge(v => v === a.id ? null : a.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                          modelAge === a.id
-                            ? "bg-brand text-white border-brand"
-                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                        }`} data-testid={`mp-model-age-${a.id}`}>
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {!modelStyle && !modelAge && (
-                  <p className="text-[11px] text-stone-400 bg-stone-50 rounded-lg px-3 py-2">
-                    <User size={11} weight="bold" className="inline mr-1" />
-                    Tanpa pilihan spesifik, AI otomatis pilih model sesuai Brand DNA kamu.
-                  </p>
-                )}
+              <div className="animate-fade-up">
+                <ModelTalentPicker
+                  gender={modelGender} onGenderChange={setModelGender}
+                  style={modelStyle} onStyleChange={setModelStyle}
+                  age={modelAge} onAgeChange={setModelAge}
+                  testidPrefix="mp-model"
+                />
               </div>
             )}
           </div>
@@ -510,7 +378,7 @@ export default function MarketplacePage() {
             </p>
 
             {/* Generate — nempel dengan card ini (semua viewport) */}
-            <button onClick={generate} disabled={generating || !photo}
+            <button onClick={generate} disabled={generating || !photo || (modelEnabled && (!modelGender || !modelStyle || !modelAge))}
               className="mt-3 w-full h-12 bg-brand hover:bg-brand/90 text-brand-cream rounded-full font-heading font-bold text-sm btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-md transition-colors tracking-wide"
               data-testid="mp-generate-btn">
               {generating

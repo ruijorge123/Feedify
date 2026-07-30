@@ -6,35 +6,19 @@ import { toast } from "react-toastify";
 import {
   Camera, Sparkle, X, CircleNotch,
   CheckCircle, Images, Package, CaretDown,
-  ArrowRight, DownloadSimple, User,
+  ArrowRight, DownloadSimple,
 } from "@phosphor-icons/react";
 import BrandDnaCard from "@/components/BrandDnaCard";
 import InspirationGallery from "@/components/InspirationGallery";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
 import DebugJsonButton from "@/components/DebugJsonButton";
 import CampaignGoalSelector, { GOALS as CAMPAIGN_GOALS } from "@/components/CampaignGoalSelector";
+import ModelTalentPicker from "@/components/ModelTalentPicker";
+import { MODEL_STYLES } from "@/lib/modelOptions";
 
 // Banner hanya pakai 4 tujuan konten inti — Edukasi, Best Seller, dan Restock disembunyikan
 // dari halaman ini (masih ada di CampaignGoalSelector buat halaman lain, mis. Food Menu).
 const BANNER_GOALS = CAMPAIGN_GOALS.filter(g => ["launch", "promo", "testimonial", "brand_awareness"].includes(g.id));
-
-const MODEL_STYLES = [
-  { id: "hijab",         label: "Hijab",         emoji: "🧕", value: "Berhijab, gaya modest fashion Indonesia" },
-  { id: "hijab-modern",  label: "Hijab Modern",  emoji: "✨", value: "Hijab modern kontemporer, hijab trendy" },
-  { id: "korean",        label: "Korean",         emoji: "🌸", value: "Korean beauty style, K-beauty aesthetic" },
-  { id: "natural",       label: "Natural",        emoji: "🌿", value: "Penampilan natural, minimal makeup" },
-  { id: "sporty",        label: "Sporty",         emoji: "⚡", value: "Sporty casual, athleisure" },
-  { id: "kasual",        label: "Kasual",         emoji: "👕", value: "Kasual sehari-hari" },
-  { id: "elegan",        label: "Elegan",         emoji: "💎", value: "Elegan dan sophisticated" },
-  { id: "profesional",   label: "Profesional",    emoji: "👔", value: "Profesional, business attire" },
-];
-
-const MODEL_AGES = [
-  { id: "18-22", label: "18–22 th" },
-  { id: "22-27", label: "22–27 th" },
-  { id: "27-35", label: "27–35 th" },
-  { id: "35-45", label: "35–45 th" },
-];
 
 const ASPECT_RATIOS = [
   { id: "1:1 (Square Feed)",   label: "1:1",  sub: "Square Feed",  w: 1,  h: 1  },
@@ -72,7 +56,7 @@ export default function BannerGeneratorPage() {
 
   // Model
   const [modelEnabled, setModelEnabled] = useState(false);
-  const [modelGender, setModelGender]   = useState("wanita");
+  const [modelGender, setModelGender]   = useState(null);
   const [modelStyle, setModelStyle]     = useState(null);
   const [modelAge, setModelAge]         = useState(null);
 
@@ -147,7 +131,7 @@ export default function BannerGeneratorPage() {
     }
   };
 
-  const canGenerate = !generating && !!referenceImg;
+  const canGenerate = !generating && !!referenceImg && (!modelEnabled || (!!modelGender && !!modelStyle && !!modelAge));
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -420,70 +404,13 @@ export default function BannerGeneratorPage() {
             </div>
 
             {modelEnabled && (
-              <div className="space-y-4 animate-fade-up">
-                {/* Gender */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Gender</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: "wanita", label: "Cewek", emoji: "👩" },
-                      { id: "pria",   label: "Cowok", emoji: "👨" },
-                    ].map(g => (
-                      <button key={g.id} type="button" onClick={() => setModelGender(g.id)}
-                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
-                          modelGender === g.id ? "border-brand bg-brand-sand text-brand" : "border-stone-100 text-stone-600 hover:border-brand/30"
-                        }`} data-testid={`model-gender-${g.id}`}>
-                        <span className="text-base">{g.emoji}</span> {g.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Style / Penampilan */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Penampilan</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {MODEL_STYLES.filter(s => modelGender === "pria"
-                      ? !["hijab", "hijab-modern"].includes(s.id)
-                      : true
-                    ).map(s => (
-                      <button key={s.id} type="button"
-                        onClick={() => setModelStyle(v => v === s.id ? null : s.id)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                          modelStyle === s.id
-                            ? "bg-brand text-white border-brand"
-                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                        }`} data-testid={`model-style-${s.id}`}>
-                        {s.emoji} {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Age range */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Kisaran Usia</p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {MODEL_AGES.map(a => (
-                      <button key={a.id} type="button"
-                        onClick={() => setModelAge(v => v === a.id ? null : a.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                          modelAge === a.id
-                            ? "bg-brand text-white border-brand"
-                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                        }`} data-testid={`model-age-${a.id}`}>
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {modelEnabled && !modelStyle && !modelAge && (
-                  <p className="text-[11px] text-stone-400 bg-stone-50 rounded-lg px-3 py-2">
-                    <User size={11} weight="bold" className="inline mr-1" />
-                    Tanpa pilihan spesifik, AI otomatis pilih model sesuai Brand DNA kamu.
-                  </p>
-                )}
+              <div className="animate-fade-up">
+                <ModelTalentPicker
+                  gender={modelGender} onGenderChange={setModelGender}
+                  style={modelStyle} onStyleChange={setModelStyle}
+                  age={modelAge} onAgeChange={setModelAge}
+                  testidPrefix="model"
+                />
               </div>
             )}
           </div>

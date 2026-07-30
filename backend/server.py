@@ -234,6 +234,10 @@ class CarouselPromptIn(BaseModel):
     talent_ethnicity: str = "auto"          # korean|indonesian|asian|western|auto
     talent_age_group: str = "young_adult"   # teen|young_adult|adult|mature
     talent_role: str = "auto"              # main|supporting|background|auto
+    # Per-slide "does THIS slide include the talent?" — index-aligned with slides, same
+    # convention as reference_images above. Empty/shorter-than-slide-count = every slide gets
+    # it (old behavior), so existing/partial clients don't silently lose the talent everywhere.
+    slide_human_enabled: List[bool] = []
 
     # Section 7 — AI Visual Director
     ai_director_mode: str = "smart"         # simple|smart|advanced
@@ -3388,6 +3392,10 @@ CAMPAIGN_GOAL_DIRECTIVES = {
         # features_detail/creative_brief construction — this is what stopped every goal from
         # getting the same ingredient-badge treatment regardless of whether it fit the mood.
         "product_knowledge_usage": "none",
+        # Controls proof_points (social-proof stats, e.g. "10.000+ pelanggan") and signature_phrase
+        # (brand tagline) in brand_context — "full" = both, "proof_only"/"phrase_only" = one, "none"
+        # = neither. A brand-new launch has no track record yet, but a bold tagline fits the reveal.
+        "brand_proof_usage": "phrase_only",
         # Text-only rule (does NOT touch composition/lighting/mood — see visual_directive below
         # for that): what informative text is ALLOWED to appear on the image for this goal.
         "on_image_text_rule": (
@@ -3409,6 +3417,9 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     "promo": {
         "name": "Promo",
         "product_knowledge_usage": "none",
+        # Deal-focused, not trust- or identity-focused — proof stats and taglines would just
+        # dilute the discount/urgency message this goal is built around.
+        "brand_proof_usage": "none",
         "on_image_text_rule": (
             "Promo-specific informative text MUST be prominent and dominant on this image: the "
             "discount amount or offer detail, what's included/free (e.g. bonus item, free shipping), "
@@ -3432,6 +3443,9 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     "testimonial": {
         "name": "Testimonial",
         "product_knowledge_usage": "none",
+        # Proof points (real trust stats) are exactly what a testimonial goal wants — the
+        # signature tagline isn't, this slide is about the customer's voice, not the brand's own.
+        "brand_proof_usage": "proof_only",
         "on_image_text_rule": (
             "The ONLY informative text allowed on this image is testimonial/social-proof related: "
             "a review quote, star rating, or customer trust language — drawn from the "
@@ -3453,6 +3467,7 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     "edukasi": {
         "name": "Edukasi",
         "product_knowledge_usage": "heavy",
+        "brand_proof_usage": "proof_only",
         "visual_directive": (
             "EDUCATIONAL CONTENT: Clear, informative, trust-building. "
             "Clean well-organised visual hierarchy — information has a clear reading order. "
@@ -3468,6 +3483,8 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     "best_seller": {
         "name": "Best Seller",
         "product_knowledge_usage": "minimal",
+        # Sales-numbers/social-proof stats align tightly with a "TERLARIS" goal.
+        "brand_proof_usage": "proof_only",
         "visual_directive": (
             "BEST SELLER PROOF: This image radiates popularity, proven quality, and social trust. "
             "'TERLARIS' badge, sales numbers, or ranking must be a prominent visual element. "
@@ -3482,6 +3499,9 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     "brand_awareness": {
         "name": "Brand Awareness",
         "product_knowledge_usage": "heavy",
+        # Both fit — the signature tagline IS brand identity, and proof points reinforce
+        # credibility as part of the brand story.
+        "brand_proof_usage": "full",
         "on_image_text_rule": (
             "Product knowledge (key ingredients, benefits, USP) MUST be represented as "
             "informative text/badges on this image — this is required, not optional. Combine it "
@@ -3503,6 +3523,8 @@ CAMPAIGN_GOAL_DIRECTIVES = {
     "restock": {
         "name": "Restok",
         "product_knowledge_usage": "minimal",
+        # Urgency/availability-focused, not trust-stat or brand-identity focused.
+        "brand_proof_usage": "none",
         "visual_directive": (
             "RESTOCK URGENCY: Communicate 'IT'S BACK — don't miss it again'. "
             "FOMO of the previous sellout is the emotional engine. "
@@ -4381,7 +4403,20 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "palette) and any text content (replaced with real brand/product information — "
             "headline, ingredient badges, benefit checklist) — see color_treatment and "
             "product_knowledge below for exactly how. Do not redesign, reinterpret, simplify, "
-            "modernize, or rearrange anything else."
+            "modernize, or rearrange anything else. "
+            "MULTI-INSTANCE PRODUCT REPLACEMENT: many reference layouts show the reference's own "
+            "product more than once — a main hero shot PLUS smaller lifestyle/usage inset photos "
+            "of it being held, worn, or used in different scenarios. Every single one of those "
+            "instances is a copy of the SAME reference product and must ALL be replaced with the "
+            "identified PRODUCT IMAGE — not just the largest/most prominent one. A secondary inset "
+            "showing someone interacting with the reference product is not a generic prop to "
+            "preserve untouched; it is another occurrence of the product being replaced. For each "
+            "instance, adapt the person's grip/gesture/interaction so it makes sense for what the "
+            "NEW product actually is and how it's actually used (e.g. a handheld fan held up and "
+            "aimed at a face does not transfer literally to a skincare jar or a bottle — show it "
+            "being held, applied, or displayed naturally instead, whatever fits that product "
+            "category) — while keeping that panel's pose, framing, camera angle, lighting, and "
+            "scene context otherwise identical to the reference."
         ),
         "reference_mode": {
             "enabled": True,
@@ -4392,6 +4427,11 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
             "typography_position_preservation": "maximum",
             "creative_freedom": "disabled",
             "replace_only": "product, scene colors (to brand palette), and text content (to real product data)",
+            "multi_instance_replacement": (
+                "required — if the reference product appears in multiple panels/insets (hero shot "
+                "plus lifestyle/usage photos), replace EVERY occurrence with the new product, "
+                "adapting each panel's held/usage gesture to fit the new product's category"
+            ),
         },
         "priority_order": [
             "reference_layout", "camera_angle", "object_positions", "reference_lighting",
@@ -4462,7 +4502,8 @@ def _build_reference_replacement_prompt(payload: "BannerPromptIn", brand: Option
         "brand_dna": {
             "brand_name": brand_name,
             "brand_personality": [p.capitalize() for p in brand_personality_list],
-            "brand_archetype": brand_archetype.capitalize(),
+            # brand_archetype dropped — brand_voice is the same info already looked up FROM it
+            # (ARCHETYPE_VOICE), just as a plain-English tone word; stating both is redundant.
             "brand_voice": brand_voice.capitalize(),
             "primary_palette": [color_primary, color_secondary],
             "preserve_brand_identity": True,
@@ -4576,11 +4617,9 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
     color_primary = _extract_hex(brand.get("color_primary", "#0B3D2E"))
     color_secondary = _extract_hex(brand.get("color_secondary", "#FDFBF7"))
     brand_name = brand.get("brand_name", payload.product_name or "Brand")
-    brand_archetype = brand.get("archetype", "")
     brand_personality = ARCHETYPE_VOICE.get(brand.get("archetype", "expert"), "professional")
     category = brand.get("category", "")
     target_audience = brand.get("target_audience", "")
-    words_always = brand.get("words_always", []) or []
     proof_points = brand.get("proof_points", []) or []
     signature_phrase = brand.get("signature_phrase", "")
 
@@ -4639,6 +4678,9 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
     # goals like Launch/Brand Awareness don't, so it stops leaking into every image regardless
     # of the chosen goal (see product_knowledge_usage on CAMPAIGN_GOAL_DIRECTIVES).
     pk_usage = goal.get("product_knowledge_usage", "minimal")
+    # Same idea for proof_points/signature_phrase (see brand_proof_usage on CAMPAIGN_GOAL_DIRECTIVES)
+    # — "full" = both, "proof_only"/"phrase_only" = one, "none" = neither.
+    pk_proof_usage = goal.get("brand_proof_usage", "full")
 
     # Smart creative brief: the 'why this product matters to this audience'
     creative_brief = f"Product '{product_name}' by {brand_name}"
@@ -4718,19 +4760,24 @@ def _build_banner_prompt(payload: BannerPromptIn, brand: Optional[dict], product
         brand_context += f"Brand personality: {', '.join(brand_personality_list)}. "
     if brand_donts:
         brand_context += f"STRICT VISUAL RESTRICTIONS — absolutely do NOT include any of these: {', '.join(brand_donts)}. "
-    if brand_archetype:
-        brand_context += f"Brand archetype: {brand_archetype}. "
+    # brand_archetype dropped here — brand_personality (below) is the same information already
+    # looked up FROM the archetype (ARCHETYPE_VOICE), just as a plain-English tone word an image
+    # model can act on directly; stating both said the same thing twice.
     if brand_personality:
         brand_context += f"Brand tone of voice: {brand_personality}. "
     if category:
         brand_context += f"Product category: {category}. "
     if target_audience:
         brand_context += f"Target audience: {target_audience}. "
-    if words_always:
-        brand_context += f"Brand keywords to reflect visually: {', '.join(words_always)}. "
-    if proof_points:
+    # words_always dropped — it's copywriting vocabulary (words the brand uses in TEXT), not a
+    # visual instruction; asking an image model to "reflect a word visually" is unreliable, and
+    # the same mood is already covered more concretely by brand_personality + category's emotion.
+    # proof_points/signature_phrase are gated by brand_proof_usage — literal facts/taglines don't
+    # belong in every goal's image (a brand-new Launch has no track record yet; a Promo shouldn't
+    # dilute its discount message with a tagline), same reasoning as product_knowledge_usage above.
+    if proof_points and pk_proof_usage in ("full", "proof_only"):
         brand_context += f"Key brand proof points: {'; '.join(proof_points)}. "
-    if signature_phrase:
+    if signature_phrase and pk_proof_usage in ("full", "phrase_only"):
         brand_context += f"Brand signature phrase: '{signature_phrase}'. "
 
     return {
@@ -5644,7 +5691,12 @@ def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], pr
                 f"THIS SLIDE'S SPECIFIC CONTENT (user-reviewed, follow this over generic role text "
                 f"where they'd conflict): {slide_outline[idx - 1]}"
             )
-        if talent_directive:
+        # Per-slide talent inclusion — defaults to True (every slide) when slide_human_enabled
+        # is empty/shorter than the slide count, so old/partial clients keep today's behavior.
+        slide_wants_talent = (
+            payload.slide_human_enabled[idx - 1] if (idx - 1) < len(payload.slide_human_enabled) else True
+        )
+        if talent_directive and slide_wants_talent:
             slide_prompt["human_model_directive"] = talent_directive
         if slide_reference:
             # The reference photo IS the consistency anchor for this slide — it already dictates
@@ -5658,16 +5710,21 @@ def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], pr
                 "own reference photo exactly (per the rules above) — do not add a brand frame, "
                 "header strip, or footer strip unless the reference photo itself already has one."
             )
-            if talent_directive:
-                consistency_text += " If a talent/model appears, the SAME person, outfit, and wardrobe must be used in every slide."
+            if talent_directive and slide_wants_talent:
+                consistency_text += " This slide includes a talent — for every OTHER slide in this series that also includes one, the SAME person, outfit, and wardrobe must be used. Slides without a talent stay product-only, no person added."
             slide_prompt["carousel_consistency_lock"] = consistency_text
         else:
             slide_prompt["carousel_consistency_lock"] = (
                 f"CONSISTENCY WITH OTHER SLIDES — this is slide {idx} of {len(roles)} in ONE carousel "
                 f"series, not a standalone image: brand frame position ({anchor.get('brand_frame', '')}), "
                 f"font system ({anchor.get('font_system', '')}), and lighting family "
-                f"({anchor.get('lighting_family', '')}) must be IDENTICAL across every slide. If a talent/"
-                f"model appears, the SAME person, outfit, and wardrobe must be used in every slide."
+                f"({anchor.get('lighting_family', '')}) must be IDENTICAL across every slide."
+                + (
+                    " This slide includes a talent — for every OTHER slide in this series that also "
+                    "includes one, the SAME person, outfit, and wardrobe must be used. Slides without "
+                    "a talent stay product-only, no person added."
+                    if (talent_directive and slide_wants_talent) else ""
+                )
             )
         if is_cta:
             slide_prompt["carousel_cta_directive"] = (
@@ -7413,6 +7470,15 @@ class FeedGeneratorIn(BaseModel):
     product_id: str
     count: int = 5          # 1–7
     content_types: List[str] = []  # empty or ["auto"] = auto mix
+    content_type_models: Dict[str, bool] = {}  # manual mode only — per-type "include a model?" toggle
+    # Shared talent identity for whichever content types have their model toggle on (manual mode
+    # only) — same field names/shapes as BannerPromptIn (model_character is the pre-translated
+    # "Wanita Indonesia"/"Pria Indonesia" string, same as what Banner's frontend already sends),
+    # since each item is built as a synthetic BannerPromptIn anyway. Left empty for Auto Mix,
+    # where gender/age/style stay AI-auto-decided per item as before.
+    model_character: str = ""
+    model_age: str = ""      # e.g. "22-27"
+    outfit_style: str = ""
 
 
 _FEED_AUTO_MIX: dict = {
@@ -7541,13 +7607,22 @@ async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = D
     items = []
     for i, t in enumerate(types_mix):
         guidance = _FEED_TYPE_GUIDANCE.get(t, _FEED_TYPE_GUIDANCE["awareness"])
-        include_model = _random.random() < 0.5
+        # Manual mode: user controls model per content type (content_type_models). Auto mix: random
+        # coin-flip per item, so the batch ends up naturally mixed instead of all-or-nothing.
+        include_model = payload.content_type_models.get(t, False) if manual_types else _random.random() < 0.5
+        # Manual mode with a real talent selection → use it exactly (human_mode="manual"), same as
+        # Banner. Auto Mix (or manual mode where the user never filled in the picker) keeps
+        # "auto" — the model auto-decides gender/age/style from brand DNA, as before.
+        has_manual_talent = include_model and manual_types and payload.model_character
         synthetic_payload = BannerPromptIn(
             product_name=product_name,
             campaign_goal=_FEED_CONTENT_TYPE_TO_CAMPAIGN_GOAL.get(t, "brand_awareness"),
             composition_concept="",  # "" = random, same as Banner's own no-reference random path
             human_enabled=include_model,
-            human_mode="auto",
+            human_mode="manual" if has_manual_talent else "auto",
+            model_character=payload.model_character if has_manual_talent else "",
+            model_age=payload.model_age if has_manual_talent else "",
+            outfit_style=payload.outfit_style if has_manual_talent else "",
             # "" (not the field's own "Minimal Clean" default) so _build_banner_prompt falls
             # through to the brand's own stored visual_style instead of silently overriding it —
             # BannerPromptIn.style_preset defaults to the literal "Minimal Clean", which is itself
@@ -7583,6 +7658,18 @@ async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = D
         concept_block = prompt_json.get("composition_concept")
         if concept_block and concept_block.get("directive"):
             concept_block["directive"] = concept_block["directive"].split(" [")[0]
+            # The stripped bracketed picks above (surface/lighting/atmosphere, e.g. "navy blue
+            # watered silk fabric") were the only source of styling detail/richness in this concept
+            # — dropping them for brand-color safety left only the bare base sentence, which reads
+            # as plain/empty next to Banner's output. Add back richness in words, with brand colors
+            # instead of the pool's own hardcoded ones, so the shot doesn't feel bare.
+            concept_block["directive"] += (
+                " Add rich, specific styling detail appropriate to this product's category — a "
+                "textured surface (not a flat empty background), complementary props, and an "
+                "atmospheric touch (soft shadow play, natural material texture, a hint of motion "
+                "or environment) — using ONLY the brand's own color palette, never a generic or "
+                "off-brand color. The shot must feel premium and intentionally styled, not bare or empty."
+            )
         # Neutralize raw-dict fields that hardcode a generic single-hero-studio composition —
         # these fields exist independently of composition_concept and directly contradict several
         # of the 12 concepts (e.g. Minimal & Type: "product plays a supporting accent role" vs

@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /studio
+Disallow: /generate/
+Disallow: /growth-consultant
+Disallow: /calendar
+Disallow: /history
+Disallow: /products
+Disallow: /settings
+Disallow: /brand-kit
+Disallow: /feedback
+Disallow: /more
+Disallow: /admin
+Disallow: /credits
+Disallow: /onboarding
+Disallow: /checkout
+Disallow: /verify-email
+Disallow: /forgot-password
+Disallow: /maintenance
+
+Sitemap: https://www.feedifyid.com/sitemap.xml

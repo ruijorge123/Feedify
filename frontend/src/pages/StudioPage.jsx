@@ -3,33 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Check, X, CaretDown,
   Sparkle, CircleNotch, CheckCircle,
-  Images, Package, User, DownloadSimple,
+  Images, Package, DownloadSimple,
 } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
 import DebugJsonButton from "@/components/DebugJsonButton";
 import InspirationGallery from "@/components/InspirationGallery";
+import ModelTalentPicker from "@/components/ModelTalentPicker";
+import { MODEL_STYLES } from "@/lib/modelOptions";
 import { toast } from "react-toastify";
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const MODEL_STYLES = [
-  { id: "hijab",         label: "Hijab",         emoji: "🧕", value: "Berhijab, gaya modest fashion Indonesia" },
-  { id: "hijab-modern",  label: "Hijab Modern",  emoji: "✨", value: "Hijab modern kontemporer, hijab trendy" },
-  { id: "korean",        label: "Korean",        emoji: "🌸", value: "Korean beauty style, K-beauty aesthetic" },
-  { id: "natural",       label: "Natural",       emoji: "🌿", value: "Penampilan natural, minimal makeup" },
-  { id: "sporty",        label: "Sporty",        emoji: "⚡", value: "Sporty casual, athleisure" },
-  { id: "kasual",        label: "Kasual",        emoji: "👕", value: "Kasual sehari-hari" },
-  { id: "elegan",        label: "Elegan",        emoji: "💎", value: "Elegan dan sophisticated" },
-  { id: "profesional",   label: "Profesional",   emoji: "👔", value: "Profesional, business attire" },
-];
-
-const MODEL_AGES = [
-  { id: "18-22", label: "18–22 th" },
-  { id: "22-27", label: "22–27 th" },
-  { id: "27-35", label: "27–35 th" },
-  { id: "35-45", label: "35–45 th" },
-];
 
 // ── Chip selector ──────────────────────────────────────────────────────────────
 
@@ -65,7 +47,7 @@ export default function StudioPage() {
 
   // Model state
   const [modelEnabled,   setModelEnabled]   = useState(false);
-  const [modelGender,    setModelGender]    = useState("wanita");
+  const [modelGender,    setModelGender]    = useState(null);
   const [modelStyle,     setModelStyle]     = useState(null);
   const [modelAge,       setModelAge]       = useState(null);
 
@@ -106,7 +88,9 @@ export default function StudioPage() {
         reference_image_base64: referenceImg ? referenceImg.split(",")[1] : undefined,
         model_type:           resolvedModelType(),
         wearing_product:      isFashion && modelEnabled,
-        model_gender:         modelGender,
+        // modelGender can be null when the model toggle is off (nothing to pick) — backend
+        // expects a plain string here, and it's irrelevant anyway when model_type="no_model".
+        model_gender:         modelGender || "wanita",
         model_outfit_style:   modelStyle
           ? (MODEL_STYLES.find(s => s.id === modelStyle)?.value || null)
           : null,
@@ -307,70 +291,12 @@ export default function StudioPage() {
                     </p>
                   </div>
                 )}
-
-                {/* Gender */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Gender</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { id: "wanita", label: "Cewek", emoji: "👩" },
-                      { id: "pria",   label: "Cowok", emoji: "👨" },
-                    ].map(g => (
-                      <button key={g.id} type="button" onClick={() => setModelGender(g.id)}
-                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-semibold transition-colors ${
-                          modelGender === g.id ? "border-brand bg-brand-sand text-brand" : "border-stone-100 text-stone-600 hover:border-brand/30"
-                        }`} data-testid={`studio-model-gender-${g.id}`}>
-                        <span className="text-base">{g.emoji}</span> {g.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Style */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Penampilan</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {MODEL_STYLES.filter(s => modelGender === "pria"
-                      ? !["hijab", "hijab-modern"].includes(s.id)
-                      : true
-                    ).map(s => (
-                      <button key={s.id} type="button"
-                        onClick={() => setModelStyle(v => v === s.id ? null : s.id)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                          modelStyle === s.id
-                            ? "bg-brand text-white border-brand"
-                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                        }`} data-testid={`studio-model-style-${s.id}`}>
-                        {s.emoji} {s.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Age */}
-                <div className="space-y-1.5">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-stone-400">Kisaran Usia</p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {MODEL_AGES.map(a => (
-                      <button key={a.id} type="button"
-                        onClick={() => setModelAge(v => v === a.id ? null : a.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                          modelAge === a.id
-                            ? "bg-brand text-white border-brand"
-                            : "bg-white text-stone-600 border-stone-200 hover:border-brand/40 hover:text-brand"
-                        }`} data-testid={`studio-model-age-${a.id}`}>
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {!modelStyle && !modelAge && (
-                  <p className="text-[11px] text-stone-400 bg-stone-50 rounded-lg px-3 py-2">
-                    <User size={11} weight="bold" className="inline mr-1" />
-                    Tanpa pilihan spesifik, AI otomatis pilih model yang sesuai.
-                  </p>
-                )}
+                <ModelTalentPicker
+                  gender={modelGender} onGenderChange={setModelGender}
+                  style={modelStyle} onStyleChange={setModelStyle}
+                  age={modelAge} onAgeChange={setModelAge}
+                  testidPrefix="studio-model"
+                />
               </div>
             )}
           </div>
@@ -400,7 +326,7 @@ export default function StudioPage() {
             </p>
 
             {/* Generate — nempel dengan card ini (semua viewport) */}
-            <button onClick={generate} disabled={generating}
+            <button onClick={generate} disabled={generating || (modelEnabled && (!modelGender || !modelStyle || !modelAge))}
               className="mt-3 w-full h-12 bg-brand hover:bg-brand/90 text-brand-cream rounded-full font-heading font-bold text-sm btn-lift inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-md transition-colors tracking-wide"
               data-testid="studio-generate-btn">
               {generating
