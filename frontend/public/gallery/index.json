@@ -19,7 +19,9 @@
                 "cleanser",
                 "minimal",
                 "premium"
-              ]
+              ],
+              "w": 320,
+              "h": 427
             },
             {
               "id": "bn-cleanser-02",
@@ -30,7 +32,9 @@
                 "cleanser",
                 "promo",
                 "clean"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-cleanser-03",
@@ -40,7 +44,9 @@
                 "skincare",
                 "cleanser",
                 "editorial"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-cleanser-04",
@@ -50,7 +56,9 @@
                 "skincare",
                 "cleanser",
                 "lifestyle"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-cleanser-05",
@@ -60,7 +68,9 @@
                 "skincare",
                 "cleanser",
                 "testimoni"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-moisturizer-01",
@@ -71,7 +81,9 @@
                 "moisturizer",
                 "premium",
                 "minimal"
-              ]
+              ],
+              "w": 637,
+              "h": 900
             },
             {
               "id": "bn-moisturizer-02",
@@ -82,7 +94,9 @@
                 "moisturizer",
                 "lifestyle",
                 "model"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-serum-01",
@@ -93,7 +107,9 @@
                 "serum",
                 "premium",
                 "promo"
-              ]
+              ],
+              "w": 599,
+              "h": 900
             },
             {
               "id": "bn-serum-02",
@@ -104,7 +120,9 @@
                 "serum",
                 "ingredient",
                 "detail"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-serum-03",
@@ -115,7 +133,9 @@
                 "serum",
                 "minimal",
                 "benefit"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-serum-04",
@@ -126,7 +146,9 @@
                 "serum",
                 "elegan",
                 "dark"
-              ]
+              ],
+              "w": 742,
+              "h": 900
             },
             {
               "id": "bn-serum-05",
@@ -136,7 +158,9 @@
                 "skincare",
                 "serum",
                 "clean"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-serum-06",
@@ -147,7 +171,9 @@
                 "serum",
                 "campaign",
                 "lifestyle"
-              ]
+              ],
+              "w": 600,
+              "h": 900
             },
             {
               "id": "bn-serum-07",
@@ -158,7 +184,9 @@
                 "serum",
                 "editorial",
                 "premium"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-serum-08",
@@ -168,7 +196,9 @@
                 "skincare",
                 "serum",
                 "brand color"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-serumlaunch-01",
@@ -179,7 +209,9 @@
                 "serum",
                 "launch",
                 "new product"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-serumlaunch-02",
@@ -190,7 +222,9 @@
                 "serum",
                 "announcement",
                 "launch"
-              ]
+              ],
+              "w": 599,
+              "h": 900
             },
             {
               "id": "bn-serumlaunch-03",
@@ -201,7 +235,9 @@
                 "serum",
                 "campaign",
                 "launch"
-              ]
+              ],
+              "w": 600,
+              "h": 900
             },
             {
               "id": "bn-serumtestimoni-01",
@@ -211,7 +247,9 @@
                 "skincare",
                 "serum",
                 "testimonial"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-serumtestimoni-02",
@@ -221,7 +259,9 @@
                 "skincare",
                 "serum",
                 "before after"
-              ]
+              ],
+              "w": 600,
+              "h": 900
             },
             {
               "id": "bn-toner-01",
@@ -231,7 +271,9 @@
                 "skincare",
                 "toner",
                 "fresh"
-              ]
+              ],
+              "w": 755,
+              "h": 900
             },
             {
               "id": "bn-tonerlaunch",
@@ -241,7 +283,9 @@
                 "skincare",
                 "toner",
                 "launch"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-facewashlaunch-01",
@@ -251,7 +295,9 @@
                 "skincare",
                 "face wash",
                 "launch"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-facewashlaunch-02",
@@ -261,7 +307,9 @@
                 "skincare",
                 "face wash",
                 "promo"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-facewashtestimoni",
@@ -271,7 +319,9 @@
                 "skincare",
                 "face wash",
                 "testimonial"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-launch-01",
@@ -281,7 +331,9 @@
                 "skincare",
                 "launch",
                 "campaign"
-              ]
+              ],
+              "w": 635,
+              "h": 900
             },
             {
               "id": "bn-launch-02",
@@ -291,7 +343,9 @@
                 "skincare",
                 "launch",
                 "announcement"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-ampoule-01",
@@ -301,7 +355,9 @@
                 "skincare",
                 "ampoule",
                 "serum"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-ampoule-02",
@@ -311,7 +367,9 @@
                 "skincare",
                 "ampoule",
                 "editorial"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-sunscreen-01",
@@ -321,7 +379,9 @@
                 "skincare",
                 "sunscreen",
                 "SPF"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-sunscreen-02",
@@ -331,7 +391,9 @@
                 "skincare",
                 "sunscreen",
                 "lifestyle"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-lipstick-01",
@@ -341,7 +403,9 @@
                 "kosmetik",
                 "lipstik",
                 "bold"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-lipstick-02",
@@ -351,7 +415,9 @@
                 "kosmetik",
                 "lipstik",
                 "collection"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-bodycare-wash",
@@ -361,7 +427,9 @@
                 "bodycare",
                 "body wash",
                 "premium"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-bodycare-scrub",
@@ -371,7 +439,9 @@
                 "bodycare",
                 "scrub",
                 "testimonial"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-bodycare-shampoo",
@@ -381,7 +451,9 @@
                 "bodycare",
                 "shampoo",
                 "testimonial"
-              ]
+              ],
+              "w": 600,
+              "h": 900
             },
             {
               "id": "bn-diffuser",
@@ -391,7 +463,9 @@
                 "lifestyle",
                 "diffuser",
                 "launch"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-parfumlaunch",
@@ -400,7 +474,9 @@
               "tags": [
                 "parfum",
                 "launch"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-perfume-01",
@@ -410,7 +486,9 @@
                 "parfum",
                 "premium",
                 "luxury"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-perfume-02",
@@ -419,7 +497,9 @@
               "tags": [
                 "parfum",
                 "minimal"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-perfume-03",
@@ -428,7 +508,9 @@
               "tags": [
                 "parfum",
                 "koleksi"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-scent-candle",
@@ -438,7 +520,9 @@
                 "lifestyle",
                 "candle",
                 "aromaterapi"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-freese-after",
@@ -448,7 +532,9 @@
                 "skincare",
                 "body lotion",
                 "promo"
-              ]
+              ],
+              "w": 750,
+              "h": 1127
             },
             {
               "id": "bn-cleanser-06",
@@ -459,7 +545,9 @@
                 "cleanser",
                 "clean",
                 "natural"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-moisturizer-03",
@@ -470,7 +558,9 @@
                 "moisturizer",
                 "minimal",
                 "premium"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-moisturizerlaunch-01",
@@ -480,7 +570,9 @@
                 "skincare",
                 "moisturizer",
                 "launch"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-serum-09",
@@ -491,7 +583,9 @@
                 "serum",
                 "editorial",
                 "premium"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-serum-10",
@@ -502,7 +596,9 @@
                 "serum",
                 "minimal",
                 "clean"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-sleepingmask-01",
@@ -512,7 +608,9 @@
                 "skincare",
                 "sleeping mask",
                 "night"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-sunscreen-03",
@@ -522,7 +620,9 @@
                 "skincare",
                 "sunscreen",
                 "bright"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-toner-02",
@@ -532,7 +632,9 @@
                 "skincare",
                 "toner",
                 "clean"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-toner-03",
@@ -543,7 +645,9 @@
                 "toner",
                 "minimal",
                 "premium"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             }
           ]
         },
@@ -561,7 +665,9 @@
                 "baju",
                 "lifestyle",
                 "editorial"
-              ]
+              ],
+              "w": 637,
+              "h": 900
             },
             {
               "id": "bn-fa-shirt",
@@ -571,7 +677,9 @@
                 "fashion",
                 "shirt",
                 "casual"
-              ]
+              ],
+              "w": 320,
+              "h": 481
             },
             {
               "id": "bn-fa-aksesoris",
@@ -582,7 +690,9 @@
                 "aksesori",
                 "perhiasan",
                 "editorial"
-              ]
+              ],
+              "w": 320,
+              "h": 400
             },
             {
               "id": "bn-fa-jamtangan-01",
@@ -592,7 +702,9 @@
                 "fashion",
                 "jam tangan",
                 "premium"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-fa-jamtangan-02",
@@ -602,7 +714,9 @@
                 "fashion",
                 "jam tangan",
                 "koleksi"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-fa-sepatu",
@@ -612,7 +726,9 @@
                 "fashion",
                 "sepatu",
                 "sneakers"
-              ]
+              ],
+              "w": 635,
+              "h": 900
             },
             {
               "id": "bn-fa-tas-01",
@@ -622,7 +738,9 @@
                 "fashion",
                 "tas",
                 "handbag"
-              ]
+              ],
+              "w": 600,
+              "h": 900
             },
             {
               "id": "bn-fa-tas-02",
@@ -632,7 +750,9 @@
                 "fashion",
                 "tas",
                 "branded"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-fa-headset",
@@ -642,7 +762,9 @@
                 "elektronik",
                 "headset",
                 "audio"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             }
           ]
         },
@@ -659,7 +781,9 @@
                 "fnb",
                 "snack",
                 "makanan"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-fnb-crunch2",
@@ -669,7 +793,9 @@
                 "fnb",
                 "snack",
                 "editorial"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-fnb-sambal",
@@ -679,7 +805,9 @@
                 "fnb",
                 "sambal",
                 "makanan"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-fnb-makanan",
@@ -689,7 +817,9 @@
                 "fnb",
                 "makanan",
                 "lifestyle"
-              ]
+              ],
+              "w": 320,
+              "h": 480
             },
             {
               "id": "bn-fnb-bery",
@@ -699,7 +829,9 @@
                 "fnb",
                 "minuman",
                 "berry"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "bn-fnb-cup",
@@ -709,7 +841,9 @@
                 "fnb",
                 "minuman",
                 "cup"
-              ]
+              ],
+              "w": 320,
+              "h": 452
             },
             {
               "id": "bn-fnb-kaleng",
@@ -719,7 +853,9 @@
                 "fnb",
                 "minuman",
                 "kaleng"
-              ]
+              ],
+              "w": 320,
+              "h": 320
             },
             {
               "id": "bn-fnb-kalengtea",
@@ -730,7 +866,9 @@
                 "minuman",
                 "teh",
                 "kaleng"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "bn-fnb-kopi",
@@ -740,7 +878,9 @@
                 "fnb",
                 "kopi",
                 "artisanal"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-fnb-matcha",
@@ -750,7 +890,9 @@
                 "fnb",
                 "matcha",
                 "premium"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "bn-fnb-botol",
@@ -760,7 +902,9 @@
                 "fnb",
                 "minuman",
                 "botol"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             }
           ]
         }
@@ -783,7 +927,9 @@
               "tags": [
                 "bodycare",
                 "bodylotion"
-              ]
+              ],
+              "w": 1086,
+              "h": 1448
             },
             {
               "id": "cr-bl-02",
@@ -793,7 +939,9 @@
               "tags": [
                 "bodycare",
                 "benefit"
-              ]
+              ],
+              "w": 1086,
+              "h": 1448
             },
             {
               "id": "cr-bl-03",
@@ -803,7 +951,9 @@
               "tags": [
                 "bodycare",
                 "closing"
-              ]
+              ],
+              "w": 1024,
+              "h": 1536
             },
             {
               "id": "cr-pf-01",
@@ -813,7 +963,9 @@
               "tags": [
                 "parfum",
                 "lifestyle"
-              ]
+              ],
+              "w": 1024,
+              "h": 1536
             },
             {
               "id": "cr-pf-02",
@@ -823,7 +975,9 @@
               "tags": [
                 "parfum",
                 "closing"
-              ]
+              ],
+              "w": 682,
+              "h": 916
             },
             {
               "id": "cr-babywash-2-slides-01",
@@ -832,7 +986,9 @@
               "description": "Slide 1 – hero produk produk",
               "tags": [
                 "produk"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-babywash-2-slides-02",
@@ -841,7 +997,9 @@
               "description": "Slide 2 – closing produk",
               "tags": [
                 "produk"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-bodywash-2-slides-01",
@@ -851,7 +1009,9 @@
               "tags": [
                 "bodycare",
                 "body wash"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-bodywash-2-slides-02",
@@ -861,7 +1021,9 @@
               "tags": [
                 "bodycare",
                 "body wash"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-cushion-2-slides-01",
@@ -871,7 +1033,9 @@
               "tags": [
                 "kosmetik",
                 "cushion"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-cushion-2-slides-02",
@@ -881,7 +1045,9 @@
               "tags": [
                 "kosmetik",
                 "cushion"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-facewash-3-slides-01",
@@ -891,7 +1057,9 @@
               "tags": [
                 "skincare",
                 "face wash"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-facewash-3-slides-02",
@@ -901,7 +1069,9 @@
               "tags": [
                 "skincare",
                 "face wash"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-facewash-3-slides-03",
@@ -911,7 +1081,9 @@
               "tags": [
                 "skincare",
                 "face wash"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-hairclay-2-slides-01",
@@ -921,7 +1093,9 @@
               "tags": [
                 "skincare",
                 "clay mask"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-hairclay-2-slides-02",
@@ -931,7 +1105,9 @@
               "tags": [
                 "skincare",
                 "clay mask"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-hairoil-4-slides-01",
@@ -941,7 +1117,9 @@
               "tags": [
                 "haircare",
                 "hair oil"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-hairoil-4-slides-02",
@@ -951,7 +1129,9 @@
               "tags": [
                 "haircare",
                 "hair oil"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-hairoil-4-slides-03",
@@ -961,7 +1141,9 @@
               "tags": [
                 "haircare",
                 "hair oil"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-hairoil-4-slides-04",
@@ -971,7 +1153,9 @@
               "tags": [
                 "haircare",
                 "hair oil"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-kaos-2-slides-01",
@@ -981,7 +1165,9 @@
               "tags": [
                 "fashion",
                 "kaos"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-kaos-2-slides-02",
@@ -991,7 +1177,9 @@
               "tags": [
                 "fashion",
                 "kaos"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-moisturizer-3-slides-01",
@@ -1001,7 +1189,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-moisturizer-3-slides-02",
@@ -1011,7 +1201,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-moisturizer-3-slides-03",
@@ -1021,7 +1213,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-moisturizer-4slides-01",
@@ -1031,7 +1225,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-moisturizer-4slides-02",
@@ -1041,7 +1237,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-moisturizer-4slides-03",
@@ -1051,7 +1249,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-moisturizer-4slides-04",
@@ -1061,7 +1261,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-parfum-3-slides-01",
@@ -1071,7 +1273,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-parfum-3-slides-02",
@@ -1081,7 +1285,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-parfum-3-slides-03",
@@ -1091,7 +1297,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-serum-3-slides-01",
@@ -1101,7 +1309,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-serum-3-slides-02",
@@ -1111,7 +1321,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-serum-3-slides-03",
@@ -1121,7 +1333,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-serum2-3-slides-01",
@@ -1131,7 +1345,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-serum2-3-slides-02",
@@ -1141,7 +1357,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-serum2-3-slides-03",
@@ -1151,7 +1369,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1448,
+              "h": 1086
             },
             {
               "id": "cr-serum3-2-slides-01",
@@ -1161,7 +1381,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-serum3-2-slides-02",
@@ -1171,7 +1393,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1024,
+              "h": 1536
             },
             {
               "id": "cr-sunscreen-2slides-01",
@@ -1181,7 +1405,9 @@
               "tags": [
                 "skincare",
                 "sunscreen"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-sunscreen-2slides-02",
@@ -1191,7 +1417,9 @@
               "tags": [
                 "skincare",
                 "sunscreen"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-tumbler-2-slides-01",
@@ -1201,7 +1429,9 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-tumbler-2-slides-02",
@@ -1211,7 +1441,9 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-tumbler-2-slides-03",
@@ -1221,7 +1453,9 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "cr-tumbler-3-slides-01",
@@ -1231,7 +1465,9 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-tumbler-3-slides-02",
@@ -1241,7 +1477,9 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-tumbler-3-slides-03",
@@ -1251,7 +1489,9 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-bodymist-3-slides-01",
@@ -1261,7 +1501,9 @@
               "tags": [
                 "bodycare",
                 "body mist"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-bodymist-3-slides-02",
@@ -1271,7 +1513,9 @@
               "tags": [
                 "bodycare",
                 "body mist"
-              ]
+              ],
+              "w": 853,
+              "h": 1280
             },
             {
               "id": "cr-bodymist-3-slides-03",
@@ -1281,7 +1525,9 @@
               "tags": [
                 "bodycare",
                 "body mist"
-              ]
+              ],
+              "w": 853,
+              "h": 1280
             },
             {
               "id": "cr-difusser-3-slides-01",
@@ -1291,7 +1537,9 @@
               "tags": [
                 "lifestyle",
                 "difusser"
-              ]
+              ],
+              "w": 853,
+              "h": 1280
             },
             {
               "id": "cr-difusser-3-slides-02",
@@ -1301,7 +1549,9 @@
               "tags": [
                 "lifestyle",
                 "difusser"
-              ]
+              ],
+              "w": 853,
+              "h": 1280
             },
             {
               "id": "cr-difusser-3-slides-03",
@@ -1311,7 +1561,9 @@
               "tags": [
                 "lifestyle",
                 "difusser"
-              ]
+              ],
+              "w": 853,
+              "h": 1280
             },
             {
               "id": "cr-lipstick-2-slides-01",
@@ -1321,7 +1573,9 @@
               "tags": [
                 "kosmetik",
                 "lipstick"
-              ]
+              ],
+              "w": 960,
+              "h": 1280
             },
             {
               "id": "cr-lipstick-2-slides-02",
@@ -1331,7 +1585,9 @@
               "tags": [
                 "kosmetik",
                 "lipstick"
-              ]
+              ],
+              "w": 960,
+              "h": 1280
             },
             {
               "id": "cr-moisturizer2-3-slides-01",
@@ -1341,7 +1597,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-moisturizer2-3-slides-02",
@@ -1351,7 +1609,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-moisturizer2-3-slides-03",
@@ -1361,7 +1621,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "cr-toner-3-slides-01",
@@ -1371,7 +1633,9 @@
               "tags": [
                 "skincare",
                 "toner"
-              ]
+              ],
+              "w": 853,
+              "h": 1280
             },
             {
               "id": "cr-toner-3-slides-02",
@@ -1381,7 +1645,9 @@
               "tags": [
                 "skincare",
                 "toner"
-              ]
+              ],
+              "w": 853,
+              "h": 1280
             },
             {
               "id": "cr-toner-3-slides-03",
@@ -1391,7 +1657,9 @@
               "tags": [
                 "skincare",
                 "toner"
-              ]
+              ],
+              "w": 853,
+              "h": 1280
             }
           ]
         }
@@ -1414,7 +1682,9 @@
                 "skincare",
                 "serum",
                 "clean"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-serum-02",
@@ -1424,7 +1694,9 @@
                 "skincare",
                 "serum",
                 "studio"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-serum-03",
@@ -1434,7 +1706,9 @@
                 "skincare",
                 "serum",
                 "minimal"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-ampoule-01",
@@ -1444,7 +1718,9 @@
                 "skincare",
                 "ampoule",
                 "commercial"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-ampoule-02",
@@ -1454,7 +1730,9 @@
                 "skincare",
                 "ampoule",
                 "dramatic"
-              ]
+              ],
+              "w": 720,
+              "h": 720
             },
             {
               "id": "st-facewash",
@@ -1464,7 +1742,9 @@
                 "skincare",
                 "face wash",
                 "clean"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-set-01",
@@ -1474,7 +1754,9 @@
                 "skincare",
                 "set",
                 "grouping"
-              ]
+              ],
+              "w": 572,
+              "h": 720
             },
             {
               "id": "st-set-02",
@@ -1484,7 +1766,9 @@
                 "skincare",
                 "set",
                 "lifestyle"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-moisturizer",
@@ -1494,7 +1778,9 @@
                 "skincare",
                 "moisturizer",
                 "premium"
-              ]
+              ],
+              "w": 480,
+              "h": 720
             },
             {
               "id": "st-sunscreen",
@@ -1503,7 +1789,9 @@
               "tags": [
                 "skincare",
                 "sunscreen"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-parfume-01",
@@ -1513,7 +1801,9 @@
                 "parfum",
                 "luxury",
                 "dramatic"
-              ]
+              ],
+              "w": 480,
+              "h": 720
             },
             {
               "id": "st-parfume-02",
@@ -1522,7 +1812,9 @@
               "tags": [
                 "parfum",
                 "minimal"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-parfume-03",
@@ -1531,7 +1823,9 @@
               "tags": [
                 "parfum",
                 "editorial"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-kopi",
@@ -1540,7 +1834,9 @@
               "tags": [
                 "fnb",
                 "kopi"
-              ]
+              ],
+              "w": 480,
+              "h": 720
             },
             {
               "id": "st-botolkaleng",
@@ -1550,7 +1846,9 @@
                 "fnb",
                 "botol",
                 "kaleng"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-botolminum",
@@ -1559,7 +1857,9 @@
               "tags": [
                 "fnb",
                 "tumbler"
-              ]
+              ],
+              "w": 576,
+              "h": 720
             },
             {
               "id": "st-ampoule1",
@@ -1568,7 +1868,9 @@
               "tags": [
                 "skincare",
                 "ampoule"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-bodywash1",
@@ -1577,7 +1879,9 @@
               "tags": [
                 "bodycare",
                 "body wash"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-casing1",
@@ -1586,7 +1890,9 @@
               "tags": [
                 "gadget",
                 "casing hp"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-cctv1",
@@ -1595,7 +1901,9 @@
               "tags": [
                 "gadget",
                 "cctv"
-              ]
+              ],
+              "w": 1199,
+              "h": 1312
             },
             {
               "id": "st-cleanser1",
@@ -1604,7 +1912,9 @@
               "tags": [
                 "skincare",
                 "cleanser"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-dispenser1",
@@ -1613,7 +1923,9 @@
               "tags": [
                 "peralatan",
                 "dispenser"
-              ]
+              ],
+              "w": 1197,
+              "h": 1315
             },
             {
               "id": "st-earphone1",
@@ -1622,7 +1934,9 @@
               "tags": [
                 "gadget",
                 "audio"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "st-jamtangan1",
@@ -1631,7 +1945,9 @@
               "tags": [
                 "fashion",
                 "jam tangan"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "st-jamtangan2",
@@ -1640,7 +1956,9 @@
               "tags": [
                 "fashion",
                 "jam tangan"
-              ]
+              ],
+              "w": 1310,
+              "h": 1201
             },
             {
               "id": "st-kacamata1",
@@ -1649,7 +1967,9 @@
               "tags": [
                 "fashion",
                 "kacamata"
-              ]
+              ],
+              "w": 1333,
+              "h": 1180
             },
             {
               "id": "st-kaos1",
@@ -1658,7 +1978,9 @@
               "tags": [
                 "fashion",
                 "kaos"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-keyboard1",
@@ -1667,7 +1989,9 @@
               "tags": [
                 "gadget",
                 "keyboard"
-              ]
+              ],
+              "w": 1196,
+              "h": 1315
             },
             {
               "id": "st-lipstick1",
@@ -1676,7 +2000,9 @@
               "tags": [
                 "kosmetik",
                 "lipstik"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-micellerwater1",
@@ -1685,7 +2011,9 @@
               "tags": [
                 "skincare",
                 "micellar water"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-moisturizer1",
@@ -1694,7 +2022,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-moisturizer2",
@@ -1703,7 +2033,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-perfume4",
@@ -1712,7 +2044,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-perfume5",
@@ -1721,7 +2055,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-perfume6",
@@ -1730,7 +2066,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-perfume7",
@@ -1739,7 +2077,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-sepatu1",
@@ -1748,7 +2088,9 @@
               "tags": [
                 "fashion",
                 "sepatu"
-              ]
+              ],
+              "w": 1402,
+              "h": 1122
             },
             {
               "id": "st-sepatu2",
@@ -1757,7 +2099,9 @@
               "tags": [
                 "fashion",
                 "sepatu"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-serum",
@@ -1766,7 +2110,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1123,
+              "h": 1401
             },
             {
               "id": "st-skincare-serum4",
@@ -1775,7 +2121,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-speaker1",
@@ -1784,7 +2132,9 @@
               "tags": [
                 "gadget",
                 "audio"
-              ]
+              ],
+              "w": 1183,
+              "h": 1330
             },
             {
               "id": "st-sunscreen1",
@@ -1793,7 +2143,9 @@
               "tags": [
                 "skincare",
                 "sunscreen"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-tas1",
@@ -1802,7 +2154,9 @@
               "tags": [
                 "fashion",
                 "tas"
-              ]
+              ],
+              "w": 1196,
+              "h": 1315
             },
             {
               "id": "st-tumbler1",
@@ -1811,7 +2165,9 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-tumbler2",
@@ -1820,7 +2176,9 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
-              ]
+              ],
+              "w": 1122,
+              "h": 1402
             },
             {
               "id": "st-bodylotion-01",
@@ -1830,7 +2188,9 @@
                 "bodycare",
                 "bodylotion",
                 "clean"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-bodylotion-02",
@@ -1840,7 +2200,9 @@
                 "bodycare",
                 "bodylotion",
                 "natural"
-              ]
+              ],
+              "w": 1024,
+              "h": 1280
             },
             {
               "id": "st-bodymist-01",
@@ -1850,7 +2212,9 @@
                 "bodycare",
                 "body mist",
                 "fresh"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-bodyscrub-01",
@@ -1860,7 +2224,9 @@
                 "bodycare",
                 "body scrub",
                 "natural"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-brownie-01",
@@ -1869,7 +2235,9 @@
               "tags": [
                 "fnb",
                 "brownie"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-candle-01",
@@ -1879,7 +2247,9 @@
                 "lifestyle",
                 "candle",
                 "warm"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-cleanser-02",
@@ -1889,7 +2259,9 @@
                 "skincare",
                 "cleanser",
                 "minimal"
-              ]
+              ],
+              "w": 1024,
+              "h": 1280
             },
             {
               "id": "st-cup-01",
@@ -1898,7 +2270,9 @@
               "tags": [
                 "fnb",
                 "cup"
-              ]
+              ],
+              "w": 1024,
+              "h": 1280
             },
             {
               "id": "st-facewash-01",
@@ -1908,7 +2282,9 @@
                 "skincare",
                 "face wash",
                 "clean"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-hairdryer-01",
@@ -1917,7 +2293,9 @@
               "tags": [
                 "elektronik",
                 "hairdryer"
-              ]
+              ],
+              "w": 1024,
+              "h": 1280
             },
             {
               "id": "st-matcha-01",
@@ -1926,7 +2304,9 @@
               "tags": [
                 "fnb",
                 "matcha"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-parfume-08",
@@ -1935,7 +2315,9 @@
               "tags": [
                 "parfum",
                 "premium"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-parfume-09",
@@ -1944,7 +2326,9 @@
               "tags": [
                 "parfum",
                 "editorial"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-parfume-10",
@@ -1953,7 +2337,9 @@
               "tags": [
                 "parfum",
                 "minimal"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-serum-04",
@@ -1963,7 +2349,9 @@
                 "skincare",
                 "serum",
                 "clean"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-serum-05",
@@ -1973,7 +2361,9 @@
                 "skincare",
                 "serum",
                 "natural"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-serum-06",
@@ -1983,7 +2373,9 @@
                 "skincare",
                 "serum",
                 "editorial"
-              ]
+              ],
+              "w": 1024,
+              "h": 1280
             },
             {
               "id": "st-serum-07",
@@ -1993,7 +2385,9 @@
                 "skincare",
                 "serum",
                 "minimal"
-              ]
+              ],
+              "w": 1024,
+              "h": 1280
             },
             {
               "id": "st-sunscreen-02",
@@ -2003,7 +2397,9 @@
                 "skincare",
                 "sunscreen",
                 "clean"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             },
             {
               "id": "st-toner-01",
@@ -2013,7 +2409,9 @@
                 "skincare",
                 "toner",
                 "clean"
-              ]
+              ],
+              "w": 1254,
+              "h": 1254
             }
           ]
         }
@@ -2036,7 +2434,9 @@
                 "skincare",
                 "serum",
                 "marketplace"
-              ]
+              ],
+              "w": 720,
+              "h": 720
             },
             {
               "id": "mp-moisturizer",
@@ -2046,7 +2446,9 @@
                 "skincare",
                 "moisturizer",
                 "marketplace"
-              ]
+              ],
+              "w": 720,
+              "h": 720
             },
             {
               "id": "mp-sunscreen",
@@ -2056,7 +2458,9 @@
                 "skincare",
                 "sunscreen",
                 "marketplace"
-              ]
+              ],
+              "w": 720,
+              "h": 720
             },
             {
               "id": "mp-toner",
@@ -2066,7 +2470,9 @@
                 "skincare",
                 "toner",
                 "marketplace"
-              ]
+              ],
+              "w": 720,
+              "h": 720
             },
             {
               "id": "mp-babylotion",
@@ -2075,7 +2481,9 @@
               "tags": [
                 "baby care",
                 "baby lotion"
-              ]
+              ],
+              "w": 1197,
+              "h": 1314
             },
             {
               "id": "mp-babyoil1",
@@ -2084,7 +2492,9 @@
               "tags": [
                 "baby care",
                 "baby oil"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-bodyscrub1",
@@ -2093,7 +2503,9 @@
               "tags": [
                 "bodycare",
                 "scrub"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-casing1",
@@ -2102,7 +2514,9 @@
               "tags": [
                 "gadget",
                 "casing hp"
-              ]
+              ],
+              "w": 1199,
+              "h": 1312
             },
             {
               "id": "mp-clay1",
@@ -2111,7 +2525,9 @@
               "tags": [
                 "skincare",
                 "clay mask"
-              ]
+              ],
+              "w": 1216,
+              "h": 1294
             },
             {
               "id": "mp-facemist1",
@@ -2120,7 +2536,9 @@
               "tags": [
                 "skincare",
                 "face mist"
-              ]
+              ],
+              "w": 1199,
+              "h": 1312
             },
             {
               "id": "mp-facewash1",
@@ -2129,7 +2547,9 @@
               "tags": [
                 "skincare",
                 "face wash"
-              ]
+              ],
+              "w": 1199,
+              "h": 1312
             },
             {
               "id": "mp-facialwash1",
@@ -2138,7 +2558,9 @@
               "tags": [
                 "skincare",
                 "face wash"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-foundation1",
@@ -2147,7 +2569,9 @@
               "tags": [
                 "kosmetik",
                 "foundation"
-              ]
+              ],
+              "w": 1196,
+              "h": 1315
             },
             {
               "id": "mp-gelang1",
@@ -2156,7 +2580,9 @@
               "tags": [
                 "fashion",
                 "aksesoris"
-              ]
+              ],
+              "w": 1213,
+              "h": 1297
             },
             {
               "id": "mp-hairpowder1",
@@ -2165,7 +2591,9 @@
               "tags": [
                 "haircare",
                 "hair powder"
-              ]
+              ],
+              "w": 1197,
+              "h": 1314
             },
             {
               "id": "mp-hoodie1",
@@ -2174,7 +2602,9 @@
               "tags": [
                 "fashion",
                 "hoodie"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-jilbab",
@@ -2183,7 +2613,9 @@
               "tags": [
                 "fashion",
                 "hijab"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-kipasangin1",
@@ -2192,7 +2624,9 @@
               "tags": [
                 "gadget",
                 "kipas angin"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-koper1",
@@ -2201,7 +2635,9 @@
               "tags": [
                 "fashion",
                 "tas"
-              ]
+              ],
+              "w": 1216,
+              "h": 1293
             },
             {
               "id": "mp-lilin1",
@@ -2210,7 +2646,9 @@
               "tags": [
                 "lifestyle",
                 "aromaterapi"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-liptint1",
@@ -2219,7 +2657,9 @@
               "tags": [
                 "kosmetik",
                 "lip tint"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-makeup1",
@@ -2228,7 +2668,9 @@
               "tags": [
                 "kosmetik",
                 "makeup"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-moisturizer1",
@@ -2237,7 +2679,9 @@
               "tags": [
                 "skincare",
                 "moisturizer"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-parfume1",
@@ -2246,7 +2690,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1199,
+              "h": 1312
             },
             {
               "id": "mp-parfume2",
@@ -2255,7 +2701,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-perfume3",
@@ -2264,7 +2712,9 @@
               "tags": [
                 "parfum",
                 "perfume"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-powerbank1",
@@ -2273,7 +2723,9 @@
               "tags": [
                 "gadget",
                 "powerbank"
-              ]
+              ],
+              "w": 1197,
+              "h": 1315
             },
             {
               "id": "mp-serum2",
@@ -2282,7 +2734,9 @@
               "tags": [
                 "skincare",
                 "serum"
-              ]
+              ],
+              "w": 1214,
+              "h": 1295
             },
             {
               "id": "mp-shirt1",
@@ -2291,7 +2745,9 @@
               "tags": [
                 "fashion",
                 "kaos"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-shirt2",
@@ -2300,7 +2756,9 @@
               "tags": [
                 "fashion",
                 "kaos"
-              ]
+              ],
+              "w": 1199,
+              "h": 1312
             },
             {
               "id": "mp-slingbag1",
@@ -2309,7 +2767,9 @@
               "tags": [
                 "fashion",
                 "tas"
-              ]
+              ],
+              "w": 1196,
+              "h": 1315
             },
             {
               "id": "mp-susncreen1",
@@ -2318,7 +2778,9 @@
               "tags": [
                 "skincare",
                 "sunscreen"
-              ]
+              ],
+              "w": 1196,
+              "h": 1315
             },
             {
               "id": "mp-tas1",
@@ -2327,7 +2789,9 @@
               "tags": [
                 "fashion",
                 "tas"
-              ]
+              ],
+              "w": 1196,
+              "h": 1315
             },
             {
               "id": "mp-toner1",
@@ -2336,7 +2800,9 @@
               "tags": [
                 "skincare",
                 "toner"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-toner2",
@@ -2345,7 +2811,9 @@
               "tags": [
                 "skincare",
                 "toner"
-              ]
+              ],
+              "w": 1198,
+              "h": 1313
             },
             {
               "id": "mp-topi1",
@@ -2354,7 +2822,9 @@
               "tags": [
                 "fashion",
                 "topi"
-              ]
+              ],
+              "w": 1196,
+              "h": 1315
             },
             {
               "id": "mp-tumbler1",
@@ -2363,7 +2833,9 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
-              ]
+              ],
+              "w": 1210,
+              "h": 1300
             }
           ]
         }
@@ -2386,7 +2858,9 @@
                 "makanan",
                 "snack",
                 "lifestyle"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "fd-crunch-02",
@@ -2396,7 +2870,9 @@
                 "makanan",
                 "snack",
                 "editorial"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "fd-sambal",
@@ -2406,7 +2882,9 @@
                 "makanan",
                 "sambal",
                 "artisanal"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "fd-makanan",
@@ -2415,7 +2893,9 @@
               "tags": [
                 "makanan",
                 "lifestyle"
-              ]
+              ],
+              "w": 320,
+              "h": 480
             }
           ]
         },
@@ -2432,7 +2912,9 @@
                 "minuman",
                 "berry",
                 "premium"
-              ]
+              ],
+              "w": 720,
+              "h": 900
             },
             {
               "id": "fd-cup",
@@ -2442,7 +2924,9 @@
                 "minuman",
                 "cup",
                 "packaging"
-              ]
+              ],
+              "w": 320,
+              "h": 452
             },
             {
               "id": "fd-kaleng",
@@ -2452,7 +2936,9 @@
                 "minuman",
                 "kaleng",
                 "lifestyle"
-              ]
+              ],
+              "w": 320,
+              "h": 320
             },
             {
               "id": "fd-kalengtea",
@@ -2462,7 +2948,9 @@
                 "minuman",
                 "teh",
                 "kaleng"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             },
             {
               "id": "fd-kopi",
@@ -2472,7 +2960,9 @@
                 "minuman",
                 "kopi",
                 "artisanal"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "fd-matcha",
@@ -2482,7 +2972,9 @@
                 "minuman",
                 "matcha",
                 "premium"
-              ]
+              ],
+              "w": 900,
+              "h": 900
             },
             {
               "id": "fd-botol",
@@ -2492,7 +2984,9 @@
                 "minuman",
                 "botol",
                 "produk"
-              ]
+              ],
+              "w": 675,
+              "h": 900
             }
           ]
         }

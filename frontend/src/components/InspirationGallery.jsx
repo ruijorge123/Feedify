@@ -200,8 +200,9 @@ export default function InspirationGallery({ open, onClose, onSelect, context = 
               isMulti={isMulti}
             />
           ) : (
-            // Default: responsive grid
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+            // Default: masonry columns — each tile takes its photo's own aspect ratio,
+            // so nothing is ever cropped and no letterbox bars are needed.
+            <div className="columns-2 sm:columns-3 gap-2.5">
               {filtered.map((photo, idx) => {
                 const isSelected = isMulti
                   ? selected.some((p) => p.id === photo.id)
@@ -230,7 +231,7 @@ export default function InspirationGallery({ open, onClose, onSelect, context = 
                 {Array.from({ length: requiredCount }).map((_, i) => {
                   const ph = selected[i];
                   return ph ? (
-                    <img key={ph.id} src={ph.url} alt="" className="h-8 w-8 rounded-md object-cover border-2 border-brand/40 flex-shrink-0" />
+                    <img key={ph.id} src={ph.url} alt="" className="h-8 w-8 rounded-md object-contain bg-stone-100 border-2 border-brand/40 flex-shrink-0" />
                   ) : (
                     <div key={i} className="h-8 w-8 rounded-md border-2 border-dashed border-stone-200 bg-stone-50 flex items-center justify-center flex-shrink-0">
                       <span className="text-[9px] font-bold text-stone-300">{i + 1}</span>
@@ -246,7 +247,7 @@ export default function InspirationGallery({ open, onClose, onSelect, context = 
             </div>
           ) : selected ? (
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <img src={selected.url} alt="" className="h-10 w-10 rounded-lg object-cover flex-shrink-0 border border-brand-sand" />
+              <img src={selected.url} alt="" className="h-10 w-10 rounded-lg object-contain bg-stone-100 flex-shrink-0 border border-brand-sand" />
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-brand truncate">{selected.description}</div>
                 <div className="text-xs text-stone-400 truncate">{selected.tags?.slice(0, 3).join(", ")}</div>
@@ -281,19 +282,24 @@ function PhotoCard({ photo, isSelected, eager, onSelect }) {
     <button
       type="button"
       onClick={onSelect}
-      className={`relative rounded-xl overflow-hidden aspect-[4/5] group border-2 transition-all ${
-        isSelected ? "border-brand shadow-lg scale-[0.98]" : "border-transparent hover:border-brand/30"
+      // No fixed aspect box and no overflow-hidden: the tile height follows the photo's
+      // own ratio, so the image is never cropped at any viewport. The p-1 mat keeps the
+      // rounded frame off the photo itself, so even the corners stay intact.
+      className={`relative block w-full mb-2.5 break-inside-avoid rounded-xl p-1 bg-white group border-2 transition-all ${
+        isSelected ? "border-brand shadow-lg" : "border-stone-200 hover:border-brand/30"
       }`}
     >
       <img
         src={photo.url}
         alt={photo.description}
-        className="w-full h-full object-cover object-top"
+        width={photo.w}
+        height={photo.h}
+        className="w-full h-auto block"
         loading={eager ? "eager" : "lazy"}
         decoding="async"
         fetchpriority={eager ? "high" : "low"}
       />
-      <div className={`absolute inset-0 bg-brand/60 flex flex-col items-center justify-center p-2 transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+      <div className={`absolute inset-1 bg-brand/60 flex flex-col items-center justify-center p-2 transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
         {isSelected && <CheckCircle size={28} weight="fill" className="text-white mb-1" />}
         <span className="text-white text-xs font-medium text-center leading-tight">{photo.description}</span>
       </div>
@@ -328,7 +334,9 @@ function CarouselLayout({ photos, selected, onSelect, isMulti }) {
       {Object.entries(groups).map(([groupName, groupPhotos]) => (
         <div key={groupName}>
           <div className="text-xs uppercase tracking-[0.15em] font-bold text-stone-400 mb-2">{groupName}</div>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          {/* items-start so each slide keeps its own natural height instead of being
+              stretched/cropped to match its neighbours */}
+          <div className="flex gap-2 items-start overflow-x-auto no-scrollbar pb-1">
             {groupPhotos.map((photo, slideIdx) => {
               const selIdx = getSelectionIndex(photo);
               const isSelected = isMulti ? selIdx >= 0 : selected?.id === photo.id;
@@ -337,15 +345,18 @@ function CarouselLayout({ photos, selected, onSelect, isMulti }) {
                   key={photo.id}
                   type="button"
                   onClick={() => onSelect(photo)}
-                  className={`flex-shrink-0 w-28 rounded-xl overflow-hidden border-2 transition-all ${
-                    isSelected ? "border-brand shadow-md scale-[0.97]" : "border-stone-200 hover:border-brand/40"
+                  className={`flex-shrink-0 w-28 rounded-xl p-1 bg-white border-2 transition-all ${
+                    isSelected ? "border-brand shadow-md" : "border-stone-200 hover:border-brand/40"
                   }`}
                 >
-                  <div className="relative aspect-square">
+                  {/* No aspect-square: the slide renders at its own ratio, uncropped */}
+                  <div className="relative">
                     <img
                       src={photo.url}
                       alt={photo.description}
-                      className="w-full h-full object-cover"
+                      width={photo.w}
+                      height={photo.h}
+                      className="w-full h-auto block"
                       loading="lazy"
                     />
                     <div className="absolute top-1 left-1 h-5 w-5 rounded-full bg-black/50 text-white text-[9px] font-bold flex items-center justify-center">
@@ -363,7 +374,7 @@ function CarouselLayout({ photos, selected, onSelect, isMulti }) {
                       </div>
                     )}
                   </div>
-                  <div className="px-1.5 py-1 bg-white">
+                  <div className="px-0.5 pt-1">
                     <div className="text-[9px] text-stone-500 truncate">{photo.description || `Slide ${slideIdx + 1}`}</div>
                   </div>
                 </button>
