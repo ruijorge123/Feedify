@@ -449,6 +449,101 @@
                 "body lotion",
                 "promo"
               ]
+            },
+            {
+              "id": "bn-cleanser-06",
+              "filename": "cleanser6.webp",
+              "description": "Post cleanser bersih natural",
+              "tags": [
+                "skincare",
+                "cleanser",
+                "clean",
+                "natural"
+              ]
+            },
+            {
+              "id": "bn-moisturizer-03",
+              "filename": "skincare-moisturizer2.webp",
+              "description": "Post moisturizer minimalis premium",
+              "tags": [
+                "skincare",
+                "moisturizer",
+                "minimal",
+                "premium"
+              ]
+            },
+            {
+              "id": "bn-moisturizerlaunch-01",
+              "filename": "skincare-moisturizerlaunch.webp",
+              "description": "Post launching moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer",
+                "launch"
+              ]
+            },
+            {
+              "id": "bn-serum-09",
+              "filename": "skincare-serum9.webp",
+              "description": "Post serum editorial premium",
+              "tags": [
+                "skincare",
+                "serum",
+                "editorial",
+                "premium"
+              ]
+            },
+            {
+              "id": "bn-serum-10",
+              "filename": "skincare-serum10.webp",
+              "description": "Post serum minimalis bersih",
+              "tags": [
+                "skincare",
+                "serum",
+                "minimal",
+                "clean"
+              ]
+            },
+            {
+              "id": "bn-sleepingmask-01",
+              "filename": "skincare-sleepingmask.webp",
+              "description": "Post sleeping mask perawatan malam",
+              "tags": [
+                "skincare",
+                "sleeping mask",
+                "night"
+              ]
+            },
+            {
+              "id": "bn-sunscreen-03",
+              "filename": "sunscreen2.webp",
+              "description": "Post sunscreen cerah harian",
+              "tags": [
+                "skincare",
+                "sunscreen",
+                "bright"
+              ]
+            },
+            {
+              "id": "bn-toner-02",
+              "filename": "skincare-toner2.webp",
+              "description": "Post toner bersih segar",
+              "tags": [
+                "skincare",
+                "toner",
+                "clean"
+              ]
+            },
+            {
+              "id": "bn-toner-03",
+              "filename": "skincare-toner3.webp",
+              "description": "Post toner minimalis premium",
+              "tags": [
+                "skincare",
+                "toner",
+                "minimal",
+                "premium"
+              ]
             }
           ]
         },
@@ -1157,6 +1252,146 @@
                 "lifestyle",
                 "tumbler"
               ]
+            },
+            {
+              "id": "cr-bodymist-3-slides-01",
+              "filename": "bodymist 3 slides/1.webp",
+              "set": "Bodymist (3 Slide)",
+              "description": "Slide 1 – hero produk body mist",
+              "tags": [
+                "bodycare",
+                "body mist"
+              ]
+            },
+            {
+              "id": "cr-bodymist-3-slides-02",
+              "filename": "bodymist 3 slides/2.webp",
+              "set": "Bodymist (3 Slide)",
+              "description": "Slide 2 – benefit 1 body mist",
+              "tags": [
+                "bodycare",
+                "body mist"
+              ]
+            },
+            {
+              "id": "cr-bodymist-3-slides-03",
+              "filename": "bodymist 3 slides/3.webp",
+              "set": "Bodymist (3 Slide)",
+              "description": "Slide 3 – closing body mist",
+              "tags": [
+                "bodycare",
+                "body mist"
+              ]
+            },
+            {
+              "id": "cr-difusser-3-slides-01",
+              "filename": "difusser 3 slides/1.webp",
+              "set": "Difusser (3 Slide)",
+              "description": "Slide 1 – hero produk difusser",
+              "tags": [
+                "lifestyle",
+                "difusser"
+              ]
+            },
+            {
+              "id": "cr-difusser-3-slides-02",
+              "filename": "difusser 3 slides/2.webp",
+              "set": "Difusser (3 Slide)",
+              "description": "Slide 2 – benefit 1 difusser",
+              "tags": [
+                "lifestyle",
+                "difusser"
+              ]
+            },
+            {
+              "id": "cr-difusser-3-slides-03",
+              "filename": "difusser 3 slides/3.webp",
+              "set": "Difusser (3 Slide)",
+              "description": "Slide 3 – closing difusser",
+              "tags": [
+                "lifestyle",
+                "difusser"
+              ]
+            },
+            {
+              "id": "cr-lipstick-2-slides-01",
+              "filename": "lipstick 2 slides/1.webp",
+              "set": "Lipstick (2 Slide)",
+              "description": "Slide 1 – hero produk lipstick",
+              "tags": [
+                "kosmetik",
+                "lipstick"
+              ]
+            },
+            {
+              "id": "cr-lipstick-2-slides-02",
+              "filename": "lipstick 2 slides/2.webp",
+              "set": "Lipstick (2 Slide)",
+              "description": "Slide 2 – closing lipstick",
+              "tags": [
+                "kosmetik",
+                "lipstick"
+              ]
+            },
+            {
+              "id": "cr-moisturizer2-3-slides-01",
+              "filename": "moisturizer2 3 slides/1.webp",
+              "set": "Moisturizer 2 (3 Slide)",
+              "description": "Slide 1 – hero produk moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-moisturizer2-3-slides-02",
+              "filename": "moisturizer2 3 slides/2.webp",
+              "set": "Moisturizer 2 (3 Slide)",
+              "description": "Slide 2 – benefit 1 moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-moisturizer2-3-slides-03",
+              "filename": "moisturizer2 3 slides/3.webp",
+              "set": "Moisturizer 2 (3 Slide)",
+              "description": "Slide 3 – closing moisturizer",
+              "tags": [
+                "skincare",
+                "moisturizer"
+              ]
+            },
+            {
+              "id": "cr-toner-3-slides-01",
+              "filename": "toner 3 slides/1.webp",
+              "set": "Toner (3 Slide)",
+              "description": "Slide 1 – hero produk toner",
+              "tags": [
+                "skincare",
+                "toner"
+              ]
+            },
+            {
+              "id": "cr-toner-3-slides-02",
+              "filename": "toner 3 slides/2.webp",
+              "set": "Toner (3 Slide)",
+              "description": "Slide 2 – benefit 1 toner",
+              "tags": [
+                "skincare",
+                "toner"
+              ]
+            },
+            {
+              "id": "cr-toner-3-slides-03",
+              "filename": "toner 3 slides/3.webp",
+              "set": "Toner (3 Slide)",
+              "description": "Slide 3 – closing toner",
+              "tags": [
+                "skincare",
+                "toner"
+              ]
             }
           ]
         }
@@ -1585,6 +1820,199 @@
               "tags": [
                 "lifestyle",
                 "tumbler"
+              ]
+            },
+            {
+              "id": "st-bodylotion-01",
+              "filename": "bodylotion1.webp",
+              "description": "Bodylotion — studio clean shot",
+              "tags": [
+                "bodycare",
+                "bodylotion",
+                "clean"
+              ]
+            },
+            {
+              "id": "st-bodylotion-02",
+              "filename": "bodylotion2.webp",
+              "description": "Bodylotion 2 — soft natural light",
+              "tags": [
+                "bodycare",
+                "bodylotion",
+                "natural"
+              ]
+            },
+            {
+              "id": "st-bodymist-01",
+              "filename": "bodymist1.webp",
+              "description": "Body mist — fresh studio shot",
+              "tags": [
+                "bodycare",
+                "body mist",
+                "fresh"
+              ]
+            },
+            {
+              "id": "st-bodyscrub-01",
+              "filename": "bodyscrub1.webp",
+              "description": "Body scrub — tekstur natural",
+              "tags": [
+                "bodycare",
+                "body scrub",
+                "natural"
+              ]
+            },
+            {
+              "id": "st-brownie-01",
+              "filename": "brownie1.webp",
+              "description": "Brownie — F&B product shot",
+              "tags": [
+                "fnb",
+                "brownie"
+              ]
+            },
+            {
+              "id": "st-candle-01",
+              "filename": "candle1.webp",
+              "description": "Lilin aromaterapi — mood hangat",
+              "tags": [
+                "lifestyle",
+                "candle",
+                "warm"
+              ]
+            },
+            {
+              "id": "st-cleanser-02",
+              "filename": "cleanser2.webp",
+              "description": "Cleanser 2 — minimalis studio",
+              "tags": [
+                "skincare",
+                "cleanser",
+                "minimal"
+              ]
+            },
+            {
+              "id": "st-cup-01",
+              "filename": "cup1.webp",
+              "description": "Cup — F&B product shot",
+              "tags": [
+                "fnb",
+                "cup"
+              ]
+            },
+            {
+              "id": "st-facewash-01",
+              "filename": "facewash1.webp",
+              "description": "Face wash — studio clean shot",
+              "tags": [
+                "skincare",
+                "face wash",
+                "clean"
+              ]
+            },
+            {
+              "id": "st-hairdryer-01",
+              "filename": "hairdryer1.webp",
+              "description": "Hair dryer — elektronik studio shot",
+              "tags": [
+                "elektronik",
+                "hairdryer"
+              ]
+            },
+            {
+              "id": "st-matcha-01",
+              "filename": "matchapowder1.webp",
+              "description": "Matcha powder — F&B product shot",
+              "tags": [
+                "fnb",
+                "matcha"
+              ]
+            },
+            {
+              "id": "st-parfume-08",
+              "filename": "perfume8.webp",
+              "description": "Parfum 8 — studio premium",
+              "tags": [
+                "parfum",
+                "premium"
+              ]
+            },
+            {
+              "id": "st-parfume-09",
+              "filename": "perfume9.webp",
+              "description": "Parfum 9 — editorial lighting",
+              "tags": [
+                "parfum",
+                "editorial"
+              ]
+            },
+            {
+              "id": "st-parfume-10",
+              "filename": "perfume10.webp",
+              "description": "Parfum 10 — minimalis bersih",
+              "tags": [
+                "parfum",
+                "minimal"
+              ]
+            },
+            {
+              "id": "st-serum-04",
+              "filename": "serum2.webp",
+              "description": "Serum — studio hero shot",
+              "tags": [
+                "skincare",
+                "serum",
+                "clean"
+              ]
+            },
+            {
+              "id": "st-serum-05",
+              "filename": "serum3.webp",
+              "description": "Serum — pencahayaan lembut",
+              "tags": [
+                "skincare",
+                "serum",
+                "natural"
+              ]
+            },
+            {
+              "id": "st-serum-06",
+              "filename": "serum4.webp",
+              "description": "Serum — editorial premium",
+              "tags": [
+                "skincare",
+                "serum",
+                "editorial"
+              ]
+            },
+            {
+              "id": "st-serum-07",
+              "filename": "serum5.webp",
+              "description": "Serum — minimalis bersih",
+              "tags": [
+                "skincare",
+                "serum",
+                "minimal"
+              ]
+            },
+            {
+              "id": "st-sunscreen-02",
+              "filename": "sunscreen2.webp",
+              "description": "Sunscreen — bright studio shot",
+              "tags": [
+                "skincare",
+                "sunscreen",
+                "clean"
+              ]
+            },
+            {
+              "id": "st-toner-01",
+              "filename": "toner1.webp",
+              "description": "Toner — studio clean shot",
+              "tags": [
+                "skincare",
+                "toner",
+                "clean"
               ]
             }
           ]
