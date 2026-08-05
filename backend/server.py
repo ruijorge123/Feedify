@@ -8391,8 +8391,8 @@ async def _notify_telegram_payment_proof(order: dict):
         caption = (
             f"\U0001F4F8 Bukti transfer masuk\n"
             f"Nama: {order.get('name') or '-'}\n"
-            f"Email: {order['email']}\n"
-            f"Nominal: Rp{order['amount']:,}".replace(",", ".")
+            f"Email: {order.get('email', '-')}\n"
+            f"Nominal: Rp{order.get('amount', 0):,}".replace(",", ".")
         )
         reply_markup = {
             "inline_keyboard": [[
@@ -8439,17 +8439,23 @@ async def _finalize_manual_payment(order_id: str, new_status: str, actor: str) -
 
     order.update({"status": new_status, "verified_by": actor})
 
-    # Reflect the final state on the original Telegram message, if there is one
+    # Reflect the final state on the original Telegram message, if there is one.
+    # Best-effort: the DB status above is already committed, so a Telegram-side hiccup
+    # here (timeout, message-not-found, etc.) must never stop the caller from acking
+    # the callback — that's what leaves an admin's tapped button spinning forever.
     if order.get("telegram_message_id"):
-        label = {"lunas": "✅ Sudah diaktifkan", "ditolak": "❌ Ditolak", "menunggu_verifikasi": "↩️ Dibatalkan, menunggu verifikasi ulang"}.get(new_status, new_status)
-        await _telegram_api(
-            "editMessageCaption",
-            data={
-                "chat_id": TELEGRAM_ADMIN_CHAT_ID,
-                "message_id": order["telegram_message_id"],
-                "caption": f"{label}\nNama: {order.get('name') or '-'}\nEmail: {order['email']}\nNominal: Rp{order['amount']:,}".replace(",", "."),
-            },
-        )
+        try:
+            label = {"lunas": "✅ Sudah diaktifkan", "ditolak": "❌ Ditolak", "menunggu_verifikasi": "↩️ Dibatalkan, menunggu verifikasi ulang"}.get(new_status, new_status)
+            await _telegram_api(
+                "editMessageCaption",
+                data={
+                    "chat_id": TELEGRAM_ADMIN_CHAT_ID,
+                    "message_id": order["telegram_message_id"],
+                    "caption": f"{label}\nNama: {order.get('name') or '-'}\nEmail: {order.get('email', '-')}\nNominal: Rp{order.get('amount', 0):,}".replace(",", "."),
+                },
+            )
+        except Exception as e:
+            logger.error(f"Telegram caption update failed (non-blocking): {e}")
     return order
 
 
@@ -8628,9 +8634,16 @@ async def telegram_webhook(secret: str, request: Request):
         await _telegram_api("answerCallbackQuery", data={"callback_query_id": callback["id"]})
         return {"ok": True}
 
-    order = await _finalize_manual_payment(order_id, new_status, actor="telegram")
-    ack_text = "Diaktifkan!" if new_status == "lunas" else "Ditolak."
-    await _telegram_api("answerCallbackQuery", data={"callback_query_id": callback["id"], "text": ack_text if order else "Order tidak ditemukan"})
+    # Defense in depth: whatever happens below, the tapped button MUST get an ack —
+    # Telegram shows an infinite loading spinner on the button until answerCallbackQuery
+    # is sent, so an unhandled exception here would otherwise strand the admin mid-tap.
+    try:
+        order = await _finalize_manual_payment(order_id, new_status, actor="telegram")
+        ack_text = "Diaktifkan!" if new_status == "lunas" else "Ditolak."
+        await _telegram_api("answerCallbackQuery", data={"callback_query_id": callback["id"], "text": ack_text if order else "Order tidak ditemukan"})
+    except Exception as e:
+        logger.error(f"telegram_webhook callback handling failed: {e}")
+        await _telegram_api("answerCallbackQuery", data={"callback_query_id": callback["id"], "text": "Gagal memproses, cek log server."})
     return {"ok": True}
 
 
