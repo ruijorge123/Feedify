@@ -28,6 +28,7 @@ export default function CheckoutPage() {
   const [copiedField, setCopiedField] = useState(null);
   const [proofPreview, setProofPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [reuploading, setReuploading] = useState(false);
   const fileInputRef = useRef(null);
 
   const createOrder = useCallback(async () => {
@@ -36,6 +37,7 @@ export default function CheckoutPage() {
       const { data } = await api.post("/checkout/manual/create");
       setOrder(data);
       setProofPreview(null);
+      setReuploading(false);
     } catch (err) {
       if (err.response?.status === 401) {
         toast("Silakan masuk dulu untuk melanjutkan.");
@@ -126,6 +128,7 @@ export default function CheckoutPage() {
     try {
       await api.post(`/checkout/manual/${order.id}/proof`, { photo_base64: proofPreview });
       setOrder((prev) => ({ ...prev, status: "menunggu_verifikasi" }));
+      setReuploading(false);
       toast.success("Bukti pembayaran terkirim! Menunggu verifikasi.");
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Gagal mengirim bukti pembayaran. Coba lagi.");
@@ -249,12 +252,12 @@ export default function CheckoutPage() {
                 <p className="font-heading font-bold text-brand text-lg">Pembayaran dikonfirmasi!</p>
                 <p className="text-sm text-stone-500 mt-1">Lifetime kamu aktif. Mengalihkan ke dashboard...</p>
               </div>
-            ) : order?.status === "ditolak" ? (
+            ) : order?.status === "ditolak" && !reuploading ? (
               <div className="text-center py-4">
                 <XCircle size={40} weight="fill" className="text-red-400 mx-auto mb-3" />
                 <p className="font-heading font-bold text-brand text-lg">Bukti pembayaran ditolak</p>
                 <p className="text-sm text-stone-500 mt-1 mb-4">Kemungkinan foto kurang jelas atau nominal tidak sesuai. Upload ulang bukti pembayaran yang benar.</p>
-                <button onClick={() => setOrder((prev) => ({ ...prev, status: "menunggu_transfer" }))}
+                <button onClick={() => setReuploading(true)}
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-brand-cream rounded-full font-semibold text-sm hover:bg-brand-light">
                   <ArrowClockwise size={16} weight="bold" /> Upload Ulang
                 </button>

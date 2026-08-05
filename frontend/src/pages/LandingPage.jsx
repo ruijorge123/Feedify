@@ -44,9 +44,17 @@ function DarkHero() {
 
   useEffect(() => {
     if (!user || hasAccess) return;
-    api.get("/checkout/manual/active")
-      .then(({ data }) => setPendingOrder(data))
-      .catch(() => {});
+    let iv;
+    const fetchActive = () => api.get("/checkout/manual/active").then(({ data }) => {
+      setPendingOrder(data);
+      // No order at all — stop polling, most landing-page visitors never checked out.
+      if (!data && iv) clearInterval(iv);
+    }).catch(() => {});
+    fetchActive();
+    // Keep polling while there's an order still awaiting a verdict — the reject/approve
+    // action happens out-of-band via the Telegram bot, so nothing pushes the update here.
+    iv = setInterval(fetchActive, 8000);
+    return () => clearInterval(iv);
   }, [user, hasAccess]);
 
   return (
