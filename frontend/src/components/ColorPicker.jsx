@@ -73,25 +73,40 @@ const ANGLES = [
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 function HexInput({ color, onChange }) {
-  const [val, setVal] = useState(color);
-  useEffect(() => setVal(color), [color]);
+  // Strip everything except hex digits — handles typing OR pasting "#0B3D2E" (with the
+  // hash) without the leading "#" eating one of the 6 character slots.
+  const cleanDigits = (s) => (s || "").replace(/[^0-9A-Fa-f]/g, "").slice(0, 6).toUpperCase();
+
+  const [digits, setDigits] = useState(cleanDigits(color));
+  const [invalid, setInvalid] = useState(false);
+  useEffect(() => { setDigits(cleanDigits(color)); setInvalid(false); }, [color]);
+
+  const handleChange = (e) => {
+    const d = cleanDigits(e.target.value);
+    setDigits(d);
+    // Live-update the moment a full 6-digit hex is typed — no need to blur/press Enter.
+    if (d.length === 6) {
+      setInvalid(false);
+      onChange("#" + d);
+    } else {
+      setInvalid(d.length > 0);
+    }
+  };
   const commit = () => {
-    const clean = val.startsWith("#") ? val : "#" + val;
-    if (/^#[0-9A-Fa-f]{6}$/.test(clean)) onChange(clean.toUpperCase());
-    else setVal(color);
+    if (digits.length === 6) { setInvalid(false); onChange("#" + digits); }
+    else setInvalid(digits.length > 0);
   };
   return (
     <div className="flex items-center gap-2 mt-3">
       <div className="h-8 w-8 rounded-lg border border-brand-sand flex-shrink-0" style={{ background: color }} />
-      <div className="flex items-center gap-1 flex-1 bg-brand-sand/60 border border-brand-sand rounded-xl px-3 py-2">
+      <div className={`flex items-center gap-1 flex-1 bg-brand-sand/60 border rounded-xl px-3 py-2 ${invalid ? "border-red-400" : "border-brand-sand"}`}>
         <span className="text-stone-400 font-mono text-sm">#</span>
         <input
           type="text"
-          value={val.replace("#", "").toUpperCase()}
-          onChange={(e) => setVal("#" + e.target.value)}
+          value={digits}
+          onChange={handleChange}
           onBlur={commit}
           onKeyDown={(e) => e.key === "Enter" && commit()}
-          maxLength={6}
           className="flex-1 bg-transparent font-mono text-sm text-brand outline-none uppercase"
           spellCheck={false}
         />
