@@ -6,6 +6,7 @@ import { Sparkle, User, Envelope, ArrowRight, ArrowLeft } from "@phosphor-icons/
 import { useGoogleLogin } from "@react-oauth/google";
 import api from "@/lib/api";
 import PasswordInput from "@/components/PasswordInput";
+import { fbTrack } from "@/lib/metaPixel";
 
 function GoogleButton({ onClick, loading }) {
   return (
@@ -67,6 +68,9 @@ export default function RegisterPage() {
         localStorage.setItem("feedify_token", data.token);
         localStorage.setItem("feedify_user", JSON.stringify(data.user));
         setUser(data.user);
+        // Meta Pixel: google-token upserts (create-or-login), so only fire for a
+        // genuinely brand-new account — avoids counting a returning user as a signup.
+        if (data.is_new_user) fbTrack("CompleteRegistration");
         toast.success(`Halo, ${data.user.name.split(" ")[0]}! Akun berhasil dibuat.`);
         navigate(data.user.has_brand_profile ? "/dashboard" : "/onboarding");
       } catch {

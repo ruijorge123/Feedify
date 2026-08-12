@@ -9,8 +9,12 @@ import {
 } from "@phosphor-icons/react";
 import SupportChatWidget from "@/components/SupportChatWidget";
 import InstallPWAButton from "@/components/InstallPWAButton";
+import { fbTrack } from "@/lib/metaPixel";
 
 export default function LandingPage() {
+  // Meta Pixel: landing page opened
+  useEffect(() => { fbTrack("ViewContent"); }, []);
+
   return (
     <div className="min-h-screen bg-brand-cream text-stone-800 overflow-x-hidden selection:bg-brand-gold selection:text-brand relative">
       {/* Persistent mesh gradient blobs — desktop only (heavy blur crashes mobile GPU) */}

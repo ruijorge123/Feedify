@@ -9,6 +9,7 @@ import { toast } from "react-toastify";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { copyToClipboard } from "@/lib/chatgpt";
+import { fbTrack } from "@/lib/metaPixel";
 
 function fmtRp(n) { return "Rp " + Number(n || 0).toLocaleString("id-ID"); }
 
@@ -94,6 +95,10 @@ export default function CheckoutPage() {
   // On confirmed payment: refresh auth state and move into the app
   useEffect(() => {
     if (order?.status !== "lunas") return;
+    // Meta Pixel: the only client-visible moment payment success actually happens —
+    // approval itself is server-side (Telegram bot / Admin Panel), the browser only
+    // learns about it via this page's polling picking up status: "lunas".
+    fbTrack("Purchase", { value: Number(order.amount) || 0, currency: "IDR" });
     (async () => {
       await refreshUser();
       toast.success("Lifetime aktif! Selamat datang di Feedify 🎉");

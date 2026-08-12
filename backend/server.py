@@ -2919,12 +2919,13 @@ async def auth_google_token(body: dict):
     if not email or not google_sub:
         raise HTTPException(status_code=400, detail="Data akun Google tidak lengkap")
 
-    user_id, user, _ = await _google_upsert_user(email, name, google_sub)
+    user_id, user, is_new = await _google_upsert_user(email, name, google_sub)
     await _block_if_maintenance(user.get("role", "user"))
     has_bp = await db.brand_profiles.find_one({"user_id": user_id}) is not None
     token  = create_jwt_token(user_id, email)
     return {
         "token": token,
+        "is_new_user": is_new,
         "user": {
             "id": user_id,
             "email": email,
@@ -6550,6 +6551,16 @@ async def save_prompt_to_history(request: Request, current_user: dict = Depends(
         except Exception:
             pass
 
+    # Snapshot BEFORE the upsert below — used for the Meta Pixel StartTrial signal
+    # (fires client-side only the very first time a user ever saves a prompt). Checking
+    # existence of this exact save_id first keeps a re-copy of the same prompt from
+    # ever reporting is_first_ever, even on a user's first-ever save.
+    already_exists = await db.generated_prompts.count_documents(
+        {"id": save_id, "user_id": current_user["id"]}
+    ) > 0
+    existing_count = await db.generated_prompts.count_documents({"user_id": current_user["id"]})
+    is_first_ever = not already_exists and existing_count == 0
+
     now = now_iso()
     doc = {
         "id": save_id,
@@ -6569,7 +6580,7 @@ async def save_prompt_to_history(request: Request, current_user: dict = Depends(
         {"$set": doc, "$setOnInsert": {"first_saved_at": now}},
         upsert=True,
     )
-    return {"id": save_id, "saved": True}
+    return {"id": save_id, "saved": True, "is_first_ever": is_first_ever}
 
 
 # ============= CONTENT RECOMMENDATION =============

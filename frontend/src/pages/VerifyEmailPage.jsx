@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { toast } from "react-toastify";
 import { EnvelopeSimple, ArrowLeft, CircleNotch, CheckCircle } from "@phosphor-icons/react";
+import { fbTrack } from "@/lib/metaPixel";
 
 export default function VerifyEmailPage() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
@@ -61,6 +62,9 @@ export default function VerifyEmailPage() {
     try {
       const { data } = await api.post("/auth/verify-otp", { email, otp: otpValue });
       await loginWithToken(data.token, data.user);
+      // Meta Pixel: this is the only completion point for email/password signup —
+      // POST /auth/register always requires OTP verification, no account is usable before this.
+      fbTrack("CompleteRegistration");
       toast.success("Email berhasil diverifikasi!");
       navigate(data.user.has_brand_profile ? "/dashboard" : "/onboarding", { replace: true });
     } catch (err) {

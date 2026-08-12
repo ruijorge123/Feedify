@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AppShell from "@/components/AppShell";
 import AdminPinGate from "@/components/AdminPinGate";
 import MenuLockGate from "@/components/MenuLockGate";
+import { fbTrack } from "@/lib/metaPixel";
 import "@/App.css";
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
@@ -51,6 +52,19 @@ function PageLoader() {
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
+// Meta Pixel: the base code in index.html already fires the first PageView on initial
+// load (before React mounts), so this only tracks SUBSEQUENT SPA route changes —
+// skipping the first run here avoids double-counting that initial load.
+function PixelPageView() {
+  const { pathname } = useLocation();
+  const isFirstRun = useRef(true);
+  useEffect(() => {
+    if (isFirstRun.current) { isFirstRun.current = false; return; }
+    fbTrack("PageView");
+  }, [pathname]);
   return null;
 }
 
@@ -116,6 +130,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <ScrollToTop />
+        <PixelPageView />
         <ToastContainer
           position="top-right"
           autoClose={3000}

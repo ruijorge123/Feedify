@@ -5,6 +5,7 @@ import {
   ShieldCheck, SealCheck, Warning, Plus, Minus,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
+import { fbTrack } from "@/lib/metaPixel";
 
 const FAQS = [
   { q: "Ini benar-benar lifetime?", a: "Ya. Bayar sekali, akses selamanya. Tidak ada renewal, tidak ada biaya bulanan, tidak ada expired." },
@@ -33,6 +34,9 @@ export default function BuyCreditsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const go = () => {
+    // Meta Pixel: fires on the click itself, regardless of whether the user still
+    // needs to log in first — this button is the literal "beli kredit" intent signal.
+    fbTrack("InitiateCheckout");
     if (!user) {
       navigate("/login?redirect=/pricing");
     } else {

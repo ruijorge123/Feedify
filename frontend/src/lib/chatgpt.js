@@ -1,14 +1,24 @@
 import api from "@/lib/api";
+import { fbTrack } from "@/lib/metaPixel";
 
 /**
  * Persist a copied prompt to History (manual copy-to-ChatGPT flow).
  * Best-effort: never throws, never blocks the copy UX.
  * Pass a stable `id` (from a useRef) so repeated copies upsert instead of duplicating.
  * Returns the saved id (reuse it as `id` on the next call for the same prompt).
+ *
+ * This is the single shared save point for Banner, Carousel, Marketplace, Food Menu,
+ * Studio, and Reels (all via PromptSuccessCard) — so it's also the one place that can
+ * reliably tell whether this is the user's first-ever generated prompt across every
+ * one of those dashboards, via the `is_first_ever` flag the backend computes.
+ * Feed Generator, Copywriting, and Talking Avatar do NOT go through this function
+ * (separate dedicated endpoints) — see the Meta Pixel install report for why those
+ * don't fire Meta Pixel's StartTrial today.
  */
 export async function savePromptToHistory(payload) {
   try {
     const { data } = await api.post("/prompts/save", payload);
+    if (data?.is_first_ever) fbTrack("StartTrial");
     return data?.id || null;
   } catch {
     return null;
