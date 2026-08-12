@@ -1,5 +1,5 @@
 import api from "@/lib/api";
-import { fbTrack } from "@/lib/metaPixel";
+import { fbTrack, getCachedUserId } from "@/lib/metaPixel";
 
 /**
  * Persist a copied prompt to History (manual copy-to-ChatGPT flow).
@@ -7,18 +7,20 @@ import { fbTrack } from "@/lib/metaPixel";
  * Pass a stable `id` (from a useRef) so repeated copies upsert instead of duplicating.
  * Returns the saved id (reuse it as `id` on the next call for the same prompt).
  *
- * This is the single shared save point for Banner, Carousel, Marketplace, Food Menu,
- * Studio, and Reels (all via PromptSuccessCard) — so it's also the one place that can
- * reliably tell whether this is the user's first-ever generated prompt across every
- * one of those dashboards, via the `is_first_ever` flag the backend computes.
- * Feed Generator, Copywriting, and Talking Avatar do NOT go through this function
- * (separate dedicated endpoints) — see the Meta Pixel install report for why those
- * don't fire Meta Pixel's StartTrial today.
+ * This is the shared save point for Banner, Carousel, Marketplace, Food Menu, Studio,
+ * and Reels (all via PromptSuccessCard) — so it's also one of four places that can
+ * report the user's first-ever generation via Meta Pixel's StartTrial (the other three:
+ * Feed Generator, Copywriting, and Talking Avatar each fire it from their own endpoint —
+ * see lib/metaPixel.js's fbTrack() docs for why they all share the SAME deterministic
+ * `trial_${userId}` eventID rather than each minting their own).
  */
 export async function savePromptToHistory(payload) {
   try {
     const { data } = await api.post("/prompts/save", payload);
-    if (data?.is_first_ever) fbTrack("StartTrial");
+    if (data?.is_first_ever) {
+      const uid = getCachedUserId();
+      if (uid) fbTrack("StartTrial", {}, `trial_${uid}`);
+    }
     return data?.id || null;
   } catch {
     return null;

@@ -98,7 +98,17 @@ export default function CheckoutPage() {
     // Meta Pixel: the only client-visible moment payment success actually happens —
     // approval itself is server-side (Telegram bot / Admin Panel), the browser only
     // learns about it via this page's polling picking up status: "lunas".
-    fbTrack("Purchase", { value: Number(order.amount) || 0, currency: "IDR" });
+    // Deterministic eventID (purchase_<order.id>) + a persisted guard keyed by that same
+    // order id: a page refresh or back-navigation while status is already "lunas" would
+    // otherwise re-run this effect and re-fire Purchase for a payment already reported.
+    const orderId = String(order.id);
+    const firedKey = `feedify_purchase_fired_${orderId}`;
+    if (!localStorage.getItem(firedKey)) {
+      localStorage.setItem(firedKey, "1");
+      // order.amount is already a plain int from the backend (base price + random
+      // suffix) — Number() here is defensive, not a format fix.
+      fbTrack("Purchase", { value: Number(order.amount) || 0, currency: "IDR" }, `purchase_${orderId}`);
+    }
     (async () => {
       await refreshUser();
       toast.success("Lifetime aktif! Selamat datang di Feedify 🎉");

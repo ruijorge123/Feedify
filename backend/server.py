@@ -6392,7 +6392,13 @@ Kembalikan HANYA JSON valid (tanpa fence) dengan struktur:
             parsed = {"_raw": raw[:1500], "error": "No JSON found"}
 
     saved_id = None
+    is_first_ever = False
     if payload.save and "error" not in parsed:
+        # Meta Pixel StartTrial signal — same pattern/collection as /prompts/save and
+        # /feed-generator/generate. Tied to payload.save because that's also what gates
+        # whether a generated_prompts row exists at all here; the frontend currently
+        # always sends save=true with no UI to turn it off.
+        is_first_ever = await db.generated_prompts.count_documents({"user_id": current_user["id"]}) == 0
         saved_id = str(uuid.uuid4())
         doc = {
             "id": saved_id,
@@ -6405,7 +6411,7 @@ Kembalikan HANYA JSON valid (tanpa fence) dengan struktur:
         }
         await db.generated_prompts.insert_one(doc)
 
-    return {"id": saved_id, "result": parsed}
+    return {"id": saved_id, "result": parsed, "is_first_ever": is_first_ever}
 
 
 # ============= CAPTION BUNDLE =============
@@ -7804,6 +7810,12 @@ Kembalikan JSON array berisi {count} objek: [{{"index": 1, "purpose": "...", "ca
             if cap.get("tip"):
                 it["tip"] = cap["tip"]
 
+    # Meta Pixel StartTrial signal — snapshot BEFORE the insert below, same pattern as
+    # /prompts/save (which shares this same collection for Banner/Carousel/Marketplace/
+    # Food/Studio/Reels), so a user's first-ever generation counts once regardless of
+    # which of these dashboards they happen to try first.
+    is_first_ever = await db.generated_prompts.count_documents({"user_id": current_user["id"]}) == 0
+
     saved_id = str(uuid.uuid4())
     await db.generated_prompts.insert_one({
         "id": saved_id,
@@ -7823,6 +7835,7 @@ Kembalikan JSON array berisi {count} objek: [{{"index": 1, "purpose": "...", "ca
         "prompts": items,
         "product_name": product_name,
         "credits": _credits_summary(credits_doc),
+        "is_first_ever": is_first_ever,
     }
 
 
@@ -10069,6 +10082,13 @@ async def talking_avatar_generate(
                 await _refund_credit(user_id, credits_needed, "Refund talking avatar - no job_id")
                 raise HTTPException(status_code=500, detail="HeyGen tidak mengembalikan job ID")
 
+            # Meta Pixel StartTrial signal — snapshot BEFORE the insert below. Counts ANY
+            # prior job regardless of status (a failed/refunded first attempt still counts
+            # as "already tried"), and fires on successful job SUBMISSION here rather than
+            # waiting for the async HeyGen render to finish — confirmed choice, matching
+            # /prompts/save's own pattern of not distinguishing success/failure downstream.
+            is_first_ever = await db.talking_avatar_jobs.count_documents({"user_id": user_id}) == 0
+
             # Save job to DB
             await db.talking_avatar_jobs.insert_one({
                 "user_id": user_id,
@@ -10084,6 +10104,7 @@ async def talking_avatar_generate(
                 "ok": True,
                 "job_id": job_id,
                 "credits": _credits_summary(credits_doc),
+                "is_first_ever": is_first_ever,
             }
 
     except HTTPException:

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { copyToClipboard, openChatGPT } from "@/lib/chatgpt";
+import { fbTrack, getCachedUserId } from "@/lib/metaPixel";
 import ChatGptImageSteps from "@/components/ChatGptImageSteps";
 import PhotoPrepBlock from "@/components/PhotoPrepBlock";
 import DebugJsonButton from "@/components/DebugJsonButton";
@@ -286,6 +287,13 @@ export default function FeedGeneratorPage() {
           outfit_style: MODEL_STYLES.find((s) => s.id === modelStyle)?.value || modelStyle,
         } : {}),
       });
+      // Meta Pixel: same deterministic trial_<userId> as the other 3 generation entry
+      // points, so a user's first-ever generation counts once regardless of which
+      // dashboard they try first.
+      if (data?.is_first_ever) {
+        const uid = getCachedUserId();
+        if (uid) fbTrack("StartTrial", {}, `trial_${uid}`);
+      }
       setResult(data);
     } catch (err) {
       const msg = err?.response?.data?.detail || "Gagal generate. Coba lagi.";

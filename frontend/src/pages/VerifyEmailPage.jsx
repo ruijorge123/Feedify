@@ -64,7 +64,7 @@ export default function VerifyEmailPage() {
       await loginWithToken(data.token, data.user);
       // Meta Pixel: this is the only completion point for email/password signup —
       // POST /auth/register always requires OTP verification, no account is usable before this.
-      fbTrack("CompleteRegistration");
+      fbTrack("CompleteRegistration", {}, `signup_${data.user.id}`);
       toast.success("Email berhasil diverifikasi!");
       navigate(data.user.has_brand_profile ? "/dashboard" : "/onboarding", { replace: true });
     } catch (err) {

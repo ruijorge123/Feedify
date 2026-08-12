@@ -70,7 +70,7 @@ export default function RegisterPage() {
         setUser(data.user);
         // Meta Pixel: google-token upserts (create-or-login), so only fire for a
         // genuinely brand-new account — avoids counting a returning user as a signup.
-        if (data.is_new_user) fbTrack("CompleteRegistration");
+        if (data.is_new_user) fbTrack("CompleteRegistration", {}, `signup_${data.user.id}`);
         toast.success(`Halo, ${data.user.name.split(" ")[0]}! Akun berhasil dibuat.`);
         navigate(data.user.has_brand_profile ? "/dashboard" : "/onboarding");
       } catch {

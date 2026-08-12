@@ -17,6 +17,7 @@ import {
   Info,
 } from "@phosphor-icons/react";
 import api from "@/lib/api";
+import { fbTrack, getCachedUserId } from "@/lib/metaPixel";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -244,6 +245,13 @@ export default function TalkingAvatarPage() {
         background: bg,
         duration_seconds: duration,
       });
+
+      // Meta Pixel: fires on successful job SUBMISSION (not waiting for the async HeyGen
+      // render to finish) — same deterministic trial_<userId> as the other 3 entry points.
+      if (data?.is_first_ever) {
+        const uid = getCachedUserId();
+        if (uid) fbTrack("StartTrial", {}, `trial_${uid}`);
+      }
 
       if (data.video_url) {
         // Immediate result

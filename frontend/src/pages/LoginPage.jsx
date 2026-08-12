@@ -453,7 +453,7 @@ export default function LoginPage() {
         setUser(data.user);
         // Meta Pixel: google-token upserts (create-or-login) — a user landing on /login
         // can still end up creating a brand-new account this way, so it's tracked here too.
-        if (data.is_new_user) fbTrack("CompleteRegistration");
+        if (data.is_new_user) fbTrack("CompleteRegistration", {}, `signup_${data.user.id}`);
         toast.success(`Halo, ${data.user.name.split(" ")[0]}!`);
         afterLoginNav(data.user);
       } catch {

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { toast } from 'react-toastify';
 import { handleGenerateError } from "@/lib/moderation";
+import { fbTrack, getCachedUserId } from "@/lib/metaPixel";
 import {
   Sparkle, CircleNotch, CheckCircle, Copy, Check,
   Target, Article, MegaphoneSimple, Hash,
@@ -265,6 +266,11 @@ export default function CopywritingPage() {
       };
       const { data } = await api.post("/prompt/generate-copywriting", payload);
       if (data.result?.error) { toast.error("Feedify gagal menghasilkan. Coba lagi."); return; }
+      // Meta Pixel: same deterministic trial_<userId> as the other 3 generation entry points.
+      if (data?.is_first_ever) {
+        const uid = getCachedUserId();
+        if (uid) fbTrack("StartTrial", {}, `trial_${uid}`);
+      }
       setResult(data);
       toast.success("Marketing copy siap!");
       setTimeout(() => document.getElementById("copy-result")?.scrollIntoView({ behavior: "smooth" }), 100);
