@@ -17,10 +17,15 @@ export default function VerifyEmailPage() {
   const { loginWithToken } = useAuth();
 
   const email = location.state?.email || "";
+  // Carried over from RegisterPage when the OTP mail failed to send, so this screen can
+  // tell the user to hit "kirim ulang" instead of waiting for a code that never arrives.
+  const otpSent = location.state?.otpSent !== false;
 
   useEffect(() => {
     if (!email) { navigate("/register", { replace: true }); return; }
+    if (!otpSent) setCountdown(0);   // let them retry immediately
     inputs.current[0]?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, navigate]);
 
   // Countdown timer untuk resend
@@ -81,7 +86,8 @@ export default function VerifyEmailPage() {
     setResending(true);
     try {
       await api.post("/auth/resend-otp", { email });
-      toast.success("Kode OTP baru dikirim!");
+      // Backend now 503s when the mail genuinely failed, so reaching here means it was sent.
+      toast.success("Kode OTP baru dikirim! Cek juga folder Spam.");
       setCountdown(60);
       setOtp(["", "", "", "", "", ""]);
       inputs.current[0]?.focus();
@@ -109,8 +115,17 @@ export default function VerifyEmailPage() {
 
           {/* Body */}
           <div className="px-8 py-8 space-y-6">
+            {!otpSent && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3" data-testid="otp-send-failed-banner">
+                <p className="text-sm font-semibold text-amber-800">Email OTP gagal dikirim</p>
+                <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                  Akun kamu sudah dibuat, tapi emailnya tidak terkirim. Tekan <strong>Kirim ulang kode</strong> di bawah.
+                </p>
+              </div>
+            )}
             <p className="text-center text-stone-500 text-sm leading-relaxed">
               Masukkan 6 digit kode yang dikirim ke email kamu. Kode berlaku <strong className="text-brand">15 menit</strong>.
+              {" "}Tidak ada di inbox? Cek folder <strong className="text-brand">Spam</strong>.
             </p>
 
             {/* OTP Input */}

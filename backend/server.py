@@ -95,6 +95,17 @@ SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USER = os.environ.get('SMTP_USER', '')
 SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 SMTP_FROM = os.environ.get('SMTP_FROM', '')
+# Transactional email provider (HTTP API). Preferred over SMTP: one HTTPS call instead of a
+# multi-round-trip SMTP handshake (much better on a serverless lambda), and — the actual point —
+# it lets mail be sent from an authenticated custom domain (SPF/DKIM/DMARC) instead of a personal
+# Gmail account, which is what keeps OTPs out of the spam folder. Set ONE of these keys plus
+# EMAIL_FROM; _send_email() falls back to SMTP when neither is configured.
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
+EMAIL_FROM = os.environ.get('EMAIL_FROM', '')          # e.g. "Feedify <noreply@feedifyid.com>"
+# Domain used for the Message-ID header. MUST match the domain mail is actually sent from —
+# a mismatch here is a well-known spam signal. Derived from the configured sender when unset.
+EMAIL_DOMAIN = os.environ.get('EMAIL_DOMAIN', '')
 # Webpushr — web push for scheduled reminders (replaces OneSignal, which replaced the old
 # VAPID/pywebpush flow before it). Scheduling delivery is delegated to Webpushr's own `send_at`
 # (serverless-safe — no always-on polling loop needed, unlike the old _reminder_loop). Targeting
@@ -2594,6 +2605,126 @@ async def _auto_consistency_check(user_id: str, prompt_id: str, image_base64: st
 
 
 # ============= AUTH =============
+# ─── Email delivery ──────────────────────────────────────────────────────────
+# One send path for all transactional mail, with three interchangeable backends. An HTTP API
+# provider is tried first because SMTP is a poor fit for a serverless lambda (multi-round-trip
+# handshake on every cold start) AND because sending from a verified custom domain with
+# SPF/DKIM/DMARC is the only real fix for OTPs landing in spam — a personal Gmail account
+# sending brand-styled mail to strangers is exactly the pattern spam filters punish.
+
+
+def _sender_identity() -> tuple:
+    """Return (from_header, domain) for outgoing mail, preferring the API-provider sender."""
+    from_header = EMAIL_FROM or SMTP_FROM or (f"Feedify <{SMTP_USER}>" if SMTP_USER else "")
+    if EMAIL_DOMAIN:
+        domain = EMAIL_DOMAIN
+    else:
+        # Derive from the sender address so Message-ID always matches the real sending domain.
+        addr = from_header.split("<")[-1].rstrip(">") if "<" in from_header else from_header
+        domain = addr.split("@")[-1].strip() if "@" in addr else "localhost"
+    return from_header, domain
+
+
+def _email_configured() -> bool:
+    return bool(RESEND_API_KEY or BREVO_API_KEY or (SMTP_USER and SMTP_PASSWORD))
+
+
+async def _send_email(to_email: str, subject: str, html: str, plain: str) -> bool:
+    """Send one transactional email. Returns True only on confirmed acceptance by the provider.
+    Never raises — callers decide what to do with a False."""
+    from_header, domain = _sender_identity()
+    if not from_header:
+        logger.warning("Email not configured (no EMAIL_FROM/SMTP_USER) — nothing sent")
+        return False
+
+    if RESEND_API_KEY:
+        return await _send_email_resend(to_email, subject, html, plain, from_header)
+    if BREVO_API_KEY:
+        return await _send_email_brevo(to_email, subject, html, plain, from_header)
+    if SMTP_USER and SMTP_PASSWORD:
+        return await _send_email_smtp(to_email, subject, html, plain, from_header, domain)
+
+    logger.warning("No email backend configured — email to %s not sent", to_email)
+    return False
+
+
+async def _send_email_resend(to_email, subject, html, plain, from_header) -> bool:
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+                json={"from": from_header, "to": [to_email], "subject": subject,
+                      "html": html, "text": plain},
+            )
+        if r.status_code in (200, 201):
+            return True
+        logger.error(f"Resend send failed [{r.status_code}]: {r.text[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Resend send error: {e}")
+        return False
+
+
+async def _send_email_brevo(to_email, subject, html, plain, from_header) -> bool:
+    import httpx
+    name = from_header.split("<")[0].strip() or "Feedify"
+    addr = from_header.split("<")[-1].rstrip(">") if "<" in from_header else from_header
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"api-key": BREVO_API_KEY, "content-type": "application/json"},
+                json={"sender": {"name": name, "email": addr},
+                      "to": [{"email": to_email}], "subject": subject,
+                      "htmlContent": html, "textContent": plain},
+            )
+        if r.status_code in (200, 201, 202):
+            return True
+        logger.error(f"Brevo send failed [{r.status_code}]: {r.text[:300]}")
+        return False
+    except Exception as e:
+        logger.error(f"Brevo send error: {e}")
+        return False
+
+
+async def _send_email_smtp(to_email, subject, html, plain, from_header, domain) -> bool:
+    import smtplib, uuid as _uuid
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.utils import formatdate, make_msgid
+
+    def _send():
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = from_header
+        msg["To"] = to_email
+        msg["Reply-To"] = SMTP_USER
+        # Message-ID domain MUST match the sending domain — pointing it at an unrelated
+        # domain is a standard spam signal (this used to hardcode "@feedify.id", a domain
+        # the app doesn't even send from).
+        msg["Message-ID"] = make_msgid(domain=domain)
+        msg["Date"] = formatdate(localtime=True)
+        # Marks this as machine-generated transactional mail rather than bulk/marketing.
+        msg["Auto-Submitted"] = "auto-generated"
+        msg.attach(MIMEText(plain, "plain", "utf-8"))
+        msg.attach(MIMEText(html, "html", "utf-8"))
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_USER, to_email, msg.as_string())
+
+    try:
+        await asyncio.to_thread(_send)
+        return True
+    except Exception as e:
+        logger.error(f"SMTP send failed to {to_email}: {e}")
+        return False
+
+
 # ─── OTP Email ───────────────────────────────────────────────────────────────
 
 def _generate_otp() -> str:
@@ -2601,8 +2732,8 @@ def _generate_otp() -> str:
 
 
 async def _send_otp_email(to_email: str, name: str, otp: str) -> bool:
-    if not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning("SMTP not configured — OTP email not sent")
+    if not _email_configured():
+        logger.warning("Email backend not configured — OTP email not sent")
         return False
 
     html = f"""
@@ -2645,38 +2776,18 @@ async def _send_otp_email(to_email: str, name: str, otp: str) -> bool:
 </body>
 </html>"""
 
-    import smtplib
-    from email.mime.multipart import MIMEMultipart
-    from email.mime.text import MIMEText
-
-    def _send():
-        import uuid
-        from email.utils import formatdate
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"Konfirmasi akun Feedify kamu ({otp})"
-        msg["From"] = SMTP_FROM or f"Feedify <{SMTP_USER}>"
-        msg["To"] = to_email
-        msg["Reply-To"] = SMTP_USER
-        msg["Message-ID"] = f"<{uuid.uuid4()}@feedify.id>"
-        msg["Date"] = formatdate(localtime=True)
-        msg["X-Mailer"] = "Feedify Mailer"
-        # Plain text fallback (reduces spam score)
-        plain = f"Hei {name},\n\nKode konfirmasi akun Feedify kamu: {otp}\n\nKode berlaku 15 menit. Jangan bagikan ke siapapun.\n\nSalam,\nTim Feedify"
-        msg.attach(MIMEText(plain, "plain", "utf-8"))
-        msg.attach(MIMEText(html, "html", "utf-8"))
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_USER, to_email, msg.as_string())
-
-    try:
-        await asyncio.to_thread(_send)
-        return True
-    except Exception as e:
-        logger.error(f"OTP email failed: {e}")
-        return False
+    # Subject deliberately does NOT contain the OTP: a bare 6-digit code in a subject line
+    # is a common phishing/spam pattern, and it also leaks the code to anyone glancing at
+    # a notification preview.
+    subject = "Kode konfirmasi akun Feedify"
+    plain = (
+        f"Hei {name},\n\n"
+        f"Kode konfirmasi akun Feedify kamu: {otp}\n\n"
+        "Kode berlaku 15 menit. Jangan bagikan ke siapapun.\n\n"
+        "Kalau kamu tidak mendaftar di Feedify, abaikan email ini.\n\n"
+        "Salam,\nTim Feedify"
+    )
+    return await _send_email(to_email, subject, html, plain)
 
 
 async def _create_otp(email: str, purpose: str = "register") -> str:
@@ -2703,8 +2814,12 @@ async def register(payload: UserRegister):
         if not existing.get("email_verified", True):
             # Account exists but unverified — resend OTP
             otp = await _create_otp(email)
-            await _send_otp_email(email, existing["name"], otp)
-            return {"requires_verification": True, "email": email, "message": "OTP baru dikirim ke email"}
+            sent = await _send_otp_email(email, existing["name"], otp)
+            return {
+                "requires_verification": True, "email": email, "otp_sent": sent,
+                "message": "OTP baru dikirim ke email" if sent
+                           else "Akun kamu sudah ada, tapi email OTP gagal dikirim. Coba tombol kirim ulang.",
+            }
         raise HTTPException(status_code=400, detail="Email sudah terdaftar")
     user_id = str(uuid.uuid4())
     doc = {
@@ -2719,8 +2834,17 @@ async def register(payload: UserRegister):
     }
     await db.users.insert_one(doc)
     otp = await _create_otp(email)
-    await _send_otp_email(email, payload.name, otp)
-    return {"requires_verification": True, "email": email, "message": "Kode OTP dikirim ke email kamu"}
+    # Report the real outcome instead of always claiming success — the account exists either
+    # way, so the user can still recover via "kirim ulang", but they must be told the mail
+    # didn't go out rather than being left staring at an OTP screen that will never fill.
+    sent = await _send_otp_email(email, payload.name, otp)
+    if not sent:
+        logger.error(f"Registration OTP email FAILED for {email} — account created but unverifiable")
+    return {
+        "requires_verification": True, "email": email, "otp_sent": sent,
+        "message": "Kode OTP dikirim ke email kamu" if sent
+                   else "Akun dibuat, tapi email OTP gagal dikirim. Pakai tombol kirim ulang di halaman berikutnya.",
+    }
 
 
 @api_router.post("/auth/login")
@@ -2731,11 +2855,15 @@ async def login(payload: UserLogin):
     await _block_if_maintenance(user.get("role", "user"))
     if not user.get("email_verified", True):
         otp = await _create_otp(user["email"])
-        await _send_otp_email(user["email"], user["name"], otp)
+        sent = await _send_otp_email(user["email"], user["name"], otp)
+        if not sent:
+            logger.error(f"Login re-verification OTP email FAILED for {user['email']}")
         raise HTTPException(
             status_code=403,
             detail="EMAIL_NOT_VERIFIED",
-            headers={"X-Email": user["email"]},
+            # X-Otp-Sent lets the client warn the user instead of silently sending them to
+            # an OTP screen when the mail never actually went out.
+            headers={"X-Email": user["email"], "X-Otp-Sent": "1" if sent else "0"},
         )
     has_bp = await db.brand_profiles.find_one({"user_id": user["id"]}) is not None
     token = create_jwt_token(user["id"], user["email"])
@@ -2807,7 +2935,11 @@ async def resend_otp(payload: dict):
     if user.get("email_verified", True):
         raise HTTPException(status_code=400, detail="Email sudah terverifikasi")
     otp = await _create_otp(email)
-    await _send_otp_email(email, user["name"], otp)
+    sent = await _send_otp_email(email, user["name"], otp)
+    if not sent:
+        # This one is an explicit user action ("kirim ulang"), so a silent success message
+        # would be an outright lie — surface it as a real error.
+        raise HTTPException(status_code=503, detail="Gagal mengirim email OTP. Coba lagi sebentar lagi.")
     return {"message": "Kode OTP baru dikirim ke email kamu"}
 
 
@@ -2819,7 +2951,12 @@ async def forgot_password(payload: dict):
     user = await db.users.find_one({"email": email})
     if user:
         otp = await _create_otp(email, purpose="reset_password")
-        await _send_otp_email(email, user["name"], otp)
+        sent = await _send_otp_email(email, user["name"], otp)
+        if not sent:
+            # Deliberately NOT surfaced to the caller: reporting the failure only for
+            # registered addresses would turn this endpoint into an account-existence
+            # oracle. Logged loudly instead so the operator can still see it.
+            logger.error(f"Password-reset OTP email FAILED for {email}")
     # Selalu balas pesan generik agar tidak membocorkan email mana yang terdaftar
     return {"message": "Jika email terdaftar, kode OTP sudah dikirim"}
 

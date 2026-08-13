@@ -48,8 +48,14 @@ export default function RegisterPage() {
     try {
       const result = await register(name, email, password);
       if (result.requires_verification) {
-        toast.success("Kode OTP dikirim ke email kamu!");
-        navigate("/verify-email", { state: { email: result.email } });
+        // otp_sent === false means the account exists but the email genuinely didn't go
+        // out — say so instead of sending them to an OTP screen that will never fill.
+        if (result.otp_sent === false) {
+          toast.warn(result.message || "Akun dibuat, tapi email OTP gagal dikirim. Coba kirim ulang.", { autoClose: 8000 });
+        } else {
+          toast.success("Kode OTP dikirim ke email kamu! Cek juga folder Spam.");
+        }
+        navigate("/verify-email", { state: { email: result.email, otpSent: result.otp_sent !== false } });
       } else {
         navigate("/onboarding");
       }
