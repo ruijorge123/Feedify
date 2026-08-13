@@ -45,6 +45,7 @@ import {
   Timer,
   WarningCircle,
   ChatCircleDots,
+  Trash,
 } from "@phosphor-icons/react";
 import { Switch } from "@/components/ui/switch";
 import { resetTour } from "@/components/ProductTour";
@@ -159,6 +160,91 @@ function RoleDialog({ target, currentUserId, open, onOpenChange, onSaved }) {
             <button onClick={save} disabled={saving || selectedRole === target.role} data-testid="role-dialog-save"
               className="flex-1 py-3 bg-brand text-brand-cream rounded-full font-semibold hover:bg-brand-light transition-all btn-touch disabled:opacity-50">
               {saving ? "Menyimpan..." : "Simpan"}
+            </button>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}
+
+// ─── Delete User Dialog (owner account only) ───────────────────────────────
+// Deletion is permanent and takes the user's brand, products, content, credits and
+// payment records with it. The admin must retype the target's email before the button
+// arms — a plain "are you sure?" is too easy to click through on the wrong table row.
+
+function DeleteUserDialog({ target, open, onOpenChange, onDeleted }) {
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => { setConfirmText(""); }, [target, open]);
+
+  const matches = target && confirmText.trim().toLowerCase() === (target.email || "").toLowerCase();
+
+  const doDelete = async () => {
+    if (!target || !matches) return;
+    setDeleting(true);
+    try {
+      const { data } = await api.delete(`/admin/users/${target.id}`, {
+        data: { confirm_email: confirmText.trim() },
+      });
+      const n = Object.values(data?.deleted_records || {})
+        .filter((v) => typeof v === "number")
+        .reduce((a, b) => a + b, 0);
+      toast.success(`Akun ${target.email} dihapus (${n} data terhapus)`);
+      onDeleted(target.id);
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Gagal menghapus user");
+    } finally { setDeleting(false); }
+  };
+
+  if (!target) return null;
+
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl p-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95">
+          <DialogPrimitive.Close className="absolute right-4 top-4 p-1.5 rounded-full text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-all">
+            <X size={16} />
+          </DialogPrimitive.Close>
+
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-11 w-11 rounded-full bg-red-50 text-red-500 flex items-center justify-center flex-shrink-0">
+              <Trash size={20} weight="duotone" />
+            </div>
+            <div className="min-w-0">
+              <DialogPrimitive.Title className="font-heading text-lg font-bold text-brand leading-tight">Hapus Akun</DialogPrimitive.Title>
+              <DialogPrimitive.Description className="text-xs text-stone-500 mt-0.5 truncate">{target.name} · {target.email}</DialogPrimitive.Description>
+            </div>
+          </div>
+
+          <div className="mb-4 px-3 py-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 leading-relaxed">
+            <strong>Permanen dan tidak bisa dibatalkan.</strong> Semua data user ini ikut terhapus:
+            brand profile, produk, konten, kredit, riwayat pembayaran, dan jadwal posting.
+          </div>
+
+          <label className="text-xs font-semibold text-stone-600 block mb-1.5">
+            Ketik <span className="font-mono text-red-600">{target.email}</span> untuk konfirmasi
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={target.email}
+            autoComplete="off"
+            data-testid="delete-user-confirm-input"
+            className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm outline-none focus:border-red-400 mb-4 font-mono"
+          />
+
+          <div className="flex gap-2">
+            <DialogPrimitive.Close asChild>
+              <button className="flex-1 py-3 border border-brand-sand text-stone-700 rounded-full font-semibold hover:bg-brand-sand transition-all btn-touch">Batal</button>
+            </DialogPrimitive.Close>
+            <button onClick={doDelete} disabled={!matches || deleting} data-testid="delete-user-confirm-btn"
+              className="flex-1 py-3 bg-red-500 text-white rounded-full font-semibold hover:bg-red-600 transition-all btn-touch disabled:opacity-40 disabled:cursor-not-allowed">
+              {deleting ? "Menghapus..." : "Hapus Permanen"}
             </button>
           </div>
         </DialogPrimitive.Content>
@@ -1080,6 +1166,10 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [roleDialog, setRoleDialog] = useState({ open: false, target: null });
   const [detailDrawer, setDetailDrawer] = useState({ open: false, userId: null });
+  // Only the owner account may delete users — the backend decides this and reports it
+  // here, so the email is never duplicated in frontend code.
+  const [canDelete, setCanDelete] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, target: null });
 
   const LIMIT = 20;
 
@@ -1089,6 +1179,7 @@ export default function AdminPage() {
       const { data } = await api.get("/admin/users", { params: { page, limit: LIMIT, search } });
       setUsers(data.users);
       setTotal(data.total);
+      setCanDelete(!!data.can_delete_users);
     } catch (err) {
       if (err?.response?.status === 403) { toast.error("Akses ditolak"); navigate("/dashboard"); }
       else toast.error("Gagal memuat data");
@@ -1102,6 +1193,10 @@ export default function AdminPage() {
 
   const handleSearch = (e) => { e.preventDefault(); setSearch(searchInput); setPage(1); };
   const handleRoleSaved = (userId, newRole) => setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u));
+  const handleDeleted = (userId) => {
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    setTotal((t) => Math.max(0, t - 1));
+  };
 
   const totalPages = Math.ceil(total / LIMIT);
   const adminCount = users.filter((u) => u.role === "admin").length;
@@ -1246,6 +1341,15 @@ export default function AdminPage() {
                         >
                           <PencilSimple size={11} /> Role
                         </button>
+                        {canDelete && (
+                          <button
+                            onClick={() => setDeleteDialog({ open: true, target: u })}
+                            data-testid={`delete-user-${u.id}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50 btn-touch transition-all"
+                          >
+                            <Trash size={11} /> Hapus
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-stone-400 italic">Anda</span>
@@ -1300,6 +1404,13 @@ export default function AdminPage() {
                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border border-brand-sand text-stone-600 hover:bg-brand-sand btn-touch">
                     <PencilSimple size={12} /> Role
                   </button>
+                  {canDelete && (
+                    <button onClick={() => setDeleteDialog({ open: true, target: u })}
+                      data-testid={`delete-user-mobile-${u.id}`}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50 btn-touch">
+                      <Trash size={12} /> Hapus
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1338,6 +1449,12 @@ export default function AdminPage() {
         open={detailDrawer.open}
         userId={detailDrawer.userId}
         onClose={() => setDetailDrawer({ open: false, userId: null })}
+      />
+      <DeleteUserDialog
+        open={deleteDialog.open}
+        onOpenChange={(v) => setDeleteDialog((s) => ({ ...s, open: v }))}
+        target={deleteDialog.target}
+        onDeleted={handleDeleted}
       />
     </div>
   );

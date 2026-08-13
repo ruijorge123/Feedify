@@ -9530,6 +9530,19 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     return current_user
 
 
+# Account deletion is irreversible and wipes every trace of a user, so it is NOT granted to
+# the admin role at large — only to this single owner account. Overridable by env var so the
+# address can be changed without a code change, but it deliberately defaults to the owner
+# rather than to "any admin".
+SUPER_ADMIN_EMAIL = os.environ.get('SUPER_ADMIN_EMAIL', 'ruijorge800.rj@gmail.com').lower()
+
+
+async def require_super_admin(current_user: dict = Depends(require_admin)) -> dict:
+    if (current_user.get("email") or "").lower() != SUPER_ADMIN_EMAIL:
+        raise HTTPException(status_code=403, detail="Akses ditolak: hanya akun pemilik yang boleh menghapus user")
+    return current_user
+
+
 @api_router.get("/admin/manual-payments")
 async def admin_list_manual_payments(status: Optional[str] = None, admin_user: dict = Depends(require_admin)):
     """List manual payment orders — collapsed to the single most recent order per email.
@@ -9897,7 +9910,12 @@ async def admin_list_users(
             "is_lifetime": bool(u.get("is_lifetime")),
         })
 
-    return {"users": enriched, "total": total, "page": page, "limit": limit}
+    # Tells the UI whether to render the delete control at all. The endpoint itself is
+    # still guarded by require_super_admin — this only avoids showing a button that
+    # would always fail for a regular admin.
+    is_super = (admin_user.get("email") or "").lower() == SUPER_ADMIN_EMAIL
+    return {"users": enriched, "total": total, "page": page, "limit": limit,
+            "can_delete_users": is_super}
 
 
 @api_router.patch("/admin/users/{user_id}/role")
@@ -9915,6 +9933,81 @@ async def admin_update_role(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
     return {"ok": True, "user_id": user_id, "role": new_role}
+
+
+class DeleteUserIn(BaseModel):
+    confirm_email: str
+
+
+# Every collection that stores rows belonging to a user, and the field they're keyed by.
+# Kept next to the delete endpoint so adding a new user-owned collection without also
+# adding it here is an obvious omission rather than a silent orphaned-data leak.
+_USER_OWNED_COLLECTIONS = [
+    ("user_credits", "user_id"), ("credit_transactions", "user_id"),
+    ("brand_profiles", "user_id"), ("business_profiles", "user_id"),
+    ("products", "user_id"), ("prompts", "user_id"),
+    ("generated_prompts", "user_id"), ("calendar_events", "user_id"),
+    ("scheduled_posts", "user_id"), ("consultations", "user_id"),
+    ("notification_settings", "user_id"), ("talking_avatar_jobs", "user_id"),
+    ("consistency_checks", "user_id"), ("daily_recommendations", "user_id"),
+    ("studio_results", "user_id"), ("video_generations", "user_id"),
+    ("manual_payments", "user_id"), ("feedback", "user_id"),
+]
+
+
+@api_router.delete("/admin/users/{user_id}")
+async def admin_delete_user(
+    user_id: str,
+    body: DeleteUserIn,
+    admin_user: dict = Depends(require_super_admin),
+):
+    """Permanently delete a user and everything they own. Owner account only.
+
+    Irreversible: there is no soft-delete or restore. The caller must echo back the
+    target's email address, so deleting the wrong row takes a deliberate act rather
+    than a mis-click on the wrong table line.
+    """
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+
+    target_email = (target.get("email") or "").lower()
+    if (body.confirm_email or "").strip().lower() != target_email:
+        raise HTTPException(status_code=400, detail="Email konfirmasi tidak cocok dengan user yang mau dihapus")
+    if user_id == admin_user["id"]:
+        raise HTTPException(status_code=400, detail="Tidak bisa menghapus akun sendiri")
+    if target_email == SUPER_ADMIN_EMAIL:
+        raise HTTPException(status_code=400, detail="Akun pemilik tidak bisa dihapus")
+
+    deleted: dict = {}
+    for coll_name, field in _USER_OWNED_COLLECTIONS:
+        try:
+            res = await db[coll_name].delete_many({field: user_id})
+            if res.deleted_count:
+                deleted[coll_name] = res.deleted_count
+        except Exception as e:
+            # Keep going: a partly-cleaned account is still better than aborting midway
+            # and leaving BOTH the user row and their data behind.
+            logger.error(f"Delete user {user_id}: collection {coll_name} failed: {e}")
+            deleted[coll_name] = f"GAGAL: {e}"
+
+    # OTPs are keyed by email, not user_id
+    try:
+        res = await db.email_otps.delete_many({"email": target_email})
+        if res.deleted_count:
+            deleted["email_otps"] = res.deleted_count
+    except Exception as e:
+        logger.error(f"Delete user {user_id}: email_otps failed: {e}")
+
+    await db.users.delete_one({"id": user_id})
+    deleted["users"] = 1
+
+    logger.warning(
+        f"USER DELETED by {admin_user.get('email')}: {target_email} (id={user_id}) — removed {deleted}"
+    )
+    return {"ok": True, "deleted_user": {"id": user_id, "email": target_email,
+                                         "name": target.get("name", "")},
+            "deleted_records": deleted}
 
 
 @api_router.patch("/admin/users/{user_id}/credits")
