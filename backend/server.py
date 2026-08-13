@@ -8523,60 +8523,128 @@ class ManualProofIn(BaseModel):
     photo_base64: str
 
 
-async def _telegram_api(method: str, **kwargs):
-    """Call a Telegram Bot API method. No-ops (returns None) if bot token isn't configured."""
+async def _telegram_api(method: str, timeout: float = 15, **kwargs):
+    """Call a Telegram Bot API method. No-ops (returns None) if bot token isn't configured.
+
+    Telegram signals failure IN the response body ({"ok": false, "description": ...}) with an
+    HTTP 200 in many cases, so a caller that only checks for an exception sees nothing. Those
+    are logged here — otherwise a rejected sendPhoto (rate limit, bad image, wrong chat_id)
+    would vanish without a trace, which for the payment-proof flow means a real transfer
+    silently never reaching the admin.
+    """
     if not TELEGRAM_BOT_TOKEN:
         return None
     import httpx
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/{method}", **kwargs)
-        try:
-            return resp.json()
-        except Exception:
-            return None
-
-
-async def _notify_telegram_payment_proof(order: dict):
-    """Fire-and-forget: push the uploaded proof photo to the admin's Telegram chat with Approve/Reject buttons."""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_ADMIN_CHAT_ID:
-        return
     try:
-        # Replace, don't stack: delete the previous proof message for this order (if any)
-        # so a re-upload doesn't flood the admin chat with multiple photos.
-        old_message_id = order.get("telegram_message_id")
-        if old_message_id:
-            await _telegram_api("deleteMessage", data={"chat_id": TELEGRAM_ADMIN_CHAT_ID, "message_id": old_message_id})
-
-        header, b64data = order["proof_photo_base64"].split(",", 1) if "," in order["proof_photo_base64"] else ("", order["proof_photo_base64"])
-        image_bytes = base64.b64decode(b64data)
-        caption = (
-            f"\U0001F4F8 Bukti transfer masuk\n"
-            f"Nama: {order.get('name') or '-'}\n"
-            f"Email: {order.get('email', '-')}\n"
-            f"Nominal: Rp{order.get('amount', 0):,}".replace(",", ".")
-        )
-        reply_markup = {
-            "inline_keyboard": [[
-                {"text": "✅ Tandai Lunas", "callback_data": f"approve:{order['id']}"},
-                {"text": "❌ Tolak", "callback_data": f"reject:{order['id']}"},
-            ]]
-        }
-        result = await _telegram_api(
-            "sendPhoto",
-            data={
-                "chat_id": TELEGRAM_ADMIN_CHAT_ID,
-                "caption": caption,
-                "reply_markup": json.dumps(reply_markup),
-            },
-            files={"photo": ("bukti_transfer.jpg", image_bytes, "image/jpeg")},
-        )
-        message_id = ((result or {}).get("result") or {}).get("message_id")
-        if message_id:
-            await db.manual_payments.update_one(
-                {"id": order["id"]}, {"$set": {"telegram_message_id": message_id}}
-            )
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/{method}", **kwargs)
+        data = resp.json()
     except Exception as e:
-        logger.error(f"Telegram proof notification failed: {e}")
+        logger.error(f"Telegram {method} transport error: {e}")
+        return None
+    if isinstance(data, dict) and not data.get("ok", False):
+        logger.error(f"Telegram {method} rejected [{data.get('error_code')}]: {data.get('description')}")
+    return data
+
+
+def _telegram_ok(result) -> bool:
+    return bool(isinstance(result, dict) and result.get("ok"))
+
+
+async def _notify_telegram_payment_proof(order: dict) -> bool:
+    """Push the uploaded proof photo to the admin's Telegram chat with Approve/Reject buttons.
+
+    Returns True only when Telegram CONFIRMS delivery. Real money rides on this notification,
+    so a failure must never pass unnoticed: the send is retried, falls back to a text-only
+    alert when the photo itself is the problem, and the outcome is always recorded on the
+    order (telegram_notified / telegram_error) so GET /admin/manual-payments can flag the
+    ones the admin was never told about.
+    """
+    order_id = order.get("id")
+
+    async def _record(ok: bool, err: str = "", message_id=None):
+        fields = {"telegram_notified": ok, "telegram_notified_at": now_iso(), "telegram_error": err}
+        if message_id:
+            fields["telegram_message_id"] = message_id
+        try:
+            await db.manual_payments.update_one({"id": order_id}, {"$set": fields})
+        except Exception as e:
+            logger.error(f"Could not record telegram status for order {order_id}: {e}")
+
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_ADMIN_CHAT_ID:
+        logger.error(f"PAYMENT PROOF UNNOTIFIED (Telegram not configured) — order {order_id}")
+        await _record(False, "telegram_not_configured")
+        return False
+
+    caption = (
+        f"\U0001F4F8 Bukti transfer masuk\n"
+        f"Nama: {order.get('name') or '-'}\n"
+        f"Email: {order.get('email', '-')}\n"
+        f"Nominal: Rp{order.get('amount', 0):,}".replace(",", ".")
+    )
+    reply_markup = json.dumps({
+        "inline_keyboard": [[
+            {"text": "✅ Tandai Lunas", "callback_data": f"approve:{order_id}"},
+            {"text": "❌ Tolak", "callback_data": f"reject:{order_id}"},
+        ]]
+    })
+
+    # Replace, don't stack: drop the previous proof message for this order (if any) so a
+    # re-upload doesn't flood the chat. Best-effort — Telegram refuses to delete messages
+    # older than 48h, and that must not stop the new one from being sent.
+    old_message_id = order.get("telegram_message_id")
+    if old_message_id:
+        await _telegram_api("deleteMessage", timeout=8,
+                            data={"chat_id": TELEGRAM_ADMIN_CHAT_ID, "message_id": old_message_id})
+
+    # ── Attempt 1..2: the photo itself ────────────────────────────────────────
+    image_bytes = None
+    try:
+        raw = order.get("proof_photo_base64") or ""
+        image_bytes = base64.b64decode(raw.split(",", 1)[1] if "," in raw else raw)
+    except Exception as e:
+        logger.error(f"Proof photo undecodable for order {order_id}: {e}")
+
+    last_err = "no attempt"
+    if image_bytes:
+        for attempt in (1, 2):
+            result = await _telegram_api(
+                "sendPhoto", timeout=12,
+                data={"chat_id": TELEGRAM_ADMIN_CHAT_ID, "caption": caption, "reply_markup": reply_markup},
+                files={"photo": ("bukti_transfer.jpg", image_bytes, "image/jpeg")},
+            )
+            if _telegram_ok(result):
+                await _record(True, "", (result.get("result") or {}).get("message_id"))
+                return True
+            last_err = (result or {}).get("description") or "no response"
+            logger.warning(f"sendPhoto attempt {attempt} failed for order {order_id}: {last_err}")
+            if attempt == 1:
+                await asyncio.sleep(1.5)
+    else:
+        last_err = "photo could not be decoded"
+
+    # ── Fallback: text-only alert. The photo is already stored and viewable in the
+    # Admin Panel, so the admin can still act — what matters is that they LEARN a
+    # payment arrived rather than the notification disappearing entirely.
+    text = (
+        f"⚠️ Bukti transfer masuk (foto gagal dikirim)\n"
+        f"Nama: {order.get('name') or '-'}\n"
+        f"Email: {order.get('email', '-')}\n"
+        f"Nominal: Rp{order.get('amount', 0):,}".replace(",", ".")
+        + f"\n\nFoto bisa dilihat di Admin Panel.\nPenyebab: {last_err}"
+    )
+    result = await _telegram_api("sendMessage", timeout=12,
+                                 data={"chat_id": TELEGRAM_ADMIN_CHAT_ID, "text": text,
+                                       "reply_markup": reply_markup})
+    if _telegram_ok(result):
+        logger.error(f"Proof photo failed but text alert sent — order {order_id}: {last_err}")
+        await _record(True, f"photo_failed_text_sent: {last_err}",
+                      (result.get("result") or {}).get("message_id"))
+        return True
+
+    logger.error(f"PAYMENT PROOF UNNOTIFIED — order {order_id}, email {order.get('email')}: {last_err}")
+    await _record(False, last_err)
+    return False
 
 
 async def _finalize_manual_payment(order_id: str, new_status: str, actor: str) -> Optional[dict]:
@@ -8765,12 +8833,15 @@ async def upload_manual_payment_proof(order_id: str, body: ManualProofIn, curren
     # Serverless-safe: AWAIT the Telegram notification instead of fire-and-forget.
     # On Vercel the function freezes right after responding, which cancels any
     # create_task() still in flight (that's the empty-message CancelledError in logs).
-    # Best-effort — the proof is already saved, so a Telegram failure never blocks the user.
+    # The proof is already stored, so a Telegram failure never blocks the buyer — but it IS
+    # reported back (admin_notified) so the UI can tell them verification may take longer,
+    # instead of promising a review that nobody was alerted to.
     try:
-        await _notify_telegram_payment_proof(order)
+        notified = await _notify_telegram_payment_proof(order)
     except Exception as e:
-        logger.error(f"Telegram proof notification failed (non-blocking): {e}")
-    return {"ok": True, "status": "menunggu_verifikasi"}
+        logger.error(f"Telegram proof notification crashed (non-blocking): {e}")
+        notified = False
+    return {"ok": True, "status": "menunggu_verifikasi", "admin_notified": notified}
 
 
 @api_router.post("/telegram/webhook/{secret}")
@@ -9481,6 +9552,15 @@ async def admin_list_manual_payments(status: Optional[str] = None, admin_user: d
 
     if status:
         latest_per_email = [i for i in latest_per_email if i.get("status") == status]
+
+    # Flag orders whose proof arrived but whose Telegram alert never got through, so the
+    # admin can spot a payment they were never notified about. Orders predating this field
+    # are left alone (None) rather than being wrongly marked as failures.
+    for item in latest_per_email:
+        item["notify_failed"] = (
+            item.get("status") == "menunggu_verifikasi"
+            and item.get("telegram_notified") is False
+        )
     return latest_per_email
 
 

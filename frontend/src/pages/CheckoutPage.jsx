@@ -141,10 +141,17 @@ export default function CheckoutPage() {
     if (!proofPreview || !order?.id) return;
     setUploading(true);
     try {
-      await api.post(`/checkout/manual/${order.id}/proof`, { photo_base64: proofPreview });
+      const { data } = await api.post(`/checkout/manual/${order.id}/proof`, { photo_base64: proofPreview });
       setOrder((prev) => ({ ...prev, status: "menunggu_verifikasi" }));
       setReuploading(false);
-      toast.success("Bukti pembayaran terkirim! Menunggu verifikasi.");
+      // The proof is stored either way, but if the admin's Telegram alert didn't get
+      // through, don't promise a prompt review — say verification may take longer so the
+      // buyer knows to follow up rather than waiting on a notification nobody received.
+      if (data?.admin_notified === false) {
+        toast.warn("Bukti terkirim, tapi notifikasi ke admin gagal. Verifikasi mungkin lebih lama — hubungi admin kalau lewat 1x24 jam.", { autoClose: 10000 });
+      } else {
+        toast.success("Bukti pembayaran terkirim! Menunggu verifikasi.");
+      }
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Gagal mengirim bukti pembayaran. Coba lagi.");
     } finally {
