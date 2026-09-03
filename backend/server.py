@@ -2546,25 +2546,52 @@ async def _analyze_inspiration_deep(reference_b64: str) -> dict:
         return {}
 
 
-def _claude_generate_sync(system: str, text: str) -> str:
-    """Sync Anthropic call — runs in thread pool so event loop stays free."""
-    import anthropic as _anthropic
-    client = _anthropic.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=60.0, max_retries=0)
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=4096,
-        system=system,
-        messages=[{"role": "user", "content": text}],
+async def _groq_chat(messages: list, max_tokens: int = 1024, temperature: float = 0.7,
+                     response_format: Optional[dict] = None) -> str:
+    """Groq chat completion, rotating through EVERY configured key until one answers.
+
+    The account holds several keys precisely so a per-key problem never takes a feature
+    down. Each call site used to run its own loop that continued only on RateLimitError
+    and broke out on anything else — so one revoked key or a single connection blip
+    silently disabled keys 2..5 and the whole feature fell over as if there were one key.
+
+    Errors every key would hit identically (a retired model, a malformed request) stop
+    the rotation immediately instead of burning five pointless round trips.
+    """
+    from groq import AsyncGroq
+    import groq as _groq
+
+    keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
+    keys = [k for k in keys if k]
+    if not keys:
+        raise HTTPException(status_code=503, detail="AI service unavailable — no Groq key configured")
+
+    # Same for every key: retrying elsewhere cannot help, so fail fast and loudly.
+    fatal = tuple(
+        e for e in (getattr(_groq, "BadRequestError", None), getattr(_groq, "NotFoundError", None))
+        if e is not None
     )
-    return response.content[0].text or ""
 
+    last_err = None
+    for idx, key in enumerate(keys, 1):
+        try:
+            client = AsyncGroq(api_key=key)
+            kwargs = {"model": GROQ_MODEL, "messages": messages,
+                      "max_tokens": max_tokens, "temperature": temperature}
+            if response_format:
+                kwargs["response_format"] = response_format
+            resp = await client.chat.completions.create(**kwargs)
+            return (resp.choices[0].message.content or "").strip()
+        except fatal as e:
+            logger.error(f"Groq request rejected identically for all keys ({GROQ_MODEL}): {e}")
+            raise
+        except Exception as e:
+            last_err = e
+            logger.warning(f"Groq key {idx}/{len(keys)} failed ({type(e).__name__}), trying next")
+            continue
 
-async def _claude_generate(system: str, text: str) -> str:
-    """Claude Haiku call. Used for text generation (Copywriting, Calendar Ideas)."""
-    if not ANTHROPIC_API_KEY:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _claude_generate_sync, system, text)
+    logger.error(f"All {len(keys)} Groq keys failed: {last_err}")
+    raise last_err if last_err else HTTPException(status_code=503, detail="AI service unavailable")
 
 
 async def _auto_consistency_check(user_id: str, prompt_id: str, image_base64: str, dashboard_type: str):
@@ -6083,39 +6110,16 @@ Slide 1: <isi slide 1>
 Slide 2: <isi slide 2>
 ...dst sampai Slide {slide_count}"""
 
-    from groq import AsyncGroq, RateLimitError as _GroqRateLimit
-    _keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
-    if not _keys:
-        raise HTTPException(status_code=500, detail="AI service unavailable")
-
-    response = None
-    _last_err = None
-    for _key in _keys:
-        if not _key:
-            continue
-        try:
-            _groq = AsyncGroq(api_key=_key)
-            _msg = await _groq.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user_prompt},
-                ],
-                max_tokens=600,
-                temperature=0.8,
-            )
-            response = _msg.choices[0].message.content
-            break
-        except _GroqRateLimit as e:
-            _last_err = e
-            continue
-        except Exception as e:
-            _last_err = e
-            break
-
-    if response is None:
-        logger.error(f"Groq carousel outline call failed: {_last_err}")
-        raise HTTPException(status_code=500, detail=_ai_error_detail(_last_err, "Gagal generate outline. Coba lagi."))
+    try:
+        response = await _groq_chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": user_prompt}],
+            max_tokens=600, temperature=0.8,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Groq carousel outline call failed: {e}")
+        raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Gagal generate outline. Coba lagi."))
 
     return {"topic": response.strip()}
 
@@ -6480,39 +6484,16 @@ Kembalikan HANYA JSON valid (tanpa fence) dengan struktur:
   "hook_lines": ["...", "...", "..."]
 }}"""
 
-    from groq import AsyncGroq, RateLimitError as _GroqRateLimit
-    _copy_keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
-    if not _copy_keys:
-        raise HTTPException(status_code=500, detail="AI service unavailable")
-
-    response = None
-    _last_err = None
-    for _key in _copy_keys:
-        if not _key:
-            continue
-        try:
-            _groq = AsyncGroq(api_key=_key)
-            _groq_msg = await _groq.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user_prompt},
-                ],
-                max_tokens=1400,
-                temperature=0.7,
-            )
-            response = _groq_msg.choices[0].message.content
-            break
-        except _GroqRateLimit as e:
-            _last_err = e
-            continue
-        except Exception as e:
-            _last_err = e
-            break
-
-    if response is None:
-        logger.error(f"Groq copy call failed: {_last_err}")
-        raise HTTPException(status_code=500, detail=_ai_error_detail(_last_err, "Gagal generate copywriting. Coba lagi."))
+    try:
+        response = await _groq_chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": user_prompt}],
+            max_tokens=1400, temperature=0.7,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Groq copy call failed: {e}")
+        raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Gagal generate copywriting. Coba lagi."))
 
     raw = response.strip()
     if raw.startswith("```"):
@@ -6608,7 +6589,10 @@ Kembalikan HANYA JSON valid (tanpa fence):
 }}"""
 
     try:
-        response = await _claude_generate(system, user_prompt)
+        response = await _groq_chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": user_prompt}],
+            max_tokens=2048, temperature=0.8,
+        )
     except Exception as e:
         logger.error(f"Caption bundle call failed: {e}")
         raise HTTPException(status_code=500, detail=_ai_error_detail(e, "Gagal generate caption. Coba lagi."))
@@ -7904,27 +7888,17 @@ Untuk tiap foto buat:
 Kembalikan JSON array berisi {count} objek: [{{"index": 1, "purpose": "...", "caption_angle": "...", "tip": "..."}}]"""
 
     captions = []
-    _fg_keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
-    if _fg_keys:
-        from groq import AsyncGroq, RateLimitError as _GroqRL
+    if GROQ_API_KEYS or GROQ_API_KEY:
         raw = None
-        for _fkey in _fg_keys:
-            if not _fkey:
-                continue
-            try:
-                _fg_client = AsyncGroq(api_key=_fkey)
-                _fg_resp = await _fg_client.chat.completions.create(
-                    model=GROQ_MODEL,
-                    messages=[{"role": "system", "content": caption_system}, {"role": "user", "content": caption_user_prompt}],
-                    max_tokens=2048,
-                    temperature=0.8,
-                )
-                raw = _fg_resp.choices[0].message.content.strip()
-                break
-            except _GroqRL:
-                continue
-            except Exception:
-                break
+        try:
+            # Caption flavor text only — the image prompt itself is fully deterministic,
+            # so a Groq failure here degrades to the defaults already set on each item.
+            raw = await _groq_chat(
+                [{"role": "system", "content": caption_system}, {"role": "user", "content": caption_user_prompt}],
+                max_tokens=2048, temperature=0.8,
+            )
+        except Exception as e:
+            logger.warning(f"Feed caption generation failed, keeping defaults: {e}")
         if raw:
             raw = raw.strip()
             if raw.startswith("```"):
@@ -9020,9 +8994,6 @@ async def support_chat(request: Request):
         if len(message) > 500:
             raise HTTPException(status_code=400, detail="Pesan terlalu panjang")
 
-        from groq import AsyncGroq, RateLimitError
-
-        # Build messages once
         messages = [{"role": "system", "content": SUPPORT_SYSTEM_PROMPT}]
         for h in (history or [])[-8:]:
             role = h.get("role")
@@ -9030,41 +9001,10 @@ async def support_chat(request: Request):
                 messages.append({"role": role, "content": h.get("content", "")})
         messages.append({"role": "user", "content": message})
 
-        # Try each key in rotation until one works
-        keys_to_try = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
-        last_error = None
-        for key in keys_to_try:
-            if not key:
-                continue
-            try:
-                client = AsyncGroq(api_key=key)
-                completion = await client.chat.completions.create(
-                    model=GROQ_MODEL,
-                    messages=messages,
-                    max_tokens=300,
-                    temperature=0.75,
-                )
-                reply = completion.choices[0].message.content.strip()
-                return {"reply": reply}
-            except RateLimitError as e:
-                last_error = e
-                logging.warning(f"Groq key rate limited, trying next key")
-                continue
-            except Exception as e:
-                last_error = e
-                break
-
-        # Groq failed — fallback to Claude (Anthropic)
-        if ANTHROPIC_API_KEY:
-            try:
-                anthropic_messages = [m for m in messages if m["role"] != "system"]
-                system_text = next((m["content"] for m in messages if m["role"] == "system"), SUPPORT_SYSTEM_PROMPT)
-                raw = await _claude_generate(system_text, anthropic_messages[-1]["content"] if anthropic_messages else message)
-                return {"reply": raw}
-            except Exception as fallback_err:
-                logging.warning(f"Claude fallback also failed: {fallback_err}")
-
-        raise Exception(f"All AI keys failed: {last_error}")
+        # Groq only — all configured keys are tried in rotation by _groq_chat. There is
+        # deliberately no third-party fallback here.
+        reply = await _groq_chat(messages, max_tokens=300, temperature=0.75)
+        return {"reply": reply}
 
     except HTTPException:
         raise
@@ -9101,27 +9041,15 @@ async def _gc_generate_followups(category: str, answers: dict) -> dict:
     )
     user_msg = f"Kategori: {category_name}\n\nJawaban awal user:\n{answers_text}\n\nGenerate 2 pertanyaan follow-up diagnostik."
 
-    keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
-    for key in keys:
-        if not key:
-            continue
-        try:
-            from groq import AsyncGroq, RateLimitError as _GRE
-            client = AsyncGroq(api_key=key)
-            resp = await client.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
-                max_tokens=400,
-                temperature=0.7,
-                response_format={"type": "json_object"},
-            )
-            result = json.loads(resp.choices[0].message.content.strip())
-            # Ensure required structure
-            if "followup_questions" in result:
-                return result
-        except Exception as e:
-            logging.warning(f"GC followup Groq error ({key[:8]}...): {e}")
-            continue
+    try:
+        result = json.loads(await _groq_chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
+            max_tokens=400, temperature=0.7, response_format={"type": "json_object"},
+        ))
+        if "followup_questions" in result:
+            return result
+    except Exception as e:
+        logging.warning(f"GC followup Groq error: {e}")
 
     # Fallback — generic questions if all keys fail
     return {
@@ -9165,40 +9093,29 @@ async def _gc_generate_action_plan(category: str, answers: dict, followup_answer
         "Buat action plan personal untuk situasi spesifik user ini."
     )
 
-    keys = GROQ_API_KEYS if GROQ_API_KEYS else ([GROQ_API_KEY] if GROQ_API_KEY else [])
-    for key in keys:
-        if not key:
-            continue
-        try:
-            from groq import AsyncGroq, RateLimitError as _GRE
-            client = AsyncGroq(api_key=key)
-            resp = await client.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
-                max_tokens=2000,
-                temperature=0.7,
-                response_format={"type": "json_object"},
-            )
-            plan = json.loads(resp.choices[0].message.content.strip())
-            tasks = [
-                {
-                    "id": str(uuid.uuid4()),
-                    "text": t.get("text", ""),
-                    "duration": t.get("duration", ""),
-                    "tool": t.get("tool"),
-                    "tool_path": t.get("tool_path"),
-                    "completed": False,
-                    "completed_at": None,
-                }
-                for t in plan.get("tasks", [])
-            ]
-            plan["tasks"] = tasks
-            if tasks and "quick_win" not in plan:
-                plan["quick_win"] = tasks[0]["text"]
-            return plan
-        except Exception as e:
-            logging.warning(f"GC action plan Groq error ({key[:8]}...): {e}")
-            continue
+    try:
+        plan = json.loads(await _groq_chat(
+            [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
+            max_tokens=2000, temperature=0.7, response_format={"type": "json_object"},
+        ))
+        tasks = [
+            {
+                "id": str(uuid.uuid4()),
+                "text": t.get("text", ""),
+                "duration": t.get("duration", ""),
+                "tool": t.get("tool"),
+                "tool_path": t.get("tool_path"),
+                "completed": False,
+                "completed_at": None,
+            }
+            for t in plan.get("tasks", [])
+        ]
+        plan["tasks"] = tasks
+        if tasks and "quick_win" not in plan:
+            plan["quick_win"] = tasks[0]["text"]
+        return plan
+    except Exception as e:
+        logging.warning(f"GC action plan Groq error: {e}")
 
     # Fallback generic plan
     tasks = [
@@ -10277,10 +10194,8 @@ async def talking_avatar_generate_script(
     payload: dict,
     current_user: dict = Depends(get_current_user),
 ):
-    """Use Claude to generate a promotional script from a product photo."""
+    """Generate a promotional script from a product photo (Groq)."""
     photo_b64 = payload.get("photo_base64", "")
-    if not ANTHROPIC_API_KEY:
-        raise HTTPException(status_code=503, detail="Script generator tidak tersedia saat ini")
 
     system_prompt = (
         "Kamu adalah copywriter profesional Indonesia yang membuat script promosi untuk video avatar. "
@@ -10291,8 +10206,11 @@ async def talking_avatar_generate_script(
 
     try:
         script = await asyncio.wait_for(
-            _claude_generate(system_prompt, user_prompt),
-            timeout=10.0,
+            _groq_chat(
+                [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
+                max_tokens=200, temperature=0.8,
+            ),
+            timeout=15.0,
         )
         return {"script": script or "Produk terbaik untuk kebutuhanmu! Kualitas premium dengan harga terjangkau. Dapatkan sekarang sebelum kehabisan!"}
     except Exception:
