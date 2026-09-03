@@ -90,6 +90,13 @@ GROQ_API_KEYS = [k for k in [
     os.environ.get('GROQ_API_KEY_4', ''),
     os.environ.get('GROQ_API_KEY_5', ''),
 ] if k]
+# Single source of truth for the Groq chat model, overridable without a code deploy.
+# Groq retires hosted models with no notice — "llama-3.3-70b-versatile" was pulled from
+# the platform entirely and every call started returning 404 model_not_found, silently
+# killing support chat, copywriting, carousel outlines, feed captions and the growth
+# consultant all at once. Keeping the name in one env-backed constant means the next
+# retirement is a Vercel env change, not a redeploy.
+GROQ_MODEL = os.environ.get('GROQ_MODEL', 'openai/gpt-oss-120b')
 SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
 SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
 SMTP_USER = os.environ.get('SMTP_USER', '')
@@ -6089,7 +6096,7 @@ Slide 2: <isi slide 2>
         try:
             _groq = AsyncGroq(api_key=_key)
             _msg = await _groq.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=GROQ_MODEL,
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user_prompt},
@@ -6486,7 +6493,7 @@ Kembalikan HANYA JSON valid (tanpa fence) dengan struktur:
         try:
             _groq = AsyncGroq(api_key=_key)
             _groq_msg = await _groq.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=GROQ_MODEL,
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user_prompt},
@@ -7907,7 +7914,7 @@ Kembalikan JSON array berisi {count} objek: [{{"index": 1, "purpose": "...", "ca
             try:
                 _fg_client = AsyncGroq(api_key=_fkey)
                 _fg_resp = await _fg_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model=GROQ_MODEL,
                     messages=[{"role": "system", "content": caption_system}, {"role": "user", "content": caption_user_prompt}],
                     max_tokens=2048,
                     temperature=0.8,
@@ -9032,7 +9039,7 @@ async def support_chat(request: Request):
             try:
                 client = AsyncGroq(api_key=key)
                 completion = await client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model=GROQ_MODEL,
                     messages=messages,
                     max_tokens=300,
                     temperature=0.75,
@@ -9102,7 +9109,7 @@ async def _gc_generate_followups(category: str, answers: dict) -> dict:
             from groq import AsyncGroq, RateLimitError as _GRE
             client = AsyncGroq(api_key=key)
             resp = await client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=GROQ_MODEL,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
                 max_tokens=400,
                 temperature=0.7,
@@ -9166,7 +9173,7 @@ async def _gc_generate_action_plan(category: str, answers: dict, followup_answer
             from groq import AsyncGroq, RateLimitError as _GRE
             client = AsyncGroq(api_key=key)
             resp = await client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=GROQ_MODEL,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
                 max_tokens=2000,
                 temperature=0.7,
