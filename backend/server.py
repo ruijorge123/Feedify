@@ -2570,7 +2570,7 @@ async def _claude_generate(system: str, text: str) -> str:
 async def _auto_consistency_check(user_id: str, prompt_id: str, image_base64: str, dashboard_type: str):
     """Run consistency check in background after image generated. Best-effort."""
     try:
-        brand = await db.brand_profiles.find_one({"user_id": user_id}, {"_id": 0})
+        brand = await _get_active_brand(user_id)
         if not brand:
             return
         system = "You are a Brand Consistency Auditor. Output ONLY valid JSON (no fence). Bahasa Indonesia."
@@ -5901,7 +5901,7 @@ def _build_carousel_prompts(payload: CarouselPromptIn, brand: Optional[dict], pr
 @api_router.post("/prompt/preview-banner")
 async def preview_banner_prompt(payload: BannerPromptIn, current_user: dict = Depends(get_current_user)):
     """Return the structured prompt JSON + natural language prompt without generating an image."""
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    brand = await _get_active_brand(current_user["id"])
 
     # Fetch product from library if product_id provided, merge into payload
     product = None
@@ -5953,7 +5953,7 @@ async def generate_banner(payload: BannerPromptIn, current_user: dict = Depends(
     _raise_if_banned(payload.headline, payload.subheadline, payload.description, payload.product_name, payload.call_to_action)
 
 
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    brand = await _get_active_brand(current_user["id"])
     prompt_obj = _build_banner_prompt(payload, brand)
 
     # product_photo_base64 = actual product to preserve (locked, used for image edit)
@@ -6021,7 +6021,7 @@ async def generate_carousel_outline(payload: CarouselOutlineIn, current_user: di
     and edits this before generating. Text-only via Groq, no image cost, no credits consumed."""
     slide_count = max(2, min(4, payload.slide_count))
 
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0}) or {}
+    brand = await _get_active_brand(current_user["id"]) or {}
     brand_name = brand.get("brand_name", "brand Anda")
 
     product = None
@@ -6123,7 +6123,7 @@ Slide 2: <isi slide 2>
 @api_router.post("/prompt/preview-carousel")
 async def preview_carousel_prompt(payload: CarouselPromptIn, current_user: dict = Depends(get_current_user)):
     """Return structured prompt JSON for all slides without generating images. No credits consumed."""
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    brand = await _get_active_brand(current_user["id"])
     product = await _fetch_product_for_payload(payload, current_user)
     prompt_obj = _build_carousel_prompts(payload, brand, product=product)
     # Inject natural_prompt into each slide so frontend can copy directly. Uses each slide's OWN
@@ -6146,7 +6146,7 @@ async def generate_carousel(payload: CarouselPromptIn, current_user: dict = Depe
 
     n_slides = payload.slide_count
 
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    brand = await _get_active_brand(current_user["id"])
     product = await _fetch_product_for_payload(payload, current_user)
     prompt_obj = _build_carousel_prompts(payload, brand, product=product)
 
@@ -6219,7 +6219,7 @@ async def generate_carousel_stream(payload: CarouselPromptIn, current_user: dict
 
     n_slides = payload.slide_count
 
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    brand = await _get_active_brand(current_user["id"])
     product = await _fetch_product_for_payload(payload, current_user)
 
     # Build prompt object upfront (pipeline runs synchronously before streaming)
@@ -6420,7 +6420,7 @@ async def generate_copywriting(payload: CopywritingIn, current_user: dict = Depe
     # Content moderation
     _raise_if_banned(payload.product_name, payload.product_description, payload.target_audience, payload.main_problem)
 
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0}) or {}
+    brand = await _get_active_brand(current_user["id"]) or {}
     brand_name = brand.get("brand_name", "brand Anda")
     auto_tone = PURPOSE_TONE.get(payload.content_purpose, "friendly")
     archetype = brand.get("archetype", "expert")
@@ -6821,7 +6821,7 @@ async def daily_recommendation(
                 "cached": True,
             }
 
-    brand = await db.brand_profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
+    brand = await _get_active_brand(user_id) or {}
     recent_types = [
         d.get("dashboard_type", "")
         for d in await db.generated_prompts.find(
@@ -7183,7 +7183,7 @@ def _build_food_menu_prompt(payload: FoodMenuIn, brand: Optional[dict]) -> dict:
 @api_router.post("/prompt/preview-food-menu")
 async def preview_food_menu_prompt(payload: FoodMenuIn, current_user: dict = Depends(get_current_user)):
     """Return structured prompt JSON without generating image. No credits consumed."""
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    brand = await _get_active_brand(current_user["id"])
     prompt_obj = _build_food_menu_prompt(payload, brand)
     natural_prompt = _build_natural_prompt(prompt_obj)
     return {"prompt_json": prompt_obj, "natural_prompt": natural_prompt}
@@ -7197,7 +7197,7 @@ async def generate_food_menu(payload: FoodMenuIn, current_user: dict = Depends(g
     _raise_if_banned(payload.menu_name, payload.headline, payload.call_to_action, item_texts)
 
 
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    brand = await _get_active_brand(current_user["id"])
     prompt_obj = _build_food_menu_prompt(payload, brand)
 
     try:
@@ -7733,7 +7733,7 @@ async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = D
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
 
     # Gate: brand DNA must exist
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
+    brand = await _get_active_brand(current_user["id"])
     if not brand:
         raise HTTPException(status_code=400, detail="Buat brand profile dulu sebelum generate")
 
@@ -10115,7 +10115,7 @@ async def admin_user_detail(user_id: str, admin_user: dict = Depends(require_adm
     if not user:
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
 
-    brand = await db.brand_profiles.find_one({"user_id": user_id}, {"_id": 0})
+    brand = await _get_active_brand(user_id)
     balance = await _get_balance(user_id)
 
     recent_content = await db.prompts.find(
@@ -10166,7 +10166,7 @@ async def preview_reels(
         "restock": "Restock", "grand_opening": "Grand Opening",
         "testimoni": "Testimoni", "edukasi_produk": "Edukasi Produk",
     }
-    brand = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0}) or {}
+    brand = await _get_active_brand(current_user["id"]) or {}
     brand_name = brand.get("brand_name", "Brand")
     goal_label = goal_labels.get(video_goal, video_goal)
 
