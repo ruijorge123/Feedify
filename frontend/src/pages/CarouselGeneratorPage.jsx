@@ -13,6 +13,7 @@ import PromptSuccessCard from "@/components/PromptSuccessCard";
 import DebugJsonButton from "@/components/DebugJsonButton";
 import ModelTalentPicker from "@/components/ModelTalentPicker";
 import { MODEL_STYLES } from "@/lib/modelOptions";
+import ActiveBrandChip from "@/components/ActiveBrandChip";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -310,6 +311,7 @@ export default function CarouselGeneratorPage() {
       <div className="animate-fade-up">
         <h1 className="font-heading text-3xl sm:text-4xl font-bold text-brand tracking-tight">Carousel</h1>
         <p className="text-stone-400 mt-1 text-sm">Pilih produk, pilih tujuan konten, AI generate seluruh slide.</p>
+        <div className="mt-3"><ActiveBrandChip /></div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import api from "@/lib/api";
 import { resetCreditsCache } from "@/lib/credits";
 import { resetConfigCache } from "@/lib/config";
+import { resetActiveBrandCache } from "@/lib/activeBrand";
 import { linkWebpushrUser, unlinkWebpushrUser } from "@/lib/pushNotifications";
 
 const AuthContext = createContext(null);
@@ -99,6 +100,7 @@ export function AuthProvider({ children }) {
     sessionStorage.clear();
     resetCreditsCache();
     resetConfigCache();
+    resetActiveBrandCache();
     setUser(null);
     window.location.href = "/login";
   };

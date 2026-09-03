@@ -15,6 +15,7 @@ import DebugJsonButton from "@/components/DebugJsonButton";
 import CampaignGoalSelector, { GOALS as CAMPAIGN_GOALS } from "@/components/CampaignGoalSelector";
 import ModelTalentPicker from "@/components/ModelTalentPicker";
 import { MODEL_STYLES } from "@/lib/modelOptions";
+import ActiveBrandChip from "@/components/ActiveBrandChip";
 
 // Banner hanya pakai 4 tujuan konten inti — Edukasi, Best Seller, dan Restock disembunyikan
 // dari halaman ini (masih ada di CampaignGoalSelector buat halaman lain, mis. Food Menu).
@@ -141,6 +142,7 @@ export default function BannerGeneratorPage() {
       <div className="animate-fade-up">
         <h1 className="font-heading text-3xl sm:text-4xl font-bold text-brand tracking-tight">Feed & Banner</h1>
         <p className="text-stone-400 mt-1 text-sm">Pilih produk + foto inspirasi, AI generate prompt siap pakai.</p>
+        <div className="mt-3"><ActiveBrandChip /></div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

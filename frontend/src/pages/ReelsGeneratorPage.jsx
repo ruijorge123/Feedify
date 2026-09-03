@@ -8,6 +8,7 @@ import {
   CheckCircle, DownloadSimple, ArrowsClockwise, Sparkle, Lightning,
   CaretDown, VideoCamera, Notepad, Clock, FrameCorners, XCircle,
 } from "@phosphor-icons/react";
+import ActiveBrandChip from "@/components/ActiveBrandChip";
 
 const VIDEO_GOALS = [
   { id: "new_launch",      label: "New Launch",       desc: "Debut produk baru" },
@@ -171,6 +172,7 @@ export default function ReelsGeneratorPage() {
         <p className="text-stone-500 mt-1 text-sm max-w-xl">
           Ubah satu foto produkmu menjadi video iklan pendek berkualitas profesional untuk Instagram Reels, TikTok, dan WhatsApp Status.
         </p>
+        <div className="mt-3"><ActiveBrandChip /></div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

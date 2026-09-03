@@ -11,6 +11,7 @@ import ReferenceUpload from "@/components/ReferenceUpload";
 import InspirationGallery from "@/components/InspirationGallery";
 import PromptSuccessCard from "@/components/PromptSuccessCard";
 import CampaignGoalSelector from "@/components/CampaignGoalSelector";
+import ActiveBrandChip from "@/components/ActiveBrandChip";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -248,6 +249,7 @@ export default function FoodMenuPage() {
         <p className="text-stone-600 mt-2 max-w-2xl">
           Upload foto menu, pilih kampanye, klik generate — Feedify merancang visual restoran siap posting.
         </p>
+        <div className="mt-3"><ActiveBrandChip /></div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

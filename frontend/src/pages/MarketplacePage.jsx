@@ -14,6 +14,7 @@ import PromptSuccessCard from "@/components/PromptSuccessCard";
 import DebugJsonButton from "@/components/DebugJsonButton";
 import ModelTalentPicker from "@/components/ModelTalentPicker";
 import { MODEL_STYLES } from "@/lib/modelOptions";
+import ActiveBrandChip from "@/components/ActiveBrandChip";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -135,6 +136,7 @@ export default function MarketplacePage() {
         </div>
         <h1 className="font-heading text-3xl sm:text-4xl font-bold text-brand tracking-tight">Marketplace</h1>
         <p className="text-stone-400 mt-1 text-sm">Thumbnail yang dirancang untuk meningkatkan CTR dan konversi penjualan.</p>
+        <div className="mt-3"><ActiveBrandChip /></div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

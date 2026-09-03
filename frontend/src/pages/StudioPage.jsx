@@ -12,6 +12,7 @@ import InspirationGallery from "@/components/InspirationGallery";
 import ModelTalentPicker from "@/components/ModelTalentPicker";
 import { MODEL_STYLES } from "@/lib/modelOptions";
 import { toast } from "react-toastify";
+import ActiveBrandChip from "@/components/ActiveBrandChip";
 
 // ── Chip selector ──────────────────────────────────────────────────────────────
 
@@ -121,6 +122,7 @@ export default function StudioPage() {
         </div>
         <h1 className="font-heading text-3xl sm:text-4xl font-bold text-brand tracking-tight">Studio</h1>
         <p className="text-stone-400 mt-1 text-sm">Commercial product photography berkualitas studio profesional — dibangun oleh ChatGPT.</p>
+        <div className="mt-3"><ActiveBrandChip /></div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

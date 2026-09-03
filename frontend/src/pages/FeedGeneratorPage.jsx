@@ -29,6 +29,7 @@ import {
   Confetti,
   User,
 } from "@phosphor-icons/react";
+import ActiveBrandChip from "@/components/ActiveBrandChip";
 
 // ── Content type config ────────────────────────────────────────────────
 const CONTENT_TYPES = [
@@ -328,7 +329,7 @@ export default function FeedGeneratorPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-32 lg:pb-10">
       {/* Page header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center">
           <SquaresFour size={20} weight="fill" />
         </div>
@@ -337,6 +338,7 @@ export default function FeedGeneratorPage() {
           <p className="text-xs text-stone-500">Generate banyak prompt foto produk sekaligus — konsisten tapi beragam</p>
         </div>
       </div>
+      <div className="mb-6"><ActiveBrandChip /></div>
 
       <div className="space-y-4">
         {/* ① Pilih Produk */}

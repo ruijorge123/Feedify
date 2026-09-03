@@ -12,6 +12,7 @@ import {
   Lightning, Package, X, CaretDown,
 } from "@phosphor-icons/react";
 import BrandDnaCard from "@/components/BrandDnaCard";
+import ActiveBrandChip from "@/components/ActiveBrandChip";
 
 const BRAND_CACHE_KEY = "feedify_brand_cache";
 
@@ -295,6 +296,7 @@ export default function CopywritingPage() {
           <p className="text-xs text-stone-500">Ceritakan produkmu — Feedify yang tulis copy-nya</p>
         </div>
       </div>
+      <div className="-mt-3 mb-5"><ActiveBrandChip /></div>
 
       {/* ① Product Knowledge */}
       <div className={`feedify-card p-5 ${!productId ? "border-2 border-red-200" : ""}`}>
