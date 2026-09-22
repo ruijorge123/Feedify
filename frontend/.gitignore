@@ -21,3 +21,6 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Original PNGs kept for re-export; the published webp versions live in public/
+assets-raw/

@@ -12,7 +12,12 @@ Disallow: /brand-kit
 Disallow: /feedback
 Disallow: /more
 Disallow: /admin
-Disallow: /credits
+Disallow: /klien
+Disallow: /command-library
+Disallow: /brand-dna
+Disallow: /produk
+Disallow: /riwayat
+Disallow: /akun-nonaktif
 Disallow: /onboarding
 Disallow: /checkout
 Disallow: /verify-email

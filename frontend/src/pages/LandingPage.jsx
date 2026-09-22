@@ -1,920 +1,1004 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import api from "@/lib/api";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  Sparkle, ArrowRight, ArrowUpRight,
-  Lightning, Lock, CheckCircle,
-  CircleNotch, XCircle,
+  Sparkle, ArrowRight, ArrowUpRight, Check, CaretDown,
+  WhatsappLogo, InstagramLogo, List, X, Images, Storefront,
+  Camera, Stack, FilmSlate, ChatCircleDots, Clock, ShieldCheck,
+  SpeakerSimpleSlash, SpeakerSimpleHigh, SignOut,
 } from "@phosphor-icons/react";
 import SupportChatWidget from "@/components/SupportChatWidget";
+import WaitingListForm from "@/components/WaitingListForm";
+import FeedifyLogo from "@/components/FeedifyLogo";
 import InstallPWAButton from "@/components/InstallPWAButton";
-import { fbTrack } from "@/lib/metaPixel";
+import { useAgencyConfig, formatRupiah, waLink } from "@/lib/agency";
+import WORKS from "@/lib/portfolioManifest";
 
-export default function LandingPage() {
-  // Meta Pixel: landing page opened
-  useEffect(() => { fbTrack("ViewContent"); }, []);
+/* ────────────────────────────────────────────────────────────────────────────
+   Real work samples. These are actual files in /public, not placeholders —
+   a sales page for a visual service has to show the visuals. Swap the arrays
+   when new client work is cleared for publication; nothing else needs touching.
+   ──────────────────────────────────────────────────────────────────────────── */
+/**
+ * Real client feeds, shown as the phone screens they actually live on.
+ *
+ * These are screenshots of finished Instagram profiles, not grids assembled from
+ * loose photos: the proof is that the nine posts hang together AND that a real
+ * account looks like this, which a bare 3x3 cannot show.
+ *
+ * To publish another: export the profile, convert to webp, add a line.
+ */
+/** Real, computed from the generated manifest — never a number typed by hand. */
+const PORTFOLIO_COUNT = WORKS.length;
+
+const FEED_MOCKUPS = [
+  { src: "/feed1.webp", cat: "Skincare Natural" },
+  { src: "/feed2.webp", cat: "Minuman Kemasan" },
+  { src: "/feed3.webp", cat: "Lip Care" },
+  { src: "/feed4.webp", cat: "Parfum" },
+  { src: "/feed5.webp", cat: "Perlengkapan Bayi" },
+  { src: "/feed6.webp", cat: "Serum Vitamin C" },
+];
+
+/** Screenshots of real client chats — social proof that costs nothing to show. */
+const TESTIMONI = [
+  { img: "/testimonihalamanawal/testimoni-skincare.webp", cat: "Skincare" },
+  { img: "/testimonihalamanawal/testimoni-bodylotion.webp", cat: "Body Lotion" },
+  { img: "/testimonihalamanawal/testimoni-kaos.webp", cat: "Fashion" },
+  { img: "/testimonihalamanawal/testimoni-hiljab.webp", cat: "Hijab" },
+];
+
+const SHOWCASE = [
+  {
+    id: "feed",
+    icon: Images,
+    label: "Feed Instagram",
+    desc: "Satu feed yang nyambung dari atas ke bawah, bukan foto satuan.",
+    images: ["/skincare-serum2.webp", "/skincare-moisturizer2.webp", "/cleanser3.webp"],
+  },
+  {
+    id: "studio",
+    icon: Camera,
+    label: "Foto Produk Studio",
+    desc: "Produkmu difoto ulang seolah masuk studio profesional.",
+    images: ["/studio/serum2.webp", "/studio/bodylotion1.webp", "/studio/perfume9.webp"],
+  },
+  {
+    id: "marketplace",
+    icon: Storefront,
+    label: "Thumbnail Marketplace",
+    desc: "Foto etalase Shopee & TikTok Shop yang bikin orang berhenti scroll.",
+    images: ["/marketplace/facemist1.webp", "/marketplace/clay1.webp", "/marketplace/babylotion.webp"],
+  },
+  {
+    id: "carousel",
+    icon: Stack,
+    label: "Carousel",
+    desc: "Cerita bertahap yang bikin orang geser sampai slide terakhir.",
+    images: ["/carousel/bodymist 3 slides/1.webp", "/carousel/bodymist 3 slides/2.webp", "/carousel/bodymist 3 slides/3.webp"],
+  },
+];
+
+const PAINS = [
+  { t: "Tiap hari bingung mau posting apa", d: "Buka Instagram, mau posting, tapi tidak tahu harus bikin konten apa lagi." },
+  { t: "Foto produk seadanya", d: "Difoto di atas meja pakai HP, hasilnya kalah jauh dari kompetitor sebelah." },
+  { t: "Feed berantakan", d: "Warna dan gaya beda-beda tiap posting, brand jadi tidak punya wajah." },
+  { t: "Tidak sempat", d: "Waktumu habis untuk produksi, packing, dan balas chat — bukan untuk bikin konten." },
+];
+
+const STEPS = [
+  { n: "01", t: "Pilih paket", d: "Bayar lewat QRIS, prosesnya sebentar. Tim kami langsung tahu pesananmu masuk." },
+  { n: "02", t: "Isi data produk sekali", d: "Upload foto produk dan ceritakan brand-mu. Cukup sekali di awal, tersimpan selamanya." },
+  { n: "03", t: "Terima konten jadi", d: "Tim kami hubungi lewat WhatsApp, diskusi, lalu kirim kontennya lengkap dengan caption." },
+];
+
+const FAQS = [
+  { q: "Saya belum punya foto produk yang bagus, gimana?", a: "Justru itu yang paling sering kami kerjakan. Cukup kirim foto dari HP dengan background seadanya — yang penting produknya terlihat jelas dan tulisan di labelnya terbaca. Sisanya tim kami yang urus." },
+  { q: "Kontennya nanti dikirim ke mana?", a: "Lewat WhatsApp, langsung ke nomormu, dalam kualitas penuh. Progres berapa konten yang sudah jadi juga bisa kamu pantau kapan saja di dashboard." },
+  { q: "Caption-nya dibuatkan juga?", a: "Ya, sudah termasuk. Setiap konten datang lengkap dengan captionnya, disesuaikan dengan gaya bicara brand-mu. Tinggal salin dan posting." },
+  { q: "Kalau hasilnya belum cocok?", a: "Bilang saja lewat WhatsApp, kami kerjakan ulang. Setiap konten punya jatah revisi, dan baru dihitung selesai setelah kamu setuju." },
+  { q: "Paketnya ada masa berlaku?", a: "Tidak ada. Paketmu berlaku sampai semua feed-nya terkirim, tanpa dikejar tenggat." },
+  { q: "Berapa lama sampai feed pertama jadi?", a: "Tergantung jumlah feed dan seberapa cepat foto produkmu masuk. Setelah pembayaran dikonfirmasi, tim kami menghubungi lewat WhatsApp dan jadwalnya kita sepakati bareng di sana — jadi kamu tahu persis kapan menerimanya, bukan sekadar janji umum." },
+];
+
+/* ── shared bits ─────────────────────────────────────────────────────────── */
+
+/**
+ * Fades sections in as they scroll into view.
+ *
+ * [data-rv] starts at opacity:0, so anything the observer never sees stays
+ * invisible for good. Sections that render after their data arrives — the price
+ * cards, most obviously — do not exist yet on mount, so a one-shot
+ * querySelectorAll would silently hide them: a MutationObserver picks up
+ * whatever React adds later.
+ */
+function useReveal() {
+  useEffect(() => {
+    if (!("IntersectionObserver" in window)) {
+      document.querySelectorAll("[data-rv]").forEach((e) => e.classList.add("rv-in"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => {
+        if (e.isIntersecting) { e.target.classList.add("rv-in"); io.unobserve(e.target); }
+      }),
+      { threshold: 0.12, rootMargin: "0px 0px -60px" }
+    );
+
+    const watch = (root) => {
+      if (root.nodeType !== 1) return;
+      if (root.matches?.("[data-rv]") && !root.classList.contains("rv-in")) io.observe(root);
+      root.querySelectorAll?.("[data-rv]:not(.rv-in)").forEach((e) => io.observe(e));
+    };
+
+    watch(document.body);
+    const mo = new MutationObserver((muts) =>
+      muts.forEach((m) => m.addedNodes.forEach(watch))
+    );
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    return () => { io.disconnect(); mo.disconnect(); };
+  }, []);
+}
+
+function Eyebrow({ children, tone = "gold" }) {
+  return (
+    <span className={`inline-block text-[11px] font-bold uppercase tracking-[0.18em] mb-3 ${
+      tone === "gold" ? "text-brand-gold" : "text-brand-light"
+    }`}>
+      {children}
+    </span>
+  );
+}
+
+/**
+ * Draggable before/after — the single most persuasive element on the page.
+ *
+ * The right-hand side is a 2x2 of finished posts rather than one image: the pitch
+ * is not "we retouch a photo", it is "one product shot becomes a set of content",
+ * and four results say that where one cannot.
+ */
+const AFTER_SET = [
+  { src: "/after2.webp", alt: "Konten Instagram hasil Feedify — highlight kandungan produk" },
+  { src: "/after3.webp", alt: "Konten Instagram hasil Feedify — varian kedua" },
+  { src: "/after4.webp", alt: "Konten Instagram hasil Feedify — varian ketiga" },
+  { src: "/after5.webp", alt: "Konten Instagram hasil Feedify — varian keempat" },
+];
+
+function BeforeAfter() {
+  const [pos, setPos] = useState(45);
+  const ref = useRef(null);
+  const dragging = useRef(false);
+
+  const setFromClientX = useCallback((clientX) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos(Math.max(2, Math.min(98, ((clientX - r.left) / r.width) * 100)));
+  }, []);
+
+  useEffect(() => {
+    const move = (e) => {
+      if (!dragging.current) return;
+      setFromClientX(e.touches ? e.touches[0].clientX : e.clientX);
+    };
+    const up = () => { dragging.current = false; };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("touchmove", move, { passive: true });
+    window.addEventListener("mouseup", up);
+    window.addEventListener("touchend", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("mouseup", up);
+      window.removeEventListener("touchend", up);
+    };
+  }, [setFromClientX]);
 
   return (
-    <div className="min-h-screen bg-brand-cream text-stone-800 overflow-x-hidden selection:bg-brand-gold selection:text-brand relative">
-      {/* Persistent mesh gradient blobs — desktop only (heavy blur crashes mobile GPU) */}
-      <div className="hidden sm:block pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute top-[30%] left-[-8%] w-[55vw] h-[55vw] rounded-full bg-brand/[0.04] blur-[150px]" />
-        <div className="absolute top-[55%] right-[-10%] w-[45vw] h-[45vw] rounded-full bg-brand-gold/[0.04] blur-[130px]" />
-        <div className="absolute bottom-[10%] left-[20%] w-[40vw] h-[40vw] rounded-full bg-brand/[0.03] blur-[120px]" />
+    <div>
+      <div
+        ref={ref}
+        data-testid="before-after"
+        className="relative aspect-[4/5] w-full cursor-ew-resize select-none overflow-hidden rounded-2xl bg-brand-sand"
+        onMouseDown={(e) => { dragging.current = true; setFromClientX(e.clientX); }}
+        onTouchStart={(e) => { dragging.current = true; setFromClientX(e.touches[0].clientX); }}
+      >
+        {/* result: four finished posts from that one product shot */}
+        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 bg-white">
+          {AFTER_SET.map(({ src, alt }) => (
+            <div key={src} className="overflow-hidden">
+              <img src={src} alt={alt} loading="lazy" className="h-full w-full object-cover" draggable={false} />
+            </div>
+          ))}
+        </div>
+
+        {/* the raw photo, clipped to the handle. The inner image is pinned to the
+            container's width so it never squashes as the clip narrows. */}
+        <div className="absolute inset-0 overflow-hidden" style={{ width: `${pos}%` }}>
+          <img
+            src="/before.webp"
+            alt="Foto produk apa adanya sebelum diolah"
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ width: ref.current ? `${ref.current.offsetWidth}px` : "100%" }}
+            draggable={false}
+          />
+        </div>
+
+        <span className="absolute left-3 top-3 rounded-full bg-black/55 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur">
+          Foto asli
+        </span>
+        <span className="absolute right-3 top-3 rounded-full bg-brand-gold px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-brand">
+          4 konten jadi
+        </span>
+
+        <div className="absolute inset-y-0 w-[2px] bg-white/90 shadow-lg" style={{ left: `${pos}%` }}>
+          <div className="absolute left-1/2 top-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white shadow-xl">
+            <ArrowRight size={12} weight="bold" className="-ml-0.5 rotate-180 text-brand" />
+            <ArrowRight size={12} weight="bold" className="-mr-0.5 text-brand" />
+          </div>
+        </div>
       </div>
-      <main>
-        <DarkHero />
-        <Marquee />
-        <PainAgitation />
-        <Transformation />
-        <HowItWorks />
-        <ComparisonTable />
-        <Testimonials />
-        <Pricing />
-        <SupportChat />
-      </main>
-      <Footer />
+
+      <p className="mt-3 text-center text-xs text-stone-400">Geser untuk membandingkan</p>
     </div>
   );
 }
 
-/* ============ DARK HERO — full cinematic ============ */
-function DarkHero() {
-  const { user, logout } = useAuth();
-  const navigate         = useNavigate();
-  const hasAccess        = user && (user.role === "admin" || user.is_lifetime === true);
-  const [pendingOrder, setPendingOrder] = useState(null);
+/**
+ * Full-bleed band of client feeds sliding past, edge to edge.
+ *
+ * One feed in a column reads as a single sample; a wall of them sliding by reads
+ * as a roster, which is the whole claim this page makes. The track is rendered
+ * twice back to back and translated by exactly -50%, so the loop closes on
+ * itself with no visible jump and no JS driving the motion.
+ */
+function FeedMarquee() {
+  const doubled = [...FEED_MOCKUPS, ...FEED_MOCKUPS];
+  return (
+    <section className="relative overflow-hidden bg-brand-terminal py-12 sm:py-16" data-testid="feed-marquee">
+      <div className="mb-8 px-5 text-center sm:px-8">
+        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-gold">
+          Feed yang kami kerjakan
+        </span>
+      </div>
+
+      <div className="marquee">
+        <div className="marquee-track">
+          {doubled.map((f, n) => (
+            <figure key={`${f.src}-${n}`} className="marquee-card">
+              <img
+                src={f.src}
+                alt={`Contoh feed Instagram ${f.cat}`}
+                loading={n < 3 ? "eager" : "lazy"}
+                decoding="async"
+                className="w-full rounded-2xl"
+              />
+              <figcaption className="mt-2.5 flex items-center justify-center gap-1.5">
+                <InstagramLogo size={12} weight="fill" className="flex-shrink-0 text-brand-gold" />
+                <span className="truncate text-xs text-brand-cream/60">{f.cat}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+
+      {/* the band should look like it continues past the screen, not stop at it */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-brand-terminal to-transparent sm:w-28" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-brand-terminal to-transparent sm:w-28" />
+    </section>
+  );
+}
+
+/**
+ * Number that counts up the first time it scrolls into view.
+ *
+ * A static figure gets skimmed; one that moves gets read. It only ever runs once,
+ * and anyone who asked for less motion is shown the final value immediately — the
+ * point is the number, the animation is decoration.
+ */
+function CountUp({ to, suffix = "", duration = 1400, className = "" }) {
+  const [n, setN] = useState(0);
+  const ref = useRef(null);
+  const done = useRef(false);
 
   useEffect(() => {
-    if (!user || hasAccess) return;
-    let iv;
-    const fetchActive = () => api.get("/checkout/manual/active").then(({ data }) => {
-      setPendingOrder(data);
-      // No order at all — stop polling, most landing-page visitors never checked out.
-      if (!data && iv) clearInterval(iv);
-    }).catch(() => {});
-    fetchActive();
-    // Keep polling while there's an order still awaiting a verdict — the reject/approve
-    // action happens out-of-band via the Telegram bot, so nothing pushes the update here.
-    iv = setInterval(fetchActive, 8000);
-    return () => clearInterval(iv);
-  }, [user, hasAccess]);
+    const el = ref.current;
+    if (!el) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !("IntersectionObserver" in window)) { setN(to); return; }
+
+    const io = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting || done.current) return;
+      done.current = true;
+      io.disconnect();
+      const t0 = performance.now();
+      const tick = (now) => {
+        const p = Math.min(1, (now - t0) / duration);
+        // ease-out: fast at first, settling on the value rather than stopping dead
+        setN(Math.round(to * (1 - Math.pow(1 - p, 3))));
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }, { threshold: 0.4 });
+
+    io.observe(el);
+    return () => io.disconnect();
+  }, [to, duration]);
+
+  return <span ref={ref} className={className}>{n}{suffix}</span>;
+}
+
+// Four clips, all the same size — one oversized "hero" video made the others
+// look like afterthoughts. Labels name the product so the row reads as a range
+// of work, not four takes of the same thing.
+const VIDEOS = ["/video7.mp4", "/video1.mp4", "/video2.mp4", "/video3.mp4"];
+
+/**
+ * One vertical video in a phone frame.
+ *
+ * Autoplay only survives everywhere when the clip is muted and inline, and it is
+ * paused whenever it is off-screen so several 720p loops never sit decoding
+ * behind a section nobody is looking at — that is what drains a phone on a
+ * landing page. Tapping toggles sound, because a muted-forever video reads as a
+ * broken GIF.
+ */
+function PhoneVideo({ src }) {
+  const ref = useRef(null);
+  const [muted, setMuted] = useState(true);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) el.play?.().catch(() => {});
+        else el.pause?.();
+      },
+      { threshold: 0.25 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   return (
-    <div className="relative sm:min-h-screen sm:min-h-[100dvh] overflow-x-hidden flex flex-col" data-testid="hero"
-      style={{ background: "radial-gradient(ellipse 120% 60% at 20% 30%, #0f3d22 0%, #060d09 55%, #060d09 100%)" }}>
-
-      {/* Ambient glows — desktop only (hidden on mobile to avoid black-out) */}
-      <div className="hidden sm:block glow-pulse absolute top-[-15%] left-[-10%] w-[65vw] h-[65vw] rounded-full bg-brand/40 blur-[130px] pointer-events-none" />
-      <div className="hidden sm:block glow-pulse-delay absolute top-[10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-brand-gold/12 blur-[110px] pointer-events-none" />
-      <div className="hidden sm:block glow-pulse absolute bottom-[5%] left-[10%] w-[55vw] h-[55vw] rounded-full bg-emerald-800/35 blur-[100px] pointer-events-none" />
-      {/* Mobile glow — lighter, smaller, works on small screens */}
-      <div className="sm:hidden absolute top-0 left-0 w-full h-[50vh] rounded-full bg-brand/20 blur-[80px] pointer-events-none" />
-
-      {/* NAV */}
-      <nav className="relative z-30 max-w-[1280px] mx-auto w-full px-5 lg:px-10 py-6 flex items-center justify-between" data-testid="landing-nav">
-        <Link to="/" className="flex items-center gap-2.5" data-testid="landing-logo">
-          <div className="h-9 w-9 rounded-xl bg-brand flex items-center justify-center">
-            <Sparkle size={18} weight="fill" className="text-brand-gold" />
-          </div>
-          <span className="font-heading text-xl font-bold text-white tracking-tight">Feedify</span>
-        </Link>
-
-        <div className="hidden md:flex items-center gap-8 text-sm text-white/50 font-medium">
-          <a href="#how" className="hover:text-white transition-colors">Cara kerja</a>
-          <a href="#pricing" className="hover:text-white transition-colors">Harga</a>
-          <a href="#faq" className="hover:text-white transition-colors">FAQ</a>
-        </div>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          {user ? (
-            <>
-              <button onClick={logout} data-testid="landing-logout-btn"
-                className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-white border border-white/25 hover:border-white/50 hover:bg-white/10 rounded-full transition-all">
-                {user.picture
-                  ? <img src={user.picture} alt="" className="w-5 h-5 rounded-full object-cover" />
-                  : <div className="w-5 h-5 rounded-full bg-brand-gold/40 flex items-center justify-center text-[10px] font-bold text-brand-gold">{(user.name || user.email || "U")[0].toUpperCase()}</div>
-                }
-                Logout
-              </button>
-              {hasAccess ? (
-                <button onClick={() => navigate("/dashboard")} data-testid="nav-dashboard-cta"
-                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
-                  Masuk Dashboard <ArrowRight size={14} weight="bold" />
-                </button>
-              ) : pendingOrder?.status === "menunggu_verifikasi" ? (
-                <button onClick={() => navigate("/checkout?plan=lifetime")} data-testid="nav-pending-badge"
-                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-amber-400/15 text-amber-300 border border-amber-400/40 rounded-full transition-all hover:bg-amber-400/25">
-                  <CircleNotch size={14} weight="bold" className="animate-spin" /> Menunggu Konfirmasi
-                </button>
-              ) : pendingOrder?.status === "ditolak" ? (
-                <button onClick={() => navigate("/checkout?plan=lifetime")} data-testid="nav-rejected-badge"
-                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-red-400/15 text-red-300 border border-red-400/40 rounded-full transition-all hover:bg-red-400/25">
-                  <XCircle size={14} weight="bold" /> Bukti Ditolak
-                </button>
-              ) : (
-                <a href="#pricing" data-testid="nav-pricing-cta"
-                  className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
-                  Beli Lifetime <ArrowRight size={14} weight="bold" />
-                </a>
-              )}
-            </>
-          ) : (
-            <>
-              <Link to="/login" data-testid="landing-login-btn"
-                className="inline-flex items-center justify-center px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold text-white border border-white/25 hover:border-white/50 hover:bg-white/10 rounded-full transition-all">
-                Masuk
-              </Link>
-              <a href="#pricing" data-testid="nav-pricing-cta"
-                className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs sm:text-sm font-semibold bg-brand-gold text-brand hover:bg-brand-amber rounded-full transition-all shadow-lg shadow-brand-gold/20">
-                Mulai Sekarang <ArrowRight size={14} weight="bold" />
-              </a>
-            </>
-          )}
-        </div>
-      </nav>
-
-      {/* HERO CONTENT */}
-      <div className="relative z-10 flex-1 flex flex-col justify-center max-w-[1280px] mx-auto w-full min-w-0 px-5 lg:px-0 pt-6 pb-4 lg:pb-24">
-
-        {/* Eyebrow */}
-        <div className="inline-flex items-center gap-2 mb-8 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-brand-gold text-[10px] font-bold uppercase tracking-[0.22em] w-fit" data-testid="hero-eyebrow">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-gold animate-pulse" />
-          Brand Studio · Untuk UMKM Indonesia
-        </div>
-
-        {/* Main headline — HUGE */}
-        <h1
-          className="font-heading font-bold text-white tracking-[-0.04em] leading-[0.92] max-w-full sm:max-w-[18ch] break-words"
-          style={{ fontSize: "clamp(2rem, 7.5vw, 7.5rem)", overflowWrap: "anywhere" }}
-          data-testid="hero-headline"
+    <figure className="w-full max-w-[13rem]">
+      <div className="relative overflow-hidden rounded-[2rem] bg-brand-terminal p-2 shadow-2xl ring-1 ring-white/10">
+        <video
+          ref={ref}
+          src={src}
+          muted={muted}
+          loop
+          playsInline
+          autoPlay
+          preload="metadata"
+          className="aspect-[9/16] w-full rounded-[1.5rem] bg-black object-cover"
+        />
+        <button
+          onClick={() => {
+            const el = ref.current;
+            if (!el) return;
+            el.muted = !el.muted;
+            setMuted(el.muted);
+            el.play?.().catch(() => {});
+          }}
+          className="absolute bottom-5 right-5 grid h-10 w-10 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition-colors hover:bg-black/75"
+          aria-label={muted ? "Nyalakan suara" : "Matikan suara"}
         >
-          Capek mikir konten tiap hari,<br className="hidden sm:block" />
-          {" "}tapi feed tetap{" "}
-          <span className="text-brand-gold italic font-medium">sepi?</span>
-        </h1>
+          {muted ? <SpeakerSimpleSlash size={16} weight="fill" /> : <SpeakerSimpleHigh size={16} weight="fill" />}
+        </button>
+      </div>
+    </figure>
+  );
+}
 
-        {/* Sub + CTA row */}
-        <div className="mt-10 lg:mt-14 flex flex-col lg:flex-row lg:items-end gap-8 lg:gap-16 min-w-0">
-          <div className="max-w-full sm:max-w-lg min-w-0">
-            <p className="text-white/60 leading-relaxed text-base lg:text-lg" data-testid="hero-sub">
-              Setiap hari mikirin mau posting apa. Foto produk seadanya. Feed berantakan.
-              Sementara kompetitor makin rapi dan laku. Feedify ubah itu — konten brand
-              profesional, konsisten, siap posting dalam 30 detik.
-            </p>
-            {/* Hero CTA — changes based on auth state */}
+function FaqItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-brand-sand">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-5 py-5 text-left"
+        data-testid="faq-item"
+      >
+        <span className="font-heading text-base sm:text-lg font-semibold text-brand">{q}</span>
+        <span className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full border transition-all duration-300 ${
+          open ? "rotate-180 border-brand bg-brand text-brand-cream" : "border-brand-sand text-brand"
+        }`}>
+          <CaretDown size={13} weight="bold" />
+        </span>
+      </button>
+      <div className={`grid transition-all duration-500 ease-out ${open ? "grid-rows-[1fr] pb-5" : "grid-rows-[0fr]"}`}>
+        <div className="overflow-hidden">
+          <p className="max-w-2xl text-sm leading-relaxed text-stone-500">{a}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── page ────────────────────────────────────────────────────────────────── */
+
+export default function LandingPage() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const cfg = useAgencyConfig();
+  const [scrolled, setScrolled] = useState(false);
+  const [menu, setMenu] = useState(false);
+  useReveal();
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const open = cfg?.registration_open !== false;
+  const slotsLeft = cfg?.slots_left;
+  const slotsTotal = cfg?.slots_total ?? 0;
+  const slotsTaken = cfg?.slots_taken ?? 0;
+  const slotPct = slotsTotal ? Math.round((slotsTaken / slotsTotal) * 100) : 0;
+  // Owner-set and shown only when it is a real figure — an invented client count is
+  // a false claim to a buyer, and it would contradict the slot counter on this very
+  // page. Left at 0 the strip simply does not render.
+  const clientsServed = cfg?.clients_served ?? 0;
+  const packages = cfg?.packages || [];
+  // Mirrors ProtectedRoute in App.js — what the dashboard itself will accept.
+  const hasAccess = !!user && (user.role === "admin" || user.is_lifetime);
+  const ctaPrimary = "inline-flex items-center gap-2 rounded-full bg-brand-gold px-7 py-4 font-semibold text-brand shadow-lg shadow-brand-gold/20 transition-all hover:-translate-y-0.5 hover:bg-brand-amber";
+  const ctaSecondary = "inline-flex items-center gap-2 rounded-full border border-brand-cream/25 px-7 py-4 font-semibold text-brand-cream transition-all hover:border-brand-cream/50 hover:bg-white/5";
+  const wa = waLink(cfg?.whatsapp || "6281210117905", "Halo Feedify, saya mau tanya soal paket konten.");
+
+  const goCheckout = (pkgId) => {
+    if (!open) { navigate("/sample"); return; }
+    const target = `/checkout?paket=${pkgId}`;
+    // The nested query string must be encoded or "?paket=" is read as a param of /login.
+    navigate(user ? target : `/login?redirect=${encodeURIComponent(target)}`);
+  };
+
+  return (
+    <div className="min-h-screen bg-brand-cream text-brand-ink overflow-x-hidden">
+      {/* ── NAV ─────────────────────────────────────────────── */}
+      <nav
+        // The logo tile is brand emerald, so a transparent bar over the emerald hero
+        // would swallow it. The bar sits a shade deeper than the hero at all times.
+        className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? "bg-brand-terminal/95 py-3 shadow-lg backdrop-blur-xl"
+            : "bg-brand-terminal py-5 shadow-sm"
+        }`}
+        data-testid="landing-nav"
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 sm:px-8">
+          <Link to="/" data-testid="landing-logo">
+            <FeedifyLogo size={36} tone="light" />
+          </Link>
+
+          <div className="hidden items-center gap-8 md:flex">
+            {[["Hasil Kerja", "/hasil-kerja"], ["Cara Kerja", "#cara-kerja"], ["Harga", "#harga"]].map(([t, href]) =>
+              href.startsWith("#") ? (
+                <a key={t} href={href} className="text-sm text-brand-cream/60 transition-colors hover:text-brand-cream">{t}</a>
+              ) : (
+                <Link key={t} to={href} className="text-sm text-brand-cream/60 transition-colors hover:text-brand-cream">{t}</Link>
+              )
+            )}
             {user ? (
-              <div className="mt-8">
-                {hasAccess ? (
-                  /* Logged in + has access */
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <InstallPWAButton />
-                    <button
-                      onClick={() => navigate("/dashboard")}
-                      data-testid="hero-dashboard-cta"
-                      className="inline-flex items-center gap-2.5 px-7 py-4 bg-brand-gold text-brand hover:bg-brand-amber rounded-full font-bold text-base shadow-2xl shadow-brand-gold/25 btn-lift">
-                      <CheckCircle size={20} weight="fill" />
-                      Masuk ke Dashboard
-                      <ArrowRight size={18} weight="bold" />
-                    </button>
-                    <p className="text-white/40 text-xs">
-                      Login sebagai <span className="text-white/70 font-semibold">{user.name || user.email}</span>
-                    </p>
-                  </div>
-                ) : (
-                  /* Logged in but hasn't paid */
-                  <div className="flex flex-col gap-4">
-                    <div className="inline-flex items-center gap-3 px-5 py-3.5 rounded-2xl border border-white/10 bg-white/5 w-fit">
-                      <Lock size={16} className="text-white/40 flex-shrink-0" />
-                      <div>
-                        <p className="text-white/80 text-sm font-semibold">Akun terdaftar sebagai <span className="text-brand-gold">{user.name || user.email}</span></p>
-                        <p className="text-white/40 text-xs mt-0.5">Selesaikan pembayaran untuk mengakses dashboard</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <a href="#pricing" data-testid="hero-cta"
-                        className="inline-flex items-center gap-2 px-7 py-4 bg-brand-gold text-brand hover:bg-brand-amber rounded-full font-bold text-base shadow-2xl shadow-brand-gold/25 btn-lift">
-                        Selesaikan Pembayaran <ArrowRight size={18} weight="bold" />
-                      </a>
-                      <button disabled
-                        className="inline-flex items-center gap-2 px-6 py-4 rounded-full font-bold text-sm text-white/30 border border-white/10 cursor-not-allowed">
-                        <Lock size={15} />
-                        Dashboard (Terkunci)
-                      </button>
-                    </div>
-                  </div>
-                )}
+              <div className="flex items-center gap-2">
+                <button onClick={() => navigate("/dashboard")} className="rounded-full bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand transition-all hover:bg-brand-amber" data-testid="nav-dashboard-cta">
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => { logout(); navigate("/"); }}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-brand-cream/25 px-4 py-2.5 text-sm font-medium text-brand-cream/70 transition-colors hover:border-brand-cream/50 hover:text-brand-cream"
+                  data-testid="landing-logout"
+                >
+                  <SignOut size={14} weight="bold" /> Keluar
+                </button>
               </div>
             ) : (
-              /* Not logged in */
-              <div className="mt-8 flex items-center gap-4 flex-wrap">
-                <a href="#pricing" data-testid="hero-cta"
-                  className="inline-flex items-center gap-2 px-7 py-4 bg-brand-gold text-brand hover:bg-brand-amber rounded-full font-bold text-base shadow-2xl shadow-brand-gold/25 btn-lift">
-                  Mulai Sekarang <ArrowRight size={18} weight="bold" />
+              <Link to="/login" className="rounded-full bg-brand-gold px-5 py-2.5 text-sm font-semibold text-brand transition-all hover:bg-brand-amber" data-testid="landing-login-btn">
+                Masuk
+              </Link>
+            )}
+          </div>
+
+          <button onClick={() => setMenu((v) => !v)} className="grid h-10 w-10 place-items-center rounded-full bg-white/10 text-brand-cream md:hidden" data-testid="nav-menu-toggle" aria-label="Menu">
+            {menu ? <X size={18} weight="bold" /> : <List size={18} weight="bold" />}
+          </button>
+        </div>
+
+        {menu && (
+          <div className="mt-3 space-y-1 border-t border-white/10 bg-brand-terminal px-5 pb-5 pt-4 md:hidden">
+            <Link to="/hasil-kerja" onClick={() => setMenu(false)} className="block py-2.5 text-brand-cream/80">Hasil Kerja</Link>
+            <a href="#cara-kerja" onClick={() => setMenu(false)} className="block py-2.5 text-brand-cream/80">Cara Kerja</a>
+            <a href="#harga" onClick={() => setMenu(false)} className="block py-2.5 text-brand-cream/80">Harga</a>
+            <Link to={user ? "/dashboard" : "/login"} onClick={() => setMenu(false)} className="mt-2 block rounded-full bg-brand-gold py-3 text-center font-semibold text-brand">
+              {user ? "Dashboard" : "Masuk"}
+            </Link>
+            {user && (
+              <button
+                onClick={() => { setMenu(false); logout(); navigate("/"); }}
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-brand-cream/25 py-3 font-semibold text-brand-cream/70"
+                data-testid="landing-logout-m"
+              >
+                <SignOut size={15} weight="bold" /> Keluar
+              </button>
+            )}
+          </div>
+        )}
+      </nav>
+
+      {/* ── HERO ────────────────────────────────────────────── */}
+      <header className="relative overflow-hidden bg-brand pb-20 pt-32 sm:pb-28 sm:pt-40">
+        {/* Soft glows — desktop only: heavy blur is a known GPU killer on low-end Android,
+            which is a large slice of this audience. */}
+        <div className="pointer-events-none absolute inset-0 hidden sm:block">
+          <div className="absolute -left-40 -top-40 h-[34rem] w-[34rem] rounded-full bg-brand-light/25 blur-[120px]" />
+          <div className="absolute -right-32 top-20 h-[28rem] w-[28rem] rounded-full bg-brand-gold/10 blur-[110px]" />
+        </div>
+
+        <div className="relative mx-auto max-w-3xl px-5 text-center sm:px-8">
+          <div>
+            {user && (
+              <div data-rv className="rv mb-5 inline-flex items-center gap-2.5 rounded-full bg-white/8 px-4 py-2 ring-1 ring-white/15" data-testid="hero-welcome">
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-brand-gold text-[11px] font-bold text-brand">
+                  {(user.name || user.email || "?").trim().charAt(0).toUpperCase()}
+                </span>
+                <span className="text-sm text-brand-cream/70">
+                  Halo, <span className="font-semibold text-brand-cream">{(user.name || "").split(" ")[0] || "kamu"}</span>
+                </span>
+              </div>
+            )}
+
+            {cfg && !user && (
+              <div data-rv className="rv mb-7 inline-flex items-center gap-2.5 rounded-full border border-brand-gold/30 bg-brand-gold/10 px-4 py-2" data-testid="slot-badge">
+                <span className="relative flex h-2 w-2">
+                  <span className={`absolute inline-flex h-full w-full rounded-full ${open ? "animate-ping bg-brand-gold/70" : "bg-stone-400"}`} />
+                  <span className={`relative inline-flex h-2 w-2 rounded-full ${open ? "bg-brand-gold" : "bg-stone-400"}`} />
+                </span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-brand-gold">
+                  {open ? "Slot batch ini" : "Slot sedang penuh"}
+                </span>
+                <span className="font-mono text-[11px] font-bold text-brand-cream">
+                  {slotsTaken}/{slotsTotal}
+                </span>
+              </div>
+            )}
+
+            <h1 data-rv className="rv font-heading text-[2.6rem] font-bold leading-[1.04] tracking-[-0.035em] text-brand-cream sm:text-6xl">
+              Feed Instagram brand kamu,
+              <br />
+              <span className="text-brand-gold">dikerjakan sampai beres.</span>
+            </h1>
+
+            <p data-rv className="rv mx-auto mt-6 max-w-xl text-base leading-relaxed text-brand-cream/60 sm:text-lg">
+              Kirim foto produkmu sekali. Tim Feedify yang menyiapkan feed dan captionnya — kamu tinggal posting, tanpa mikir mau posting apa lagi.
+            </p>
+
+            {/* Three audiences land here, and each needs a different first button.
+                A signed-in account that has not paid would be bounced straight back
+                out by the dashboard's own guard, so it is never offered that door. */}
+            <div data-rv className="rv mt-9 flex flex-wrap justify-center gap-3" data-testid="hero-cta-row">
+              {hasAccess ? (
+                <button onClick={() => navigate("/dashboard")} className={ctaPrimary} data-testid="hero-cta-dashboard">
+                  {user?.has_brand_profile ? "Buka Dashboard" : "Lengkapi Data Brand"} <ArrowRight size={16} weight="bold" />
+                </button>
+              ) : user ? (
+                <a href="#harga" className={ctaPrimary} data-testid="hero-cta-lanjut-bayar">
+                  Pilih Paket & Mulai <ArrowRight size={16} weight="bold" />
                 </a>
-                <a href="#pain" data-testid="hero-cta-secondary"
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/50 hover:text-white transition-colors">
-                  Lihat Contoh Hasil ↓
+              ) : (
+                <a href="#harga" className={ctaPrimary} data-testid="hero-cta-paket">
+                  Lihat Paket <ArrowRight size={16} weight="bold" />
                 </a>
+              )}
+
+              {hasAccess ? (
+                <a href="#harga" className={ctaSecondary}>Lihat Paket</a>
+              ) : (
+                <Link to="/sample" className={ctaSecondary} data-testid="hero-cta-sample">
+                  Minta Sample Gratis
+                </Link>
+              )}
+            </div>
+
+            {/* One number, then the industries it came from. "279 karya" counted
+                files and "6 kategori usaha" measured something no buyer cares
+                about — both read as filling space. An agency's credibility is who
+                trusts it and in what business, so that is all this says. */}
+            {clientsServed > 0 && (
+              <div data-rv className="rv mt-10 inline-flex flex-col items-center gap-3 rounded-2xl bg-white/5 px-7 py-5 ring-1 ring-white/10" data-testid="trust-strip">
+                <div className="flex items-baseline gap-2">
+                  <CountUp to={clientsServed} suffix="+" className="font-heading text-3xl font-bold text-brand-gold" />
+                  <span className="text-sm text-brand-cream/60">brand mempercayakan feed-nya</span>
+                </div>
+                <div className="h-px w-full bg-white/10" />
+                <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5">
+                  {[...new Set(FEED_MOCKUPS.map((f) => f.cat))].map((c, i) => (
+                    <span key={c} className="inline-flex items-center gap-2.5 text-[11px] text-brand-cream/45">
+                      {i > 0 && <span className="h-1 w-1 rounded-full bg-brand-cream/20" />}
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div data-rv className="rv mt-10 flex flex-wrap justify-center gap-x-9 gap-y-4">
+              {[["Caption termasuk", "Tinggal salin & posting"], ["Revisi sampai sreg", `Maksimal ${cfg?.max_revisi ?? 2}x per konten`], ["Tanpa masa berlaku", "Sampai kontennya habis"]].map(([v, l]) => (
+                <div key={v}>
+                  <div className="text-sm font-semibold text-brand-cream">{v}</div>
+                  <div className="text-xs text-brand-cream/45">{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ── PITA FEED ───────────────────────────────────────── */}
+      <FeedMarquee />
+
+      {/* ── VIDEO ───────────────────────────────────────────── */}
+      <section className="bg-brand-terminal pb-20 pt-4 sm:pb-24" data-testid="video-section">
+        <div className="mx-auto max-w-5xl px-5 sm:px-8">
+          <div data-rv className="rv text-center">
+            <Eyebrow>Bukan cuma foto diam</Eyebrow>
+            <h2 className="font-heading text-3xl font-bold leading-tight tracking-tight text-brand-cream sm:text-4xl">
+              Produkmu, dibuat bergerak.
+            </h2>
+            <p className="mx-auto mt-4 max-w-md leading-relaxed text-brand-cream/55">
+              Dari foto produk yang sama, kami bisa membuat video pendek untuk Reels
+              dan TikTok — bukan slideshow, tapi gerakan kamera sungguhan.
+            </p>
+          </div>
+
+          <div data-rv className="rv mt-11 flex flex-wrap items-start justify-center gap-5 sm:gap-6">
+            {VIDEOS.map((src) => <PhoneVideo key={src} src={src} />)}
+          </div>
+
+          <div data-rv className="rv mt-10 text-center">
+            <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border border-brand-cream/25 px-6 py-3.5 font-semibold text-brand-cream transition-all hover:border-brand-cream/50 hover:bg-white/5">
+              <WhatsappLogo size={16} weight="fill" /> Tanya Soal Video
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── BEFORE / AFTER ──────────────────────────────────── */}
+      <section className="bg-brand-cream py-20 sm:py-24">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2">
+          <div data-rv className="rv">
+            <Eyebrow tone="sage">Geser dan lihat sendiri</Eyebrow>
+            <h2 className="font-heading text-3xl font-bold leading-tight tracking-tight text-brand sm:text-4xl">
+              Kamu kirim satu foto.
+              <br />Yang balik empat feed.
+            </h2>
+            <p className="mt-5 max-w-md leading-relaxed text-stone-500">
+              Foto produk yang sama bisa dipakai berkali-kali tanpa terlihat mengulang —
+              sudut, komposisi, dan pesannya kami buat berbeda tiap feed. Itu bedanya
+              punya stok konten dan cuma punya satu foto bagus.
+            </p>
+          </div>
+          <div data-rv className="rv"><BeforeAfter /></div>
+        </div>
+      </section>
+
+      {/* ── MASALAH ─────────────────────────────────────────── */}
+      <section className="bg-white py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <div data-rv className="rv max-w-2xl">
+            <Eyebrow tone="sage">Kenapa ini ada</Eyebrow>
+            <h2 className="font-heading text-3xl font-bold leading-tight tracking-tight text-brand sm:text-4xl">
+              Jualan sudah capek. Mikirin konten jangan lagi.
+            </h2>
+          </div>
+          <div className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-brand-sand sm:grid-cols-2">
+            {PAINS.map((p) => (
+              <div key={p.t} data-rv className="rv bg-white p-7">
+                <h3 className="font-heading text-lg font-semibold text-brand">{p.t}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-stone-500">{p.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CARA KERJA ──────────────────────────────────────── */}
+      <section id="cara-kerja" className="bg-brand py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <div data-rv className="rv max-w-2xl">
+            <Eyebrow>Cara Kerja</Eyebrow>
+            <h2 className="font-heading text-3xl font-bold leading-tight tracking-tight text-brand-cream sm:text-4xl">
+              Tiga langkah. Sisanya kami.
+            </h2>
+          </div>
+          <div className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-white/10 md:grid-cols-3">
+            {STEPS.map((s) => (
+              <div key={s.n} data-rv className="rv bg-brand p-8">
+                <div className="font-heading text-3xl font-bold text-brand-gold">{s.n}</div>
+                <h3 className="mt-5 font-heading text-lg font-semibold text-brand-cream">{s.t}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-brand-cream/55">{s.d}</p>
+              </div>
+            ))}
+          </div>
+          <div data-rv className="rv mt-6 flex items-start gap-3 rounded-2xl border border-brand-gold/20 bg-brand-gold/[0.07] p-5">
+            <Clock size={18} weight="duotone" className="mt-0.5 flex-shrink-0 text-brand-gold" />
+            <p className="text-sm leading-relaxed text-brand-gold/90">
+              Setelah pembayaranmu masuk, tim kami menghubungi lewat WhatsApp untuk membahas detailnya — termasuk kapan kontenmu siap.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── APA YANG DIKERJAKAN ─────────────────────────────── */}
+      <section className="bg-brand-cream py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <div data-rv className="rv flex flex-wrap items-end justify-between gap-6">
+            <div className="max-w-xl">
+              <Eyebrow tone="sage">Yang Kami Kerjakan</Eyebrow>
+              <h2 className="font-heading text-3xl font-bold leading-tight tracking-tight text-brand sm:text-4xl">
+                Bukan cuma foto feed.
+              </h2>
+            </div>
+            <Link to="/hasil-kerja" className="inline-flex items-center gap-2 text-sm font-semibold text-brand hover:underline" data-testid="go-to-portfolio">
+              Lihat semua hasil kerja <ArrowUpRight size={15} weight="bold" />
+            </Link>
+          </div>
+
+          <div className="mt-12 grid gap-6 sm:grid-cols-2">
+            {SHOWCASE.map(({ id, icon: Icon, label, desc, images }) => (
+              <div key={id} data-rv className="rv group overflow-hidden rounded-2xl border border-brand-sand bg-white p-4 transition-all hover:-translate-y-1 hover:shadow-xl">
+                <div className="grid grid-cols-3 gap-1.5 overflow-hidden rounded-xl">
+                  {images.map((src) => (
+                    <div key={src} className="aspect-square overflow-hidden rounded-lg bg-brand-sand">
+                      <img src={src} alt={label} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-start gap-3 px-2 pb-1 pt-5">
+                  <Icon size={20} weight="duotone" className="mt-0.5 flex-shrink-0 text-brand-light" />
+                  <div>
+                    <h3 className="font-heading text-base font-semibold text-brand">{label}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-stone-500">{desc}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── HARGA ───────────────────────────────────────────── */}
+      <section id="harga" className="bg-white py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <div data-rv className="rv text-center">
+            <Eyebrow tone="sage">Harga</Eyebrow>
+            <h2 className="font-heading text-3xl font-bold leading-tight tracking-tight text-brand sm:text-4xl">
+              Bayar sekali, konten siap posting.
+            </h2>
+            <p className="mx-auto mt-4 max-w-md text-sm text-stone-500">
+              Kami membatasi jumlah klien supaya tiap brand digarap serius.
+            </p>
+
+            {cfg && (
+              <div className="mx-auto mt-7 max-w-sm" data-testid="slot-counter">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs font-bold uppercase tracking-[0.14em] text-stone-400">
+                    Slot terisi
+                  </span>
+                  <span className="font-heading text-xl font-bold text-brand">
+                    {slotsTaken}<span className="text-stone-300">/{slotsTotal}</span>
+                  </span>
+                </div>
+                <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-brand-sand">
+                  <div
+                    className="h-full rounded-full bg-brand-gold transition-[width] duration-700 ease-out"
+                    style={{ width: `${Math.max(slotPct, 3)}%` }}
+                  />
+                </div>
+                <p className="mt-2.5 text-xs text-stone-400">
+                  {open ? `Tersisa ${slotsLeft} slot di batch ini` : "Batch ini sudah penuh"}
+                </p>
               </div>
             )}
           </div>
 
-          {/* Stats row */}
-          <div className="flex items-center gap-8 lg:gap-12 lg:pb-1">
-            <HeroStat num="< 30s" label="Per gambar" />
-            <div className="h-10 w-px bg-white/10" />
-            <HeroStat num="∞" label="Tools AI" />
-            <div className="h-10 w-px bg-white/10" />
-            <HeroStat num="999+" label="Library inspirasi" />
-          </div>
-        </div>
-
-        {/* Scrolling content strip */}
-        <ContentStrip />
-      </div>
-
-      {/* Bottom fade to page background */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-b from-transparent to-brand-cream pointer-events-none" />
-    </div>
-  );
-}
-
-function HeroStat({ num, label }) {
-  return (
-    <div>
-      <div className="font-heading font-bold text-white text-2xl lg:text-3xl tracking-tight leading-none">{num}</div>
-      <div className="text-white/40 text-xs mt-1 font-medium">{label}</div>
-    </div>
-  );
-}
-
-const STRIP_ITEMS = [
-  { img: "/skincare-moisturizer.webp",                          label: "Skincare",    tag: "Moisturizer",   contain: false },
-  { img: "/skincare-moisturizer1.webp",                         label: "Skincare",    tag: "Moisturizer",   contain: true },
-  { img: "/studio/skincare-moisturizer birutema.webp",          label: "Skincare",    tag: "Moisturizer",   contain: true },
-  { img: "/perfume1.webp",                                      label: "Parfum",      tag: "Perfume",       contain: true },
-  { img: "/perfume2.webp",                                      label: "Parfum",      tag: "Perfume",       contain: true },
-  { img: "/studio/perfume3.webp",                               label: "Parfum",      tag: "Perfume",       contain: true },
-  { img: "/cleanser1.webp",                                     label: "Skincare",    tag: "Cleanser",      contain: true },
-  { img: "/cleanser2.webp",                                     label: "Skincare",    tag: "Cleanser",      contain: true },
-  { img: "/cleanser3.webp",                                     label: "Skincare",    tag: "Cleanser",      contain: true },
-  { img: "/studio/skincare-facewash.webp",                      label: "Skincare",    tag: "Face Wash",     contain: true },
-  { img: "/skincare-serum5.webp",                               label: "Skincare",    tag: "Serum",         contain: true },
-  { img: "/skincare-serumtestimoni.webp",                       label: "Skincare",    tag: "Serum",         contain: true },
-  { img: "/skincare-serumtestimoni2.webp",                      label: "Skincare",    tag: "Serum",         contain: true },
-  { img: "/studio/skincare-serum.webp",                         label: "Skincare",    tag: "Serum",         contain: true },
-  { img: "/studio/skincare-serum2.webp",                        label: "Skincare",    tag: "Serum",         contain: true },
-  { img: "/studio/skincare-ampoule.webp",                       label: "Skincare",    tag: "Ampoule",       contain: true },
-  { img: "/bodycare-bodywash.webp",                             label: "Bodycare",    tag: "Body Wash",     contain: true },
-  { img: "/bodycare-scrubtestimoni.webp",                       label: "Bodycare",    tag: "Scrub",         contain: true },
-  { img: "/minuman-matcha.webp",                                label: "Café",        tag: "Matcha",        contain: true },
-  { img: "/minuman-bery.webp",                                  label: "Minuman",     tag: "Berry Drink",   contain: true },
-  { img: "/minuman-kalengtea.webp",                             label: "Minuman",     tag: "Tea Kaleng",    contain: true },
-  { img: "/minuman-kaleng.webp",                                label: "Minuman",     tag: "Beverage",      contain: true },
-  { img: "/minuman-cup.webp",                                   label: "F&B",         tag: "Minuman Cup",   contain: true },
-  { img: "/minuman-kopi.webp",                                  label: "Café",        tag: "Menu Kopi",     contain: true },
-  { img: "/makanan-crunch.webp",                                label: "Kuliner",     tag: "Snack",         contain: true },
-  { img: "/makanan-sambal.webp",                                label: "Kuliner",     tag: "Sambal",        contain: true },
-  { img: "/makanan.webp",                                       label: "Kuliner",     tag: "Rice Bowl",     contain: true },
-  { img: "/fashion-baju.webp",                                  label: "Fashion",     tag: "Baju",          contain: true },
-  { img: "/fashion-shirt.webp",                                 label: "Fashion",     tag: "Pakaian",       contain: false },
-  { img: "/headset1.webp",                                      label: "Elektronik",  tag: "Headset",       contain: true },
-  { img: "/jamtangan1.webp",                                    label: "Aksesoris",   tag: "Jam Tangan",    contain: true },
-  { img: "/aksesoris.webp",                                     label: "Aksesoris",   tag: "Perhiasan",     contain: true },
-  { img: "/skincare-toner1.webp",                               label: "Skincare",    tag: "Toner",         contain: true },
-  { img: "/freese-after.webp",                                  label: "Skincare",    tag: "Body Lotion",   contain: true },
-  { img: "/marketplace/skincare-moisturizer.webp",              label: "Marketplace", tag: "Moisturizer",   contain: true },
-  { img: "/marketplace/skincare-toneuplotion.webp",             label: "Marketplace", tag: "Toner Lotion",  contain: true },
-  { img: "/studio/lipstick1.webp",                              label: "Kosmetik",    tag: "Lipstik",       contain: true },
-  { img: "/studio/moisturizer1.webp",                           label: "Skincare",    tag: "Moisturizer",   contain: true },
-  { img: "/studio/serum.webp",                                  label: "Skincare",    tag: "Serum",         contain: true },
-  { img: "/studio/tumbler2.webp",                               label: "Lifestyle",   tag: "Tumbler",       contain: true },
-  { img: "/studio/micellerwater1.webp",                         label: "Skincare",    tag: "Micellar Water",contain: true },
-  { img: "/marketplace/susncreen1.webp",                        label: "Marketplace", tag: "Sunscreen",     contain: true },
-  { img: "/marketplace/toner1.webp",                            label: "Marketplace", tag: "Toner",         contain: true },
-  { img: "/marketplace/shirt1.webp",                            label: "Fashion",     tag: "Kaos",          contain: true },
-  { img: "/marketplace/liptint1.webp",                          label: "Kosmetik",    tag: "Lip Tint",      contain: true },
-  { img: "/marketplace/hairpowder1.webp",                       label: "Haircare",    tag: "Hair Powder",   contain: true },
-  { img: "/marketplace/casing1.webp",                           label: "Gadget",      tag: "Casing HP",     contain: true },
-  { img: "/marketplace/babylotion.webp",                        label: "Baby Care",   tag: "Baby Lotion",   contain: true },
-  { img: "/marketplace/parfume2.webp",                          label: "Parfum",      tag: "Perfume",       contain: true },
-  { img: "/marketplace/makeup1.webp",                           label: "Kosmetik",    tag: "Makeup",        contain: true },
-];
-
-function ContentStrip() {
-  const items = [...STRIP_ITEMS, ...STRIP_ITEMS];
-  return (
-    <div className="mt-8 sm:mt-14 lg:mt-20 pb-10 relative" data-testid="hero-result-showcase">
-      <div className="absolute left-0 top-0 bottom-50 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(to right, #060d09, transparent)" }} />
-      <div className="absolute right-0 top-0 bottom-50 w-24 z-10 pointer-events-none" style={{ background: "linear-gradient(to left, #060d09, transparent)" }} />
-      <div className="overflow-hidden">
-        <div className="strip-scroll flex gap-3 w-max pb-2">
-          {items.map((item, i) => (
-            <StripCard key={i} item={item} />
-          ))}
-        </div>
-      </div>
-      <div className="mt-5 flex items-center justify-center gap-3 text-white/25 text-xs font-medium">
-        <div className="h-px w-12 bg-white/10" />
-        Kategori UMKM yang bisa dibuat dengan Feedify
-        <div className="h-px w-12 bg-white/10" />
-      </div>
-    </div>
-  );
-}
-
-function StripCard({ item }) {
-  return (
-    <div className="flex-shrink-0 w-44 sm:w-48 rounded-2xl overflow-hidden group cursor-default"
-      style={{ boxShadow: "0 20px 50px -12px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.07)" }}>
-      <div className="relative aspect-[3/4] bg-[#111]">
-        <img src={item.img} alt={item.label}
-          className={`h-full w-full transition-transform duration-700 ease-out group-hover:scale-[1.04] ${item.contain ? "object-contain p-3" : "object-cover"}`}
-          loading="lazy"
-          onError={(e) => { e.currentTarget.style.display = "none"; }} />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/5 to-transparent" />
-        <div className="absolute top-3 left-3">
-          <span className="text-[8px] font-bold uppercase tracking-[0.15em] text-white/80 bg-black/50 sm:backdrop-blur-sm px-2 py-1 rounded-full">
-            {item.tag}
-          </span>
-        </div>
-        <div className="absolute bottom-3 left-3 right-3">
-          <div className="text-white text-xs font-semibold tracking-wide">{item.label}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============ MARQUEE ============ */
-function Marquee() {
-  const tags = ["F&B & Café","Skincare","Fashion Lokal","Hijab & Modest","Frozen Food","Catering","Jasa Lokal","Retail UMKM","Edukasi & Course","Kuliner Daerah"];
-  return (
-    <section className="relative py-8 lg:py-10 border-y border-brand-sand bg-white" data-testid="marquee">
-      <div className="max-w-[1280px] mx-auto px-5 lg:px-10 flex items-center gap-6 flex-wrap justify-center text-stone-500">
-        <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light">Dipakai UMKM dari berbagai kategori</span>
-        <div className="hidden sm:block h-4 w-px bg-brand-sand" />
-        <div className="flex items-center gap-x-7 gap-y-2 flex-wrap justify-center font-heading font-semibold text-sm text-stone-700">
-          {tags.map(t => <span key={t}>{t}</span>)}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============ TRANSFORMATION ============ */
-function Transformation() {
-  return (
-    <section id="pain" className="relative overflow-hidden bg-brand" data-testid="transformation">
-      {/* Subtle texture */}
-      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "32px 32px" }} />
-      <div className="absolute top-0 right-0 w-[50vw] h-[60vh] rounded-full bg-brand-gold/8 blur-[120px] pointer-events-none" />
-
-      <div className="relative max-w-[1280px] mx-auto px-5 lg:px-10 py-20 lg:py-32">
-
-        {/* Top — headline */}
-        <div className="max-w-3xl mb-14 lg:mb-20">
-          <div className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full bg-brand-gold/15 border border-brand-gold/25 text-brand-gold text-[10px] font-bold uppercase tracking-[0.2em]">
-            <Sparkle size={10} weight="fill" /> Hasil nyata
-          </div>
-          <p className="text-brand-cream/50 text-sm font-semibold uppercase tracking-[0.15em] mb-3">Ini yang berubah setelah pakai Feedify:</p>
-          <h2 className="font-heading font-bold text-brand-cream leading-[1.0] tracking-[-0.03em]" style={{ fontSize: "clamp(2rem, 5.5vw, 4.5rem)" }}>
-            Ribuan orang scroll feed-mu<br />
-            setiap hari —<br />
-            <span className="text-brand-gold italic font-medium">berapa yang benar-benar berhenti?</span>
-          </h2>
-          <p className="mt-6 text-brand-cream/60 text-base lg:text-lg leading-relaxed max-w-xl">
-            Orang tidak berhenti karena produknya bagus. Mereka berhenti karena visualnya menarik perhatian. Feedify pastikan setiap foto yang kamu posting punya daya tarik itu — otomatis, konsisten, sesuai brand.
-          </p>
-        </div>
-
-        {/* Before / After — horizontal on desktop, stacked on mobile */}
-        <div className="grid lg:grid-cols-2 gap-5 lg:gap-8 items-end" data-testid="transformation-grid">
-
-          {/* Before */}
-          <div className="relative group">
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="h-6 w-6 rounded-full bg-white/10 border border-white/15 flex items-center justify-center">
-                <span className="text-[9px] font-bold text-white/50">✕</span>
-              </div>
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/30">Sebelum Feedify</span>
-            </div>
-            <div className="rounded-2xl overflow-hidden bg-white/5 border border-white/10 aspect-[4/5] relative">
-              <img src="/freese-before.webp" alt="Foto produk polos"
-                className="h-full w-full object-contain p-10 opacity-90" loading="lazy" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-5">
-                <div className="space-y-1.5">
-                  {["Foto polos tanpa layout", "Tidak ada identitas brand", "Follower tidak tahu harus ngapain"].map(t => (
-                    <div key={t} className="flex items-center gap-2">
-                      <span className="text-red-400 text-xs">✕</span>
-                      <span className="text-white/50 text-xs">{t}</span>
-                    </div>
-                  ))}
+          {/* When the batch is closed every package button leads nowhere, so the
+              waiting list takes the whole block rather than sitting beside it. */}
+          {cfg && !open ? (
+            <div className="mt-12"><WaitingListForm /></div>
+          ) : (
+            /* Three across from tablet up: the packages only sell by comparison,
+               and stacking them turns the middle one into just a scroll stop. */
+            <div className="mt-12 grid gap-5 md:grid-cols-3">
+              {/* Skeletons hold the exact card footprint while the config loads, so
+                  the section never collapses and jumps the page down on arrival. */}
+            {!cfg && [0, 1, 2].map((i) => (
+              <div key={i} className="animate-pulse rounded-3xl border border-brand-sand bg-white p-6 lg:p-8">
+                <div className="h-3 w-20 rounded bg-brand-sand" />
+                <div className="mt-5 h-3 w-24 rounded bg-brand-sand" />
+                <div className="mt-3 h-9 w-40 rounded bg-brand-sand" />
+                <div className="mt-8 space-y-3">
+                  {[0, 1, 2, 3, 4].map((j) => <div key={j} className="h-3 w-full rounded bg-brand-sand/70" />)}
                 </div>
+                <div className="mt-8 h-12 w-full rounded-full bg-brand-sand" />
               </div>
-            </div>
-          </div>
+            ))}
 
-          {/* After */}
-          <div className="relative group">
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="h-6 w-6 rounded-full bg-brand-gold/20 border border-brand-gold/40 flex items-center justify-center">
-                <Sparkle size={10} weight="fill" className="text-brand-gold" />
-              </div>
-              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-gold">Setelah Feedify</span>
-            </div>
-            <div className="rounded-2xl overflow-hidden border-2 border-brand-gold/40 aspect-[4/5] relative shadow-2xl shadow-black/40">
-              <img src="/freese-after.webp" alt="Hasil feed profesional"
-                className="h-full w-full object-cover" loading="lazy" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-5">
-                <div className="space-y-1.5">
-                  {["Visual setara brand global", "Warna & gaya sesuai brand DNA", "Siap posting, langsung convert"].map(t => (
-                    <div key={t} className="flex items-center gap-2">
-                      <span className="text-brand-gold text-xs">✓</span>
-                      <span className="text-white/80 text-xs font-medium">{t}</span>
-                    </div>
-                  ))}
+            {packages.map((p) => (
+              <div
+                key={p.id}
+                data-rv
+                className={`rv relative rounded-3xl p-6 transition-all hover:-translate-y-1.5 lg:p-8 ${
+                  p.popular
+                    ? "bg-brand text-brand-cream shadow-2xl shadow-brand/25"
+                    : "border border-brand-sand bg-white hover:shadow-xl"
+                }`}
+                data-testid={`plan-${p.id}`}
+              >
+                {p.popular && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-brand-gold px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-brand">
+                    Paling Dipilih
+                  </span>
+                )}
+                <div className={`text-[11px] font-bold uppercase tracking-[0.15em] ${p.popular ? "text-brand-gold" : "text-stone-400"}`}>
+                  {p.name}
                 </div>
-              </div>
-              {/* Time badge */}
-              <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-brand-gold text-brand text-[10px] font-bold uppercase tracking-[0.15em] shadow-lg">
-                ⚡ 30 detik
-              </div>
-            </div>
-          </div>
-        </div>
+                <div className={`mt-4 text-sm ${p.popular ? "text-brand-cream/60" : "text-stone-500"}`}>
+                  {p.feeds} feed
+                </div>
+                <div className="mt-1 font-heading text-4xl font-bold tracking-tight">
+                  {formatRupiah(p.price_idr)}
+                </div>
+                <p className={`mt-1 text-xs ${p.popular ? "text-brand-cream/45" : "text-stone-400"}`}>{p.tagline}</p>
 
-      </div>
-    </section>
-  );
-}
+                <ul className="mt-7 space-y-3">
+                  {(p.features || []).map((f) => (
+                    <li key={f} className="flex items-start gap-2.5 text-sm">
+                      <Check size={14} weight="bold" className={`mt-1 flex-shrink-0 ${p.popular ? "text-brand-gold" : "text-brand-light"}`} />
+                      <span className={p.popular ? "text-brand-cream/85" : "text-stone-600"}>{f}</span>
+                    </li>
+                  ))}
+                </ul>
 
-function Outcome({ num, label }) {
-  return (
-    <div className="border-l-2 border-brand-gold pl-5">
-      <div className="font-heading font-bold text-brand tracking-[-0.04em] leading-none" style={{ fontSize: "clamp(2rem, 4vw, 3.5rem)" }}>{num}</div>
-      <div className="mt-2 text-xs sm:text-sm text-stone-600 leading-snug">{label}</div>
-    </div>
-  );
-}
-
-/* ============ HOW IT WORKS ============ */
-function HowItWorks() {
-  const steps = [
-    { n: "01", label: "Brand DNA", title: "Isi Brand Profile, sekali saja.", desc: "Nama brand, palet warna, gaya visual, dan tone. Lima menit. Disimpan permanen sebagai DNA visual yang otomatis dipakai di setiap dashboard." },
-    { n: "02", label: "Generate", title: "Pilih dashboard. Isi pesan inti.", desc: "Feed & Banner, Carousel, Studio, Feed Generator, atau Marketplace. Anda hanya menulis apa yang ingin disampaikan — Feedify menyusun spesifikasi visual setara art director." },
-    { n: "03", label: "Hasil", title: "Foto siap posting.", desc: "Feedify menyusun spesifikasi visual lengkap — konsisten dengan Brand DNA Anda, siap diunduh dan diposting." },
-  ];
-  return (
-    <section id="how" className="relative py-24 lg:py-36 bg-white border-y border-brand-sand" data-testid="how-it-works">
-      <div className="max-w-[1280px] mx-auto px-5 lg:px-10">
-        <div className="max-w-3xl mb-16 lg:mb-20">
-          <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Cara kerja</div>
-          <h2 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95]" style={{ fontSize: "clamp(2rem, 5.5vw, 4.5rem)" }}>
-            Tiga langkah. <span className="italic font-medium text-brand-light">Tanpa belajar tools baru.</span>
-          </h2>
-        </div>
-        <div className="space-y-12 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-12">
-          {steps.map((s, i) => (
-            <div key={i} className="relative group" data-testid={`step-${i + 1}`}>
-              <div className="flex items-baseline gap-4 mb-6 pb-6 border-b border-brand-sand">
-                <span className="font-heading text-2xl font-bold text-brand-gold tracking-tight">{s.n}</span>
-                <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-stone-400">{s.label}</span>
-              </div>
-              <h3 className="font-heading font-bold text-brand tracking-tight leading-[1.05] mb-4" style={{ fontSize: "clamp(1.4rem, 2.4vw, 2rem)" }}>{s.title}</h3>
-              <p className="text-stone-600 leading-relaxed">{s.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============ TESTIMONIALS ============ */
-const TESTIMONIALS = [
-  { img: "/testimonihalamanawal/testimoni-hiljab.webp",     badge: "Hemat biaya agency",        glow: "rgba(229,193,88,0.15)" },
-  { img: "/testimonihalamanawal/testimoni-bodylotion.webp", badge: "Feeds makin estetik",       glow: "rgba(11,61,46,0.4)" },
-  { img: "/testimonihalamanawal/testimoni-skincare.webp",   badge: "Followers naik terus",      glow: "rgba(229,193,88,0.12)" },
-  { img: "/testimonihalamanawal/testimoni-kaos.webp",       badge: "Customer makin yakin beli", glow: "rgba(11,61,46,0.35)" },
-];
-
-function Testimonials() {
-  return (
-    <section
-      className="relative py-20 lg:py-32 overflow-hidden"
-      style={{ background: "radial-gradient(ellipse 140% 80% at 50% 110%, #0f3d22 0%, #060d09 50%, #060d09 100%)" }}
-      data-testid="testimonials"
-    >
-      {/* Background glows */}
-      <div className="absolute top-[10%] left-[-5%] w-[40vw] h-[40vw] rounded-full bg-brand-gold/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[10%] right-[-5%] w-[35vw] h-[35vw] rounded-full bg-brand/30 blur-[100px] pointer-events-none" />
-
-      <div className="max-w-[1280px] mx-auto px-5 lg:px-10">
-
-        {/* Header */}
-        <div className="text-center mb-12 lg:mb-16">
-          <div className="inline-flex items-center gap-2 mb-5 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-brand-gold text-[10px] font-bold uppercase tracking-[0.22em]">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-gold animate-pulse" />
-            Bukan kata kami
-          </div>
-          <h2
-            className="font-heading font-bold text-brand-cream tracking-[-0.03em] leading-[0.95]"
-            style={{ fontSize: "clamp(2rem, 5.5vw, 4.5rem)" }}
-          >
-            Kata mereka yang sudah<br />
-            <span className="text-brand-gold italic font-medium">buktikan sendiri.</span>
-          </h2>
-          <p className="mt-4 text-white/40 text-sm max-w-md mx-auto leading-relaxed">
-            Apa kata mereka setelah pakai Feedify.
-          </p>
-        </div>
-
-        {/* Marquee strip */}
-        <div className="relative mt-4" data-testid="testimonial-marquee">
-          {/* Left fade */}
-          <div className="absolute left-0 top-0 bottom-0 w-20 sm:w-32 z-10 pointer-events-none"
-            style={{ background: "linear-gradient(to right, #060d09, transparent)" }} />
-          {/* Right fade */}
-          <div className="absolute right-0 top-0 bottom-0 w-20 sm:w-32 z-10 pointer-events-none"
-            style={{ background: "linear-gradient(to left, #060d09, transparent)" }} />
-
-          <div className="overflow-hidden">
-            <div className="testimoni-scroll flex gap-5 w-max pb-3">
-              {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
-                <div
-                  key={i}
-                  className="flex-shrink-0 w-[240px] sm:w-[280px] flex flex-col gap-2.5"
-                  data-testid={i < TESTIMONIALS.length ? `testimonial-${i + 1}` : undefined}
+                <button
+                  onClick={() => goCheckout(p.id)}
+                  className={`mt-8 w-full rounded-full py-3.5 font-semibold transition-all ${
+                    p.popular
+                      ? "bg-brand-gold text-brand hover:bg-brand-amber"
+                      : "border border-brand text-brand hover:bg-brand hover:text-brand-cream"
+                  }`}
+                  data-testid={`plan-cta-${p.id}`}
                 >
-                  {/* Badge */}
-                  <div className="flex justify-center">
-                    <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-brand-gold text-brand text-[9px] sm:text-[10px] font-bold shadow-lg shadow-brand-gold/25 whitespace-nowrap">
-                      <Lightning size={9} weight="fill" /> {t.badge}
-                    </span>
-                  </div>
-
-                  {/* Phone frame */}
-                  <div
-                    className="rounded-[22px] overflow-hidden bg-[#f0f2f5]"
-                    style={{ boxShadow: `0 20px 50px -10px rgba(0,0,0,0.8), 0 0 0 1.5px rgba(255,255,255,0.08), 0 0 30px -8px ${t.glow}` }}
-                  >
-                    {/* Top chrome */}
-                    <div className="h-7 bg-[#1c1c1e] flex items-center justify-between px-3">
-                      <div className="text-white/30 text-[8px] font-medium">9:41</div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-1.5 bg-white/25 rounded-sm" />
-                        <div className="w-1 h-1 rounded-full bg-white/25" />
-                        <div className="w-3 h-1.5 border border-white/25 rounded-sm" />
-                      </div>
-                    </div>
-
-                    {/* Full screenshot — no crop */}
-                    <img
-                      src={t.img}
-                      alt={`Testimoni ${(i % TESTIMONIALS.length) + 1}`}
-                      className="w-full h-auto block"
-                      loading="lazy"
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
-                    />
-
-                    {/* Bottom chrome */}
-                    <div className="h-5 bg-[#f0f2f5] flex items-center justify-center">
-                      <div className="w-16 h-1 bg-black/15 rounded-full" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom trust line */}
-        <div className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8 text-white/25 text-xs">
-          <span className="flex items-center gap-2"><span className="h-px w-8 bg-white/15" />Feedback langsung dari pengguna<span className="h-px w-8 bg-white/15" /></span>
-          <span className="hidden sm:block h-3 w-px bg-white/15" />
-          <span className="flex items-center gap-2"><Lightning size={10} weight="fill" className="text-brand-gold/40" />Hasil bisa berbeda tiap brand</span>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Pricing() {
-  return (
-    <section id="pricing" className="relative py-20 lg:py-28 bg-white border-y border-brand-sand" data-testid="pricing">
-      <div className="max-w-[1280px] mx-auto px-5 lg:px-10 text-center">
-        <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Harga</div>
-        <div className="flex flex-col items-center gap-1 mb-4">
-          <div className="relative inline-flex items-center gap-3">
-            <span className="font-heading font-bold text-stone-400 relative" style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)" }}>
-              Rp 367.000
-              <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[3px] bg-red-500 rounded-full" />
-            </span>
-            <span className="text-base font-black px-3 py-1.5 rounded-full bg-red-500 text-white shadow-lg tracking-wide">−82%</span>
-          </div>
-          <p className="text-xs text-red-500 font-semibold tracking-wide uppercase">Harga normal agency · kamu bayar jauh lebih murah</p>
-        </div>
-        <h2 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95] mb-4" style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}>
-          Bayar sekali. <span className="text-brand-gold">Rp 68.000</span> seumur hidup.
-        </h2>
-        <p className="text-stone-500 text-base lg:text-lg max-w-2xl mx-auto mb-8 leading-relaxed">
-          Bukan langganan bulanan. Bukan per-foto. Satu kali bayar Rp 68.000 —
-          semua dashboard, semua fitur, selamanya. Konten brand profesional kapan pun kamu mau.
-        </p>
-
-        {/* Risk reversal badges */}
-        <div className="inline-flex flex-col items-start gap-2 mb-10 text-left mx-auto">
-          {[
-            "Bayar sekali Rp 68.000 — akses selamanya, bukan per bulan",
-            "Semua tools AI langsung terbuka penuh sejak hari pertama",
-            "Kalau generate gagal, prompt otomatis bisa dicoba ulang",
-            "Tidak ada biaya tambahan, tidak ada hidden fee",
-          ].map((line) => (
-            <div key={line} className="flex items-center gap-2.5 text-sm text-stone-600">
-              <div className="w-5 h-5 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center flex-shrink-0">
-                <span className="text-brand text-[10px] font-bold">✓</span>
+                  {open ? `Pilih ${p.name}` : "Slot penuh"}
+                </button>
               </div>
-              {line}
+            ))}
             </div>
-          ))}
-        </div>
+          )}
 
-        {/* Urgency */}
-        <p className="text-xs text-stone-400 mb-5 italic">
-          Setiap hari nunda = kompetitormu makin jauh di depan.
-        </p>
-
-        <Link to="/pricing" data-testid="go-to-pricing"
-          className="inline-flex items-center gap-2.5 px-10 py-4 bg-brand text-brand-cream hover:bg-brand-light rounded-full font-bold text-lg shadow-xl shadow-brand/20 btn-lift">
-          Lihat Paket &amp; Harga <ArrowRight size={20} weight="bold" />
-        </Link>
-        <div className="mt-5 text-xs text-stone-400">Satu harga · Rp 68.000 · akses seumur hidup · semua dashboard terbuka</div>
-      </div>
-    </section>
-  );
-}
-/* ============ SUPPORT CHAT ============ */
-function SupportChat() {
-  return (
-    <section id="faq" className="relative py-20 lg:py-32 bg-brand-cream" data-testid="faq">
-      <div className="max-w-[1100px] mx-auto px-5 lg:px-10">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 mb-4 px-3 py-1.5 rounded-full bg-brand/8 border border-brand/15 text-brand text-[10px] font-bold uppercase tracking-[0.2em]">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Asisten Online
+          <div data-rv className="rv mt-10 flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-stone-500">
+            {["Bayar lewat QRIS", "Caption sudah termasuk", "Brief cukup diisi sekali"].map((t) => (
+              <span key={t} className="inline-flex items-center gap-2">
+                <Check size={13} weight="bold" className="text-brand-light" /> {t}
+              </span>
+            ))}
           </div>
-          <h2 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95]" style={{ fontSize: "clamp(2rem, 4.5vw, 4rem)" }}>
-            Ada pertanyaan? <br />
-            <span className="italic font-medium text-brand-light">Tanya langsung di sini.</span>
-          </h2>
-          <p className="mt-4 text-stone-500 max-w-md mx-auto text-sm lg:text-base">
-            Asisten Feedify siap jawab apa pun — harga, fitur, cara kerja, sampai cocok atau tidaknya buat bisnis kamu.
-          </p>
         </div>
-        <SupportChatWidget title="" subtitle="" />
-      </div>
-    </section>
-  );
-}
+      </section>
 
+      {/* ── TESTIMONI ───────────────────────────────────────── */}
+      <section className="bg-brand py-20 sm:py-24">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <div data-rv className="rv max-w-2xl">
+            <Eyebrow>Kata mereka</Eyebrow>
+            <h2 className="font-heading text-3xl font-bold leading-tight tracking-tight text-brand-cream sm:text-4xl">
+              Bukan kami yang bilang bagus.
+            </h2>
+            <p className="mt-4 leading-relaxed text-brand-cream/60">
+              Ini percakapan apa adanya dengan pemilik brand yang kontennya kami kerjakan.
+            </p>
+          </div>
 
-/* ============ PAIN AGITATION ============ */
-const PAIN_POINTS = [
-  "😩 Tiap hari bingung mau posting apa",
-  "📉 Feed berantakan, warna nggak konsisten",
-  "📸 Foto produk terlihat murahan & seadanya",
-  "💸 Mau sewa fotografer/agency, tapi mahal (Rp 500rb–1jt/bulan)",
-  "🤳 Nggak punya model buat promosi produk",
-  "⏰ Waktu habis buat edit, jualan malah keteteran",
-  "😔 Udah posting rutin tapi tetap sepi pembeli",
-  "🎨 Nggak ngerti desain, hasil selalu kelihatan amatir",
-];
-
-function PainAgitation() {
-  return (
-    <section
-      className="relative py-20 lg:py-28 overflow-hidden"
-      style={{ background: "linear-gradient(180deg, #FFFAF5 0%, #FFF5EC 100%)" }}
-      data-testid="pain-agitation"
-    >
-      {/* Subtle warm texture */}
-      <div className="absolute inset-0 opacity-[0.025]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #c28e6e 1px, transparent 0)", backgroundSize: "28px 28px" }} />
-
-      <div className="relative max-w-[1280px] mx-auto px-5 lg:px-10">
-
-        {/* Header */}
-        <div className="text-center mb-12 lg:mb-16">
-          <h2
-            className="font-heading font-bold text-brand tracking-[-0.03em] leading-[1.05]"
-            style={{ fontSize: "clamp(1.8rem, 4.5vw, 3.5rem)" }}
-          >
-            Kalau kamu ngalamin ini,<br />
-            kamu nggak sendirian 👇
-          </h2>
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {TESTIMONI.map(({ img, cat }) => (
+              <figure
+                key={img}
+                data-rv
+                className="rv overflow-hidden rounded-2xl bg-white/5 p-2 ring-1 ring-white/10 transition-all duration-500 hover:-translate-y-1.5 hover:ring-brand-gold/40"
+              >
+                <img src={img} alt={`Testimoni klien ${cat}`} loading="lazy" className="w-full rounded-xl object-cover" />
+                <figcaption className="px-2 py-3 text-[11px] font-bold uppercase tracking-[0.14em] text-brand-gold">
+                  {cat}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
+      </section>
 
-        {/* Pain grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-14 lg:mb-16">
-          {PAIN_POINTS.map((pain) => (
-            <div
-              key={pain}
-              className="bg-white rounded-2xl px-5 py-4 border border-rose-100 shadow-sm flex items-start gap-3 group hover:border-rose-200 hover:shadow-md transition-all duration-200"
+      {/* ── FAQ + ANITA ─────────────────────────────────────── */}
+      <section className="bg-white py-20 sm:py-24">
+        <div className="mx-auto max-w-3xl px-5 sm:px-8">
+          <div data-rv className="rv text-center">
+            <Eyebrow tone="sage">Pertanyaan</Eyebrow>
+            <h2 className="font-heading text-3xl font-bold tracking-tight text-brand sm:text-4xl">Yang sering ditanya</h2>
+          </div>
+          <div data-rv className="rv mt-10">
+            {FAQS.map((f) => <FaqItem key={f.q} {...f} />)}
+          </div>
+          {/* The chat sits here, directly under the FAQ, because this is the moment a
+              reader's question is unanswered — not buried under the footer. */}
+          <div data-rv className="rv mt-14">
+            <SupportChatWidget
+              title="Pertanyaanmu tidak ada di atas?"
+              subtitle="Tanya Anita — asisten Feedify, jawab langsung."
+            />
+          </div>
+
+          <div data-rv className="rv mt-8 text-center">
+            <p className="text-sm text-stone-500">Lebih suka ngobrol dengan orangnya langsung?</p>
+            <a
+              href={wa}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-full border border-brand px-6 py-3 text-sm font-semibold text-brand transition-all hover:bg-brand hover:text-brand-cream"
+              data-testid="faq-wa-cta"
             >
-              <div className="w-7 h-7 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center flex-shrink-0 mt-0.5 text-sm">
-                ✕
-              </div>
-              <p className="text-sm text-stone-700 leading-snug font-medium">{pain}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Transition text */}
-        <div className="max-w-2xl mx-auto text-center">
-          <div className="rounded-3xl border border-amber-200 bg-amber-50/80 px-8 py-8 mb-8">
-            <p className="text-stone-700 leading-relaxed text-base lg:text-lg">
-              Masalahnya bukan produkmu jelek.{" "}
-              <br className="hidden sm:block" />
-              Masalahnya calon pembeli menilai dari tampilan dulu — dan tampilan yang
-              berantakan bikin mereka <strong>scroll pergi sebelum lihat produkmu.</strong>
-            </p>
-            <p className="mt-4 font-heading font-bold text-brand text-lg lg:text-xl">
-              Feedify hadir untuk mastiin itu nggak kejadian lagi.
-            </p>
-          </div>
-          <a
-            href="#pricing"
-            className="inline-flex items-center gap-2.5 px-8 py-4 bg-brand text-brand-cream hover:bg-brand-light rounded-full font-bold text-base shadow-lg shadow-brand/20 btn-lift"
-          >
-            Aku Mau Konten yang Rapi <ArrowRight size={18} weight="bold" />
-          </a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============ COMPARISON TABLE ============ */
-const COST_ITEMS = [
-  { label: "Fotografer Produk",          cost: "Rp 300.000",  per: "/ sesi",   monthly: 600000,   note: "~2 sesi/bulan = Rp 600.000" },
-  { label: "Editor Foto Freelance",      cost: "Rp 100.000",  per: "/ foto",   monthly: 2000000,  note: "~20 foto/bulan = Rp 2.000.000" },
-  { label: "Agency Edit Feeds IG",       cost: "Rp 500.000",  per: "/ bulan",  monthly: 500000,   note: "Paket paling murah" },
-  { label: "Canva Pro",                  cost: "Rp 200.000",  per: "/ bulan",  monthly: 200000,   note: "Template doang, tetap kerjain sendiri" },
-];
-
-const FEATURE_ROWS = [
-  { label: "Waktu per konten",  old: "Berjam-jam nunggu revisi",  feedify: "< 30 detik" },
-  { label: "Konsistensi brand", old: "Tergantung mood tim",       feedify: "Otomatis on-brand tiap saat" },
-  { label: "Skill dibutuhkan",  old: "Harus bisa desain / brief", feedify: "Nggak perlu skill apapun" },
-  { label: "Kontrol output",    old: "Terbatas, revisi berbayar", feedify: "Penuh — generate ulang gratis" },
-  { label: "Biaya berikutnya",  old: "Tagihan lagi bulan depan",  feedify: "Rp 0 — sudah bayar selamanya" },
-];
-
-function ComparisonTable() {
-  return (
-    <section className="relative py-20 lg:py-28 bg-brand-cream border-y border-brand-sand" data-testid="comparison-table">
-      <div className="max-w-[1280px] mx-auto px-5 lg:px-10">
-
-        {/* Header */}
-        <div className="max-w-2xl mb-12 lg:mb-16">
-          <div className="text-[10px] uppercase tracking-[0.25em] font-bold text-brand-light mb-4">Perbandingan Biaya</div>
-          <h2 className="font-heading font-bold text-brand tracking-[-0.03em] leading-[0.95]" style={{ fontSize: "clamp(2rem, 5vw, 4rem)" }}>
-            Cara lama habiskan{" "}
-            <span className="italic text-red-500">jutaan</span>{" "}
-            per bulan.
-          </h2>
-          <p className="text-stone-500 mt-4 text-base lg:text-lg leading-relaxed">
-            Sebelum beli Feedify, coba hitung dulu berapa yang kamu keluarkan sekarang.
-          </p>
-        </div>
-
-        {/* Cost breakdown card */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-10">
-
-          {/* Left: cost breakdown */}
-          <div className="rounded-3xl border border-red-100 bg-white overflow-hidden">
-            <div className="px-6 py-4 bg-red-50 border-b border-red-100">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-500">Pengeluaran cara lama / bulan</p>
-            </div>
-            <div className="divide-y divide-stone-100">
-              {COST_ITEMS.map(({ label, cost, per, note }) => (
-                <div key={label} className="px-6 py-4 flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-stone-700">{label}</p>
-                    <p className="text-[11px] text-stone-400 mt-0.5">{note}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-heading font-bold text-red-500 text-sm">{cost}</p>
-                    <p className="text-[10px] text-stone-400">{per}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="px-6 py-4 bg-red-500 flex items-center justify-between">
-              <p className="font-heading font-bold text-white text-sm">Total per bulan</p>
-              <p className="font-heading font-bold text-white text-xl">Rp 3.300.000</p>
-            </div>
-            <div className="px-6 py-3 bg-red-600 text-center">
-              <p className="text-xs text-white/80">= <strong className="text-white">Rp 39.600.000 per tahun</strong> hanya untuk konten</p>
-            </div>
-          </div>
-
-          {/* Right: Feedify */}
-          <div className="rounded-3xl overflow-hidden shadow-2xl shadow-brand/15" style={{ background: "linear-gradient(160deg, #0B3D2E, #1a5c3a)" }}>
-            <div className="px-6 py-4 bg-brand-gold text-center">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand">Feedify — bayar sekali, selesai</p>
-            </div>
-            <div className="px-6 py-8 flex flex-col items-center justify-center text-center flex-1 gap-4">
-              <div>
-                <p className="text-white/40 text-sm mb-1">Kamu hemat</p>
-                <p className="font-heading font-bold text-brand-gold leading-none" style={{ fontSize: "clamp(2.5rem, 6vw, 4rem)" }}>
-                  Rp 3.300.000
-                </p>
-                <p className="text-white/50 text-sm mt-1">setiap bulan dibanding cara lama</p>
-              </div>
-              <div className="w-full border-t border-white/10 pt-5">
-                <p className="text-white/40 text-xs mb-2 uppercase tracking-wider">Yang kamu bayar</p>
-                <p className="font-heading font-bold text-white" style={{ fontSize: "clamp(2.2rem, 5vw, 3.5rem)" }}>Rp 68.000</p>
-                <p className="text-brand-gold text-sm font-semibold mt-1">Sekali · Seumur hidup · Tidak ada lagi</p>
-              </div>
-              <div className="w-full space-y-2 pt-2">
-                {["Semua tools langsung aktif", "Generate ulang gratis selamanya", "Update fitur baru otomatis gratis"].map(t => (
-                  <div key={t} className="flex items-center gap-2 text-left">
-                    <div className="w-4 h-4 rounded-full bg-brand-gold/20 border border-brand-gold/40 flex items-center justify-center flex-shrink-0">
-                      <span className="text-brand-gold text-[8px] font-bold">✓</span>
-                    </div>
-                    <span className="text-white/70 text-xs">{t}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <a href="#pricing"
-              className="block w-full py-4 bg-brand-gold text-brand font-heading font-bold text-center text-base hover:bg-brand-amber transition-colors">
-              Ambil Akses Rp 68.000 →
+              <WhatsappLogo size={16} weight="fill" /> Chat Tim Feedify
             </a>
           </div>
         </div>
+      </section>
 
-        {/* Feature comparison rows */}
-        <div className="rounded-3xl overflow-hidden border border-brand-sand">
-          <div className="grid grid-cols-3 bg-stone-50 border-b border-brand-sand">
-            <div className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-stone-400">Aspek</div>
-            <div className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-stone-400 border-l border-brand-sand">Cara Lama</div>
-            <div className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-brand-gold border-l border-brand-sand">✦ Feedify</div>
+      {/* ── CTA ─────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden bg-brand py-24">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 hidden h-[40rem] w-[40rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-gold/10 blur-[130px] sm:block" />
+        <div className="relative mx-auto max-w-2xl px-5 text-center sm:px-8">
+          <h2 data-rv className="rv font-heading text-3xl font-bold leading-tight tracking-tight text-brand-cream sm:text-5xl">
+            Mau lihat dulu hasilnya?
+          </h2>
+          <p data-rv className="rv mx-auto mt-5 max-w-md leading-relaxed text-brand-cream/60">
+            Kirim satu foto produkmu, kami buatkan satu contoh gratis. Tanpa bayar, tanpa komitmen.
+          </p>
+          <div data-rv className="rv mt-9 flex flex-wrap justify-center gap-3">
+            <Link to="/sample" className="inline-flex items-center gap-2 rounded-full bg-brand-gold px-8 py-4 font-semibold text-brand shadow-lg shadow-brand-gold/20 transition-all hover:-translate-y-0.5 hover:bg-brand-amber" data-testid="cta-sample">
+              Minta Sample Gratis <ArrowRight size={16} weight="bold" />
+            </Link>
+            <a href="#harga" className="inline-flex items-center gap-2 rounded-full border border-brand-cream/25 px-8 py-4 font-semibold text-brand-cream transition-all hover:border-brand-cream/50 hover:bg-white/5">
+              Langsung Pilih Paket
+            </a>
           </div>
-          {FEATURE_ROWS.map(({ label, old, feedify }, i) => (
-            <div key={label} className={`grid grid-cols-3 border-b border-brand-sand last:border-0 ${i % 2 === 0 ? "bg-white" : "bg-brand-sand/20"}`}>
-              <div className="px-5 py-4 text-xs font-bold text-stone-600">{label}</div>
-              <div className="px-5 py-4 text-xs text-stone-400 border-l border-brand-sand/60 flex items-center gap-1.5">
-                <span className="text-red-400 flex-shrink-0">✗</span> {old}
-              </div>
-              <div className="px-5 py-4 text-xs font-semibold text-brand border-l border-brand-sand/60 flex items-center gap-1.5">
-                <span className="text-brand-gold flex-shrink-0">✓</span> {feedify}
-              </div>
-            </div>
-          ))}
         </div>
+      </section>
 
-        <div className="mt-10 text-center">
-          <a href="#pricing"
-            className="inline-flex items-center gap-2 px-7 py-3.5 bg-brand text-brand-cream hover:bg-brand-light rounded-full font-bold text-sm shadow-lg shadow-brand/20 btn-lift">
-            Mulai Hemat Sekarang <ArrowRight size={16} weight="bold" />
-          </a>
-          <p className="mt-3 text-xs text-stone-400">Bayar Rp 68.000 sekali — hemat jutaan tiap bulannya</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ============ FOOTER ============ */
-function Footer() {
-  return (
-    <footer className="relative py-12 lg:py-16 border-t border-brand-sand" data-testid="footer">
-      <div className="max-w-[1280px] mx-auto px-5 lg:px-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div>
-          <Link to="/" className="flex items-center gap-2.5 mb-3">
-            <div className="h-9 w-9 rounded-xl bg-brand text-brand-gold flex items-center justify-center">
-              <Sparkle size={18} weight="fill" />
+      {/* ── FOOTER ──────────────────────────────────────────── */}
+      <footer className="bg-brand py-12">
+        <div className="mx-auto max-w-6xl px-5 sm:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-6 border-t border-white/10 pt-10">
+            <Link to="/">
+              <FeedifyLogo size={34} tone="light" />
+            </Link>
+            <div className="flex flex-wrap items-center gap-6 text-sm text-brand-cream/45">
+              <Link to="/hasil-kerja" className="transition-colors hover:text-brand-cream">Hasil Kerja</Link>
+              <a href="#harga" className="transition-colors hover:text-brand-cream">Harga</a>
+              <Link to="/sample" className="transition-colors hover:text-brand-cream">Sample Gratis</Link>
+              <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 transition-colors hover:text-brand-cream">
+                <WhatsappLogo size={15} weight="fill" /> WhatsApp
+              </a>
+              <a href="https://www.instagram.com/feedify_id" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 transition-colors hover:text-brand-cream">
+                <InstagramLogo size={15} weight="fill" /> Instagram
+              </a>
             </div>
-            <span className="font-heading text-xl font-bold text-brand tracking-tight">Feedify</span>
-          </Link>
-          <div className="text-xs text-stone-500 max-w-xs">Brand Studio untuk UMKM Indonesia. Made with care in Jakarta.</div>
+          </div>
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3 text-xs text-brand-cream/30">
+            <span>© {new Date().getFullYear()} Feedify · Konten media sosial untuk UMKM Indonesia</span>
+            <InstallPWAButton />
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 text-sm text-stone-600">
-          <a href="#how" className="hover:text-brand">Cara kerja</a>
-          <a href="#pricing" className="hover:text-brand">Harga</a>
-          <a href="#faq" className="hover:text-brand">FAQ</a>
-          <Link to="/login" className="hover:text-brand">Masuk</Link>
-        </div>
-      </div>
-      <div className="max-w-[1280px] mx-auto px-5 lg:px-10 mt-8 pt-6 border-t border-brand-sand text-xs text-stone-500">
-        © {new Date().getFullYear()} Feedify. All rights reserved.
-      </div>
-    </footer>
+      </footer>
+    </div>
   );
 }

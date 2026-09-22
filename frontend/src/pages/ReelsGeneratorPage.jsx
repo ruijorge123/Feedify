@@ -433,7 +433,7 @@ export default function ReelsGeneratorPage() {
               <div className="flex items-center justify-between text-xs">
                 <span className="text-stone-400">Biaya Generate</span>
                 <span className="font-bold text-brand-gold flex items-center gap-1">
-                  <Lightning size={11} weight="fill" /> {CREDITS_PER_VIDEO} kredit
+                  <Lightning size={11} weight="fill" /> {CREDITS_PER_VIDEO}x proses
                 </span>
               </div>
             </div>

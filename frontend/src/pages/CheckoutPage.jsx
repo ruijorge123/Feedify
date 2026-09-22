@@ -1,352 +1,460 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Sparkle, ArrowLeft, Check, CheckCircle, Copy,
-  ShieldCheck, Timer, Image as ImageIcon, UploadSimple,
-  CircleNotch, WarningCircle, XCircle, ArrowClockwise,
+  ArrowLeft, Check, CheckCircle, ShieldCheck, Timer, UploadSimple,
+  CircleNotch, WarningCircle, XCircle, ArrowClockwise, QrCode,
+  DownloadSimple, WhatsappLogo, X,
 } from "@phosphor-icons/react";
 import { toast } from "react-toastify";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { copyToClipboard } from "@/lib/chatgpt";
-import { fbTrack } from "@/lib/metaPixel";
+import FeedifyLogo from "@/components/FeedifyLogo";
+import { useAgencyConfig, formatRupiah, waLink } from "@/lib/agency";
+import { compressImageFile } from "@/lib/imageCompress";
 
-function fmtRp(n) { return "Rp " + Number(n || 0).toLocaleString("id-ID"); }
-
-function fmtCountdown(totalSeconds) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
+function fmtCountdown(total) {
+  const m = Math.floor(total / 60);
+  const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/**
+ * QRIS checkout.
+ *
+ * QRIS is the only channel: the buyer scans, pays the package price exactly, and
+ * uploads the screenshot. Approval is a human step (Telegram / Admin Panel), so
+ * this page's job is to make the three actions unmissable — scan, pay, upload —
+ * and then to keep the buyer informed while they wait for a person to confirm.
+ */
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const { user, refreshUser } = useAuth();
+  const cfg = useAgencyConfig();
 
+  const paket = params.get("paket") || "populer";
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [secondsLeft, setSecondsLeft] = useState(null);
-  const [copiedField, setCopiedField] = useState(null);
   const [proofPreview, setProofPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [reuploading, setReuploading] = useState(false);
-  const fileInputRef = useRef(null);
+  const [zoomQr, setZoomQr] = useState(false);
+  // Collected here rather than after signup: this is the number the team
+  // contacts and delivers to, and the payment alert is useless without it.
+  const [waNumber, setWaNumber] = useState("");
+  const [waSaved, setWaSaved] = useState(false);
+  const fileRef = useRef(null);
 
-  const createOrder = useCallback(async () => {
+  const packages = cfg?.packages || [];
+  const selected = packages.find((p) => p.id === (order?.paket_id || paket));
+  const isPreview = order?.preview === true;
+
+  const createOrder = useCallback(async (pkgId) => {
     setLoading(true);
     try {
-      const { data } = await api.post("/checkout/manual/create");
+      const { data } = await api.post("/checkout/manual/create", { paket: pkgId, whatsapp: waNumber });
       setOrder(data);
+      if (data?.whatsapp) { setWaNumber(data.whatsapp); setWaSaved(true); }
       setProofPreview(null);
       setReuploading(false);
     } catch (err) {
       if (err.response?.status === 401) {
         toast("Silakan masuk dulu untuk melanjutkan.");
-        setTimeout(() => navigate("/login?redirect=/checkout?plan=lifetime"), 1200);
-      } else if (err.response?.status === 409) {
-        // Already a lifetime user — no need to pay again
-        toast.success("Akunmu sudah Lifetime aktif 🎉");
-        setTimeout(() => navigate("/dashboard"), 1000);
+        setTimeout(() => navigate(`/login?redirect=/checkout?paket=${pkgId}`), 1200);
       } else {
-        toast.error("Gagal membuat pesanan. Coba lagi.");
+        toast.error(err?.response?.data?.detail || "Gagal membuat pesanan. Coba lagi.");
       }
     } finally {
       setLoading(false);
     }
   }, [navigate]);
 
-  useEffect(() => {
-    // Already have access? Skip checkout entirely.
-    if (user && (user.is_lifetime || user.role === "admin")) {
-      toast.success("Akunmu sudah punya akses penuh 🎉");
-      navigate("/dashboard");
-      return;
-    }
-    createOrder();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createOrder]);
+  useEffect(() => { createOrder(paket); }, [paket, createOrder]);
 
   // Countdown to expiry
   useEffect(() => {
     if (!order?.expires_at) return;
-    const tick = () => {
-      const diff = Math.max(0, Math.floor((new Date(order.expires_at) - new Date()) / 1000));
-      setSecondsLeft(diff);
-    };
+    const tick = () => setSecondsLeft(
+      Math.max(0, Math.floor((new Date(order.expires_at) - new Date()) / 1000))
+    );
     tick();
     const iv = setInterval(tick, 1000);
     return () => clearInterval(iv);
   }, [order?.expires_at]);
 
-  // Poll ONLY while waiting for admin verification (proof already uploaded).
-  // Never poll during menunggu_transfer / ditolak, or it would overwrite the
-  // user's in-progress "upload ulang" state back to the server status.
+  // Poll ONLY while waiting for admin verification, never during upload states —
+  // otherwise a poll would overwrite the buyer's in-progress "upload ulang".
   useEffect(() => {
-    if (!order?.id || order.status !== "menunggu_verifikasi") return;
+    if (!order?.id || isPreview || order.status !== "menunggu_verifikasi") return;
     const iv = setInterval(async () => {
       try {
         const { data } = await api.get(`/checkout/manual/${order.id}`);
         setOrder((prev) => (prev ? { ...prev, ...data } : prev));
-      } catch { /* ignore transient poll errors */ }
+      } catch { /* transient */ }
     }, 5000);
     return () => clearInterval(iv);
-  }, [order?.id, order?.status]);
+  }, [order?.id, order?.status, isPreview]);
 
-  // On confirmed payment: refresh auth state and move into the app
+  // Approved: pull the new entitlement and move into the app.
   useEffect(() => {
     if (order?.status !== "lunas") return;
-    // Meta Pixel: the only client-visible moment payment success actually happens —
-    // approval itself is server-side (Telegram bot / Admin Panel), the browser only
-    // learns about it via this page's polling picking up status: "lunas".
-    // Deterministic eventID (purchase_<order.id>) + a persisted guard keyed by that same
-    // order id: a page refresh or back-navigation while status is already "lunas" would
-    // otherwise re-run this effect and re-fire Purchase for a payment already reported.
-    const orderId = String(order.id);
-    const firedKey = `feedify_purchase_fired_${orderId}`;
-    if (!localStorage.getItem(firedKey)) {
-      localStorage.setItem(firedKey, "1");
-      // order.amount is already a plain int from the backend (base price + random
-      // suffix) — Number() here is defensive, not a format fix.
-      fbTrack("Purchase", { value: Number(order.amount) || 0, currency: "IDR" }, `purchase_${orderId}`);
-    }
     (async () => {
       await refreshUser();
-      toast.success("Lifetime aktif! Selamat datang di Feedify 🎉");
-      setTimeout(() => {
-        navigate(user?.has_brand_profile ? "/dashboard" : "/onboarding?topup=success");
-      }, 1200);
+      toast.success("Pembayaran dikonfirmasi. Selamat datang di Feedify!");
+      setTimeout(() => navigate(user?.has_brand_profile ? "/dashboard" : "/onboarding"), 1400);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order?.status]);
 
-  const handleCopy = async (field, value) => {
-    await copyToClipboard(String(value));
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 1500);
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
+  const pickProof = async (file) => {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("File harus berupa gambar (screenshot/foto bukti pembayaran)");
-      return;
+    if (!file.type.startsWith("image/")) { toast.error("File harus berupa gambar"); return; }
+    if (file.size > 20 * 1024 * 1024) { toast.error("Ukuran maksimal 20 MB"); return; }
+    try {
+      setProofPreview(await compressImageFile(file, { maxDimension: 1280, quality: 0.85 }));
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => setProofPreview(reader.result);
+      reader.readAsDataURL(file);
     }
-    const reader = new FileReader();
-    reader.onload = () => setProofPreview(reader.result);
-    reader.readAsDataURL(file);
   };
 
   const submitProof = async () => {
     if (!proofPreview || !order?.id) return;
+    if (isPreview) { toast.info("Ini mode pratinjau admin — bukti tidak dikirim."); return; }
+    if (waDigits.length < 9) { toast.error("Isi nomor WhatsApp dulu"); return; }
     setUploading(true);
     try {
+      if (!waSaved) {
+        await api.post("/checkout/manual/create", { paket: order.paket_id || paket, whatsapp: waNumber });
+        setWaSaved(true);
+      }
       const { data } = await api.post(`/checkout/manual/${order.id}/proof`, { photo_base64: proofPreview });
       setOrder((prev) => ({ ...prev, status: "menunggu_verifikasi" }));
       setReuploading(false);
-      // The proof is stored either way, but if the admin's Telegram alert didn't get
-      // through, don't promise a prompt review — say verification may take longer so the
-      // buyer knows to follow up rather than waiting on a notification nobody received.
       if (data?.admin_notified === false) {
-        toast.warn("Bukti terkirim, tapi notifikasi ke admin gagal. Verifikasi mungkin lebih lama — hubungi admin kalau lewat 1x24 jam.", { autoClose: 10000 });
+        toast.warn("Bukti tersimpan, tapi notifikasi ke admin gagal. Verifikasi bisa lebih lama — hubungi kami kalau lewat 1x24 jam.", { autoClose: 10000 });
       } else {
-        toast.success("Bukti pembayaran terkirim! Menunggu verifikasi.");
+        toast.success("Bukti terkirim. Menunggu konfirmasi admin.");
       }
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Gagal mengirim bukti pembayaran. Coba lagi.");
+      toast.error(err?.response?.data?.detail || "Gagal mengirim bukti. Coba lagi.");
     } finally {
       setUploading(false);
     }
   };
 
-  // Timer only matters while the user still needs to transfer. Once proof is uploaded
-  // (menunggu_verifikasi), paid (lunas), or rejected (ditolak), the 60-min window is irrelevant.
-  const expired = order?.status === "menunggu_transfer" && secondsLeft === 0;
+  const wa = waLink(cfg?.whatsapp || "6281210117905",
+    `Halo Feedify, saya sudah bayar paket ${selected?.name || ""} tapi belum dikonfirmasi.`);
 
-  if (loading) {
+  const waDigits = String(waNumber || "").replace(/\D/g, "");
+  const status = order?.status;
+  const expired = secondsLeft === 0 && status === "menunggu_transfer";
+  const showUpload = !status || status === "menunggu_transfer" || status === "ditolak" || reuploading;
+
+  if (loading && !order) {
     return (
-      <div className="min-h-screen bg-brand-cream flex items-center justify-center">
-        <CircleNotch size={28} className="animate-spin text-brand-light" />
+      <div className="flex min-h-screen items-center justify-center bg-brand-cream">
+        <CircleNotch size={26} className="animate-spin text-brand" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-brand-cream">
-      {/* Nav */}
-      <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-brand-sand">
-        <div className="max-w-2xl mx-auto px-5 py-4 flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-stone-600 hover:text-brand text-sm font-medium">
-            <ArrowLeft size={16} weight="bold" /> Kembali
+      {/* header */}
+      <div className="bg-brand-terminal px-5 py-5 sm:px-8">
+        <div className="mx-auto flex max-w-5xl items-center justify-between">
+          <button onClick={() => navigate("/#harga")} className="inline-flex items-center gap-2 text-sm text-brand-cream/60 transition-colors hover:text-brand-cream" data-testid="checkout-back">
+            <ArrowLeft size={15} weight="bold" /> Ganti paket
           </button>
-          <Link to="/" className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-brand flex items-center justify-center">
-              <Sparkle size={13} weight="fill" className="text-brand-gold" />
-            </div>
-            <span className="font-heading text-base font-bold text-brand">Feedify</span>
-          </Link>
-          <div className="flex items-center gap-1.5 text-xs text-stone-400">
-            <ShieldCheck size={14} className="text-green-500" /> Diverifikasi Manual
-          </div>
+          <Link to="/"><FeedifyLogo size={32} tone="light" /></Link>
         </div>
-      </nav>
+      </div>
 
-      <div className="max-w-2xl mx-auto px-5 py-10 space-y-6">
-        <div className="text-center sm:text-left">
-          <div className="inline-flex items-center gap-1.5 mb-3 px-3 py-1 rounded-full bg-brand-gold/10 border border-brand-gold/30">
-            <Sparkle size={11} weight="fill" className="text-brand-gold" />
-            <span className="text-[10px] uppercase tracking-[0.18em] font-bold text-brand">Akses Selamanya</span>
-          </div>
-          <h1 className="font-heading font-bold text-brand text-3xl sm:text-[34px] tracking-[-0.02em] leading-[1.1]">Aktivasi Lifetime Feedify</h1>
-          <p className="text-stone-500 text-sm mt-2 leading-relaxed">Scan QRIS di bawah, bayar nominal uniknya, lalu upload bukti — tim kami aktifkan akunmu.</p>
+      {isPreview && (
+        <div className="bg-brand-gold/20 px-5 py-3 text-center text-sm font-medium text-brand">
+          Mode pratinjau admin — akunmu sudah punya akses penuh, jadi tidak ada pesanan yang dibuat.
         </div>
+      )}
 
-        {/* Step 1 — QRIS scan + unique nominal */}
-        <div className="bg-white rounded-3xl border border-brand-sand shadow-[0_1px_2px_rgba(11,61,46,0.04)] p-6 sm:p-7" data-testid="manual-qris-card">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2.5">
-              <span className="flex-shrink-0 h-6 w-6 rounded-full bg-brand text-brand-cream text-[11px] font-bold flex items-center justify-center">1</span>
-              <span className="text-xs font-bold text-brand uppercase tracking-[0.12em]">Scan &amp; Bayar QRIS</span>
-            </div>
-            {secondsLeft !== null && !expired && order?.status === "menunggu_transfer" && (
-              <div className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full tabular-nums ${secondsLeft < 300 ? "bg-red-50 text-red-500" : "bg-stone-100 text-stone-500"}`}>
-                <Timer size={12} weight="bold" /> {fmtCountdown(secondsLeft)}
-              </div>
-            )}
-          </div>
+      <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
+        <div className="grid gap-8 lg:grid-cols-[1fr_.8fr] lg:items-start">
 
-          {expired ? (
-            <div className="text-center py-6">
-              <WarningCircle size={32} className="text-amber-500 mx-auto mb-3" weight="fill" />
-              <p className="font-semibold text-stone-700 mb-1">Waktu pembayaran sudah habis</p>
-              <p className="text-sm text-stone-500 mb-4">Nominal unik-nya sudah kadaluarsa. Buat pesanan baru untuk dapat nominal yang baru.</p>
-              <button onClick={createOrder} data-testid="manual-recreate-btn"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-brand-cream rounded-full font-semibold text-sm hover:bg-brand-light">
-                <ArrowClockwise size={16} weight="bold" /> Buat Pesanan Baru
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* QRIS image */}
-              <div className="rounded-2xl bg-white border border-stone-200 p-4 mb-5 flex justify-center">
-                <img
-                  src="/datapenting/qris2.jpeg"
-                  alt="QRIS Feedify — scan untuk bayar"
-                  className="w-full max-w-[280px] rounded-lg"
-                  data-testid="qris-image"
-                />
-              </div>
-
-              {/* Nominal — wajib persis */}
-              <div className="relative rounded-2xl bg-white border border-brand-sand p-5 mb-3 overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand-gold/20 via-brand-gold to-brand-gold/20" />
-                <div className="text-[10px] uppercase tracking-[0.14em] text-stone-400 font-bold mb-2">Bayar persis nominal ini</div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-heading font-extrabold text-brand text-[32px] leading-none tracking-tight tabular-nums" data-testid="manual-unique-amount">{fmtRp(order?.amount)}</span>
-                  <button onClick={() => handleCopy("nominal", order?.amount)} data-testid="manual-copy-amount-btn"
-                    className="flex-shrink-0 inline-flex items-center gap-1.5 h-10 pl-3.5 pr-4 rounded-full bg-brand text-brand-cream hover:bg-brand-light text-xs font-bold transition-colors">
-                    {copiedField === "nominal" ? <><Check size={15} weight="bold" /> Tersalin</> : <><Copy size={15} weight="bold" /> Salin</>}
-                  </button>
+          {/* ── kiri: langkah pembayaran ─────────────────────── */}
+          <div className="order-2 lg:order-1">
+            {status === "lunas" ? (
+              <Panel>
+                <div className="py-10 text-center">
+                  <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand">
+                    <CheckCircle size={32} weight="fill" className="text-brand-gold" />
+                  </div>
+                  <h2 className="mt-6 font-heading text-2xl font-bold text-brand">Pembayaran dikonfirmasi</h2>
+                  <p className="mt-2 text-sm text-stone-500">Mengarahkan kamu ke dashboard...</p>
                 </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 rounded-xl bg-stone-50 border border-stone-100 p-3.5">
-                <WarningCircle size={16} weight="fill" className="text-brand-gold flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-stone-500 leading-relaxed">
-                  Scan QRIS di atas pakai aplikasi apa aja (GoPay, DANA, OVO, ShopeePay, atau m-banking), lalu masukkan nominal <b className="text-brand">persis {fmtRp(order?.amount)}</b> sampai 3 digit terakhir — jangan dibulatkan. Nominal unik ini yang bikin kami cepat mengenali pembayaranmu.
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Step 2 — upload proof / status */}
-        {!expired && (
-          <div className="bg-white rounded-3xl border border-brand-sand shadow-[0_1px_2px_rgba(11,61,46,0.04)] p-6 sm:p-7" data-testid="manual-proof-card">
-            <div className="flex items-center gap-2.5 mb-6">
-              <span className="flex-shrink-0 h-6 w-6 rounded-full bg-brand text-brand-cream text-[11px] font-bold flex items-center justify-center">2</span>
-              <span className="text-xs font-bold text-brand uppercase tracking-[0.12em]">Bukti Pembayaran</span>
-            </div>
-
-            {order?.status === "lunas" ? (
-              <div className="text-center py-4">
-                <CheckCircle size={40} weight="fill" className="text-green-500 mx-auto mb-3" />
-                <p className="font-heading font-bold text-brand text-lg">Pembayaran dikonfirmasi!</p>
-                <p className="text-sm text-stone-500 mt-1">Lifetime kamu aktif. Mengalihkan ke dashboard...</p>
-              </div>
-            ) : order?.status === "ditolak" && !reuploading ? (
-              <div className="text-center py-4">
-                <XCircle size={40} weight="fill" className="text-red-400 mx-auto mb-3" />
-                <p className="font-heading font-bold text-brand text-lg">Bukti pembayaran ditolak</p>
-                <p className="text-sm text-stone-500 mt-1 mb-4">Kemungkinan foto kurang jelas atau nominal tidak sesuai. Upload ulang bukti pembayaran yang benar.</p>
-                <button onClick={() => setReuploading(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-brand-cream rounded-full font-semibold text-sm hover:bg-brand-light">
-                  <ArrowClockwise size={16} weight="bold" /> Upload Ulang
-                </button>
-              </div>
-            ) : order?.status === "menunggu_verifikasi" ? (
-              <div className="text-center py-4">
-                {proofPreview && (
-                  <img src={proofPreview} alt="Bukti pembayaran" className="max-h-40 mx-auto rounded-xl border border-stone-200 mb-4 object-contain" />
-                )}
-                <CircleNotch size={24} className="animate-spin text-brand-light mx-auto mb-3" />
-                <p className="font-semibold text-stone-700">Bukti pembayaran sedang diverifikasi</p>
-                <p className="text-sm text-stone-500 mt-1 mb-5">Biasanya selesai dalam beberapa menit. Kamu bisa tinggalkan halaman ini — status "Menunggu Konfirmasi" akan tetap muncul di halaman utama.</p>
-                <Link to="/" data-testid="manual-back-home-btn"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border-2 border-stone-200 text-stone-600 text-sm font-semibold hover:border-brand hover:text-brand transition-colors">
-                  <ArrowLeft size={15} weight="bold" /> Kembali ke Beranda
-                </Link>
-              </div>
+              </Panel>
+            ) : status === "menunggu_verifikasi" && !reuploading ? (
+              <Panel>
+                <div className="py-8 text-center">
+                  <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand-gold/15">
+                    <CircleNotch size={26} className="animate-spin text-brand-gold" />
+                  </div>
+                  <h2 className="mt-6 font-heading text-xl font-bold text-brand">Bukti sedang diperiksa</h2>
+                  <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-stone-500">
+                    Admin kami memeriksa pembayaranmu. Biasanya tidak sampai satu jam pada
+                    jam kerja. Halaman ini akan berubah sendiri begitu disetujui — tidak
+                    perlu dimuat ulang.
+                  </p>
+                  <div className="mt-7 flex flex-wrap justify-center gap-3">
+                    <a href={wa} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border border-brand px-5 py-2.5 text-sm font-semibold text-brand transition-all hover:bg-brand hover:text-brand-cream">
+                      <WhatsappLogo size={15} weight="fill" /> Hubungi Admin
+                    </a>
+                    <button onClick={() => setReuploading(true)} className="rounded-full px-5 py-2.5 text-sm font-medium text-stone-500 hover:text-brand">
+                      Kirim ulang bukti
+                    </button>
+                  </div>
+                </div>
+              </Panel>
             ) : (
-              <>
-                {proofPreview ? (
-                  <div className="space-y-4">
-                    <div className="relative rounded-2xl overflow-hidden border-2 border-brand/20">
-                      <img src={proofPreview} alt="Preview bukti pembayaran" className="w-full max-h-64 object-contain bg-stone-50" />
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => fileInputRef.current?.click()}
-                        className="flex-1 py-2.5 rounded-full border-2 border-stone-200 text-stone-600 text-sm font-semibold hover:border-brand hover:text-brand">
-                        Ganti Foto
-                      </button>
-                      <button onClick={submitProof} disabled={uploading} data-testid="manual-submit-proof-btn"
-                        className="flex-1 py-2.5 rounded-full bg-brand text-brand-cream text-sm font-bold hover:bg-brand-light disabled:opacity-60 inline-flex items-center justify-center gap-2">
-                        {uploading ? <><CircleNotch size={15} className="animate-spin" /> Mengirim...</> : "Kirim Bukti Pembayaran"}
-                      </button>
+              <div className="space-y-4">
+                {status === "ditolak" && (
+                  <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
+                    <XCircle size={18} weight="fill" className="mt-0.5 flex-shrink-0 text-red-500" />
+                    <div>
+                      <div className="text-sm font-semibold text-red-700">Bukti sebelumnya ditolak</div>
+                      <p className="mt-1 text-xs leading-relaxed text-red-600">
+                        Biasanya karena nominal tidak cocok atau screenshot tidak terbaca.
+                        Kirim ulang screenshot yang jelas — pesananmu masih aktif.
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  <label htmlFor="proof-upload" data-testid="manual-upload-dropzone"
-                    className="block cursor-pointer border-2 border-dashed border-brand-gold/50 bg-brand-gold/5 rounded-2xl p-9 text-center hover:border-brand-gold hover:bg-brand-gold/10 transition-colors">
-                    <div className="h-12 w-12 rounded-full bg-brand-gold/15 flex items-center justify-center mx-auto mb-3">
-                      <UploadSimple size={22} className="text-brand-gold" weight="duotone" />
-                    </div>
-                    <div className="font-bold text-brand text-sm">Upload Bukti Pembayaran</div>
-                    <div className="text-xs text-stone-400 mt-1">Screenshot atau foto struk transfer</div>
-                  </label>
                 )}
-                <input ref={fileInputRef} id="proof-upload" type="file" accept="image/png,image/jpeg,image/webp"
-                  className="hidden" onChange={handleFileChange} data-testid="manual-upload-input" />
-              </>
+
+                {expired && (
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <WarningCircle size={18} weight="fill" className="mt-0.5 flex-shrink-0 text-amber-500" />
+                      <div className="text-sm text-amber-800">Waktu pesanan habis. Buat ulang untuk melanjutkan.</div>
+                    </div>
+                    <button onClick={() => createOrder(paket)} className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-4 py-2 text-xs font-bold text-white">
+                      <ArrowClockwise size={13} weight="bold" /> Buat ulang
+                    </button>
+                  </div>
+                )}
+
+                {/* langkah 1 — scan */}
+                <Panel>
+                  <Step n="1" title="Scan QRIS ini dan bayar" />
+                  <div className="mt-5 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+                    <button
+                      onClick={() => setZoomQr(true)}
+                      className="group relative flex-shrink-0 overflow-hidden rounded-2xl border-2 border-brand-sand bg-white p-2 transition-all hover:border-brand-gold"
+                      data-testid="qris-image"
+                    >
+                      <img src={order?.qris_image || "/datapenting/qris2.jpeg"} alt="Kode QRIS Feedify" className="h-52 w-52 object-contain" />
+                      <span className="absolute inset-x-2 bottom-2 rounded-lg bg-brand/90 py-1.5 text-[11px] font-bold text-brand-cream opacity-0 transition-opacity group-hover:opacity-100">
+                        Ketuk untuk perbesar
+                      </span>
+                    </button>
+
+                    <div className="w-full flex-1">
+                      <div className="rounded-2xl bg-brand p-5 text-center sm:text-left">
+                        <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-cream/45">
+                          Nominal yang harus dibayar
+                        </div>
+                        <div className="mt-1.5 font-heading text-3xl font-bold text-brand-gold">
+                          {formatRupiah(order?.amount)}
+                        </div>
+                        <div className="mt-1 text-xs text-brand-cream/50">
+                          Bayar pas sejumlah ini — jangan dibulatkan.
+                        </div>
+                      </div>
+                      <a
+                        href={order?.qris_image || "/datapenting/qris2.jpeg"}
+                        download="qris-feedify.jpeg"
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-brand-sand py-2.5 text-sm font-medium text-brand transition-colors hover:border-brand"
+                      >
+                        <DownloadSimple size={15} weight="bold" /> Simpan kode QRIS
+                      </a>
+                      <p className="mt-3 text-xs leading-relaxed text-stone-400">
+                        Bisa dibayar dari GoPay, OVO, DANA, ShopeePay, atau m-banking apa pun
+                        yang mendukung QRIS.
+                      </p>
+                    </div>
+                  </div>
+
+                  {secondsLeft != null && !expired && (
+                    <div className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-brand-sand/50 py-2.5 text-sm">
+                      <Timer size={15} weight="duotone" className="text-brand-light" />
+                      <span className="text-stone-500">Selesaikan dalam</span>
+                      <span className="font-mono font-bold text-brand">{fmtCountdown(secondsLeft)}</span>
+                    </div>
+                  )}
+                </Panel>
+
+                {/* langkah 2 — upload */}
+                {showUpload && (
+                  <Panel>
+                    <Step n="2" title="Nomor WhatsApp kamu" />
+                    <p className="mt-2 text-sm text-stone-500">
+                      Ke nomor ini tim kami menghubungi dan mengirim semua kontenmu.
+                    </p>
+                    <input
+                      value={waNumber}
+                      onChange={(e) => { setWaNumber(e.target.value); setWaSaved(false); }}
+                      placeholder="0812xxxxxxx"
+                      inputMode="tel"
+                      className="feedify-input mt-4"
+                      data-testid="checkout-wa"
+                    />
+
+                    <div className="mt-8">
+                      <Step n="3" title="Kirim screenshot buktinya" />
+                      <p className="mt-2 text-sm text-stone-500">
+                        Pastikan nominal dan waktu pembayaran terbaca jelas di screenshot.
+                      </p>
+                    </div>
+
+                    {proofPreview ? (
+                      <div className="relative mt-5 overflow-hidden rounded-2xl border-2 border-brand/15">
+                        <img src={proofPreview} alt="Bukti pembayaran" className="max-h-72 w-full bg-stone-50 object-contain" />
+                        <button
+                          onClick={() => { setProofPreview(null); if (fileRef.current) fileRef.current.value = ""; }}
+                          className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/60 text-white backdrop-blur"
+                          aria-label="Hapus bukti"
+                        >
+                          <X size={14} weight="bold" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => fileRef.current?.click()}
+                        className="mt-5 flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-brand-gold/50 bg-brand-gold/5 px-6 py-9 transition-colors hover:border-brand-gold hover:bg-brand-gold/10"
+                        data-testid="checkout-upload"
+                      >
+                        <div className="grid h-11 w-11 place-items-center rounded-full bg-brand-gold/15">
+                          <UploadSimple size={20} weight="duotone" className="text-brand-gold" />
+                        </div>
+                        <span className="font-semibold text-brand">Pilih screenshot pembayaran</span>
+                        <span className="text-xs text-stone-400">JPG atau PNG, maksimal 20 MB</span>
+                      </button>
+                    )}
+                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => pickProof(e.target.files?.[0])} />
+
+                    <button
+                      onClick={submitProof}
+                      disabled={!proofPreview || uploading || expired || waDigits.length < 9}
+                      className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-brand py-4 font-semibold text-brand-cream transition-all hover:bg-brand-light disabled:opacity-40"
+                      data-testid="checkout-submit-proof"
+                    >
+                      {uploading ? <><CircleNotch size={17} className="animate-spin" /> Mengirim...</> : <><Check size={17} weight="bold" /> Kirim Bukti Pembayaran</>}
+                    </button>
+                    {waDigits.length > 0 && waDigits.length < 9 && (
+                      <p className="mt-2.5 text-center text-xs text-amber-600">Nomor WhatsApp belum lengkap.</p>
+                    )}
+                  </Panel>
+                )}
+              </div>
             )}
           </div>
-        )}
 
-        {/* Trust footer */}
-        <div className="flex items-center justify-center gap-x-5 gap-y-2 flex-wrap px-2 pt-1">
-          <div className="flex items-center gap-1.5 text-xs text-stone-500">
-            <ShieldCheck size={15} className="text-green-500" /> Bayar via QRIS
-          </div>
-          <span className="h-3 w-px bg-stone-200 hidden sm:block" />
-          <div className="flex items-center gap-1.5 text-xs text-stone-500">
-            <ImageIcon size={15} className="text-brand-gold" weight="duotone" /> Verifikasi bukti pembayaran
-          </div>
-          <span className="h-3 w-px bg-stone-200 hidden sm:block" />
-          <div className="flex items-center gap-1.5 text-xs text-stone-500">
-            <Sparkle size={15} weight="fill" className="text-brand-gold" /> Aktif otomatis setelah dikonfirmasi
+          {/* ── kanan: ringkasan paket ───────────────────────── */}
+          <div className="order-1 lg:sticky lg:top-8 lg:order-2">
+            <Panel>
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-stone-400">Pesananmu</div>
+
+              {selected ? (
+                <>
+                  <div className="mt-3 flex items-baseline justify-between gap-3">
+                    <span className="font-heading text-2xl font-bold text-brand">Paket {selected.name}</span>
+                    <span className="flex-shrink-0 rounded-full bg-brand-sand px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-light">
+                      {selected.feeds} feed
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-stone-500">{selected.tagline}</p>
+
+                  <ul className="mt-6 space-y-2.5 border-t border-brand-sand pt-6">
+                    {(selected.features || []).map((f) => (
+                      <li key={f} className="flex items-start gap-2.5 text-sm">
+                        <Check size={14} weight="bold" className="mt-1 flex-shrink-0 text-brand-light" />
+                        <span className="text-stone-600">{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-6 flex items-baseline justify-between border-t border-brand-sand pt-5">
+                    <span className="text-sm font-medium text-stone-500">Total</span>
+                    <span className="font-heading text-2xl font-bold text-brand">{formatRupiah(order?.amount ?? selected.price_idr)}</span>
+                  </div>
+
+                  {/* switching package re-uses the same order row on the server */}
+                  {packages.length > 1 && status === "menunggu_transfer" && (
+                    <div className="mt-5 border-t border-brand-sand pt-5">
+                      <div className="text-xs font-semibold text-stone-400">Ganti paket</div>
+                      <div className="mt-2.5 flex flex-wrap gap-2">
+                        {packages.filter((p) => p.id !== selected.id).map((p) => (
+                          <button
+                            key={p.id}
+                            onClick={() => setParams({ paket: p.id })}
+                            className="rounded-full border border-brand-sand px-3.5 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-brand hover:text-brand"
+                          >
+                            {p.name} · {formatRupiah(p.price_idr)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  <div className="h-7 w-40 animate-pulse rounded bg-brand-sand" />
+                  <div className="h-4 w-28 animate-pulse rounded bg-brand-sand" />
+                </div>
+              )}
+
+              <div className="mt-6 flex items-start gap-2.5 rounded-xl bg-brand-sand/50 p-3.5">
+                <ShieldCheck size={16} weight="duotone" className="mt-0.5 flex-shrink-0 text-brand-light" />
+                <p className="text-xs leading-relaxed text-stone-500">
+                  Pembayaran dicek manual oleh admin, bukan robot. Kalau ada yang tidak
+                  beres, uangmu tidak hangus — hubungi kami lewat WhatsApp.
+                </p>
+              </div>
+            </Panel>
           </div>
         </div>
       </div>
+
+      {/* QRIS diperbesar — orang membayar dari HP yang sama, jadi harus bisa dizoom */}
+      {zoomQr && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-6 backdrop-blur-sm" onClick={() => setZoomQr(false)}>
+          <button className="absolute right-5 top-5 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white" aria-label="Tutup">
+            <X size={18} weight="bold" />
+          </button>
+          <div className="w-full max-w-sm rounded-3xl bg-white p-5" onClick={(e) => e.stopPropagation()}>
+            <img src={order?.qris_image || "/datapenting/qris2.jpeg"} alt="Kode QRIS Feedify" className="w-full object-contain" />
+            <div className="mt-4 text-center">
+              <div className="text-xs text-stone-400">Nominal</div>
+              <div className="font-heading text-2xl font-bold text-brand">{formatRupiah(order?.amount)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Panel({ children }) {
+  return <div className="rounded-3xl border border-brand-sand bg-white p-6 shadow-sm sm:p-8">{children}</div>;
+}
+
+function Step({ n, title }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="grid h-7 w-7 flex-shrink-0 place-items-center rounded-full bg-brand font-heading text-xs font-bold text-brand-gold">
+        {n}
+      </span>
+      <h2 className="font-heading text-lg font-bold text-brand">{title}</h2>
     </div>
   );
 }

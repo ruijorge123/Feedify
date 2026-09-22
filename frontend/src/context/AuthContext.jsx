@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
-import { resetCreditsCache } from "@/lib/credits";
+import { clearClient } from "@/lib/client";
+import { setActiveClient } from "@/lib/clientPicker";
+import { exitViewAs } from "@/lib/viewAs";
 import { resetConfigCache } from "@/lib/config";
 import { resetActiveBrandCache } from "@/lib/activeBrand";
 import { linkWebpushrUser, unlinkWebpushrUser } from "@/lib/pushNotifications";
@@ -98,7 +100,9 @@ export function AuthProvider({ children }) {
     unlinkWebpushrUser();
     localStorage.clear();
     sessionStorage.clear();
-    resetCreditsCache();
+    clearClient();
+    setActiveClient(null);
+    exitViewAs();
     resetConfigCache();
     resetActiveBrandCache();
     setUser(null);

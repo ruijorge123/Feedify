@@ -5,6 +5,8 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { invalidateMenuLockCache } from "@/lib/menuLock";
 import { toast } from 'react-toastify';
+import AgencySettingsPanel from "@/components/admin/AgencySettingsPanel";
+import WaitingListPanel from "@/components/admin/WaitingListPanel";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   Users,
@@ -222,7 +224,7 @@ function DeleteUserDialog({ target, open, onOpenChange, onDeleted }) {
 
           <div className="mb-4 px-3 py-2.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 leading-relaxed">
             <strong>Permanen dan tidak bisa dibatalkan.</strong> Semua data user ini ikut terhapus:
-            brand profile, produk, konten, kredit, riwayat pembayaran, dan jadwal posting.
+            brand profile, produk, konten, riwayat pembayaran, dan data klien.
           </div>
 
           <label className="text-xs font-semibold text-stone-600 block mb-1.5">
@@ -695,7 +697,7 @@ function PaymentVerificationPanel() {
                   {o.status === "lunas" ? (
                     <button
                       onClick={() => setConfirmAction({ order: o, newStatus: "menunggu_verifikasi", danger: true,
-                        title: "Batalkan status Lunas?", description: `Akun ${o.email} akan kembali jadi belum bayar dan akses Lifetime dicabut. Kredit yang sudah ditambahkan tidak ditarik kembali.` })}
+                        title: "Batalkan status Lunas?", description: `Akun ${o.email} akan kembali jadi belum bayar dan aksesnya dicabut. Jatah feed yang sudah diberikan tidak ditarik kembali.` })}
                       data-testid={`payment-verification-revert-${o.id}`}
                       className="px-3 py-1.5 rounded-full text-xs font-semibold border border-stone-200 text-stone-500 hover:border-red-300 hover:text-red-500">
                       Batalkan
@@ -765,6 +767,19 @@ function FeedbackPanel() {
       await api.post(`/admin/feedback/${item.id}/read`, { read: next });
     } catch {
       setItems((prev) => prev.map((f) => f.id === item.id ? { ...f, read: !next } : f)); // revert
+    }
+  };
+
+  const hapus = async (item) => {
+    if (!window.confirm("Hapus masukan ini? Tidak bisa dibatalkan.")) return;
+    const before = items;
+    setItems((prev) => prev.filter((f) => f.id !== item.id)); // optimistic
+    try {
+      await api.delete(`/admin/feedback/${item.id}`);
+      toast.success("Masukan dihapus");
+    } catch {
+      setItems(before);
+      toast.error("Gagal menghapus masukan");
       toast.error("Gagal memperbarui status");
     }
   };
@@ -802,16 +817,25 @@ function FeedbackPanel() {
                   </div>
                   <div className="text-xs text-stone-400 truncate">{f.email} · {formatDate(f.created_at)}</div>
                 </div>
-                <button
-                  onClick={() => toggleRead(f)}
-                  data-testid={`feedback-toggle-read-${f.id}`}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                    f.read
-                      ? "border border-stone-200 text-stone-500 hover:border-brand hover:text-brand"
-                      : "bg-brand text-white hover:bg-brand-light"
-                  }`}>
-                  {f.read ? "Tandai belum dibaca" : "Tandai sudah dibaca"}
-                </button>
+                <div className="flex flex-shrink-0 items-center gap-1.5">
+                  <button
+                    onClick={() => toggleRead(f)}
+                    data-testid={`feedback-toggle-read-${f.id}`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      f.read
+                        ? "border border-stone-200 text-stone-500 hover:border-brand hover:text-brand"
+                        : "bg-brand text-white hover:bg-brand-light"
+                    }`}>
+                    {f.read ? "Tandai belum dibaca" : "Tandai sudah dibaca"}
+                  </button>
+                  <button
+                    onClick={() => hapus(f)}
+                    data-testid={`feedback-delete-${f.id}`}
+                    aria-label="Hapus masukan"
+                    className="p-2 text-stone-300 transition-colors hover:text-red-500">
+                    <Trash size={15} weight="duotone" />
+                  </button>
+                </div>
               </div>
               <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-wrap break-words">{f.message}</p>
             </div>
@@ -1044,117 +1068,6 @@ function MenuLockdownPanel() {
 
 // ─── Daily Voucher Panel ───────────────────────────────────────────────────
 
-function DailyVoucherPanel() {
-  const [voucher, setVoucher] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [regenerating, setRegenerating] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const load = async () => {
-    try {
-      const { data } = await api.get("/admin/daily-voucher");
-      setVoucher(data);
-    } catch { toast.error("Gagal memuat voucher harian"); }
-    finally { setLoading(false); }
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const regenerate = async () => {
-    if (!window.confirm("Generate kode baru hari ini? Kode lama tidak bisa dipakai lagi.")) return;
-    setRegenerating(true);
-    try {
-      const { data } = await api.post("/admin/daily-voucher/regenerate");
-      toast.success(`Kode baru: ${data.code}`);
-      await load();
-    } catch { toast.error("Gagal generate kode"); }
-    finally { setRegenerating(false); }
-  };
-
-  const copy = () => {
-    if (!voucher?.code) return;
-    navigator.clipboard.writeText(voucher.code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  if (loading) return (
-    <div className="feedify-card p-6 animate-pulse">
-      <div className="h-4 bg-stone-100 rounded w-1/3 mb-3" />
-      <div className="h-10 bg-stone-100 rounded w-1/2" />
-    </div>
-  );
-
-  const isFull = voucher?.is_full;
-  const remaining = voucher?.claims_remaining ?? 0;
-
-  return (
-    <CollapsibleCard
-      icon={InstagramLogo}
-      iconClassName="text-pink-500"
-      title="Voucher Harian IG Story"
-      badge={
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isFull ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}>
-          {voucher?.claims_used}/{voucher?.max_claims}{isFull ? " · PENUH" : ""}
-        </span>
-      }
-      testid="daily-voucher-panel"
-    >
-      <div className="flex items-center justify-end gap-2 -mt-1">
-        <button onClick={regenerate} disabled={regenerating}
-          className="flex-shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-stone-200 text-stone-500 hover:border-brand hover:text-brand transition-all disabled:opacity-50">
-          <ArrowsClockwise size={13} className={regenerating ? "animate-spin" : ""} />
-          Generate ulang
-        </button>
-      </div>
-      <div className="flex items-center gap-3 p-3 sm:p-4 bg-brand rounded-2xl min-w-0">
-        <div className="flex-1 min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-brand-cream/60 font-bold mb-1">Kode hari ini · {voucher?.date}</div>
-          <div className="font-heading text-2xl sm:text-3xl font-bold text-brand-gold tracking-widest break-all">{voucher?.code}</div>
-          <div className="text-xs text-brand-cream/70 mt-1">Diskon {voucher?.discount_pct}% · Max {voucher?.max_claims} pengguna</div>
-        </div>
-        <button onClick={copy}
-          className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand-cream/10 hover:bg-brand-cream/20 text-brand-cream text-xs font-semibold transition-all">
-          {copied ? <CheckCircle size={15} weight="fill" className="text-green-400" /> : <Copy size={15} />}
-          {copied ? "Tersalin!" : "Salin"}
-        </button>
-      </div>
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-semibold text-stone-600">Progress Klaim</span>
-          <span className={`text-xs font-bold ${isFull ? "text-red-500" : "text-emerald-600"}`}>
-            {voucher?.claims_used}/{voucher?.max_claims} diklaim{isFull ? " · PENUH" : ` · ${remaining} sisa`}
-          </span>
-        </div>
-        <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full transition-all ${isFull ? "bg-red-400" : "bg-emerald-500"}`}
-            style={{ width: `${((voucher?.claims_used || 0) / (voucher?.max_claims || 5)) * 100}%` }} />
-        </div>
-      </div>
-      {voucher?.claimants?.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase tracking-[0.15em] text-stone-400">Yang Sudah Klaim</div>
-          {voucher.claimants.map((c, i) => (
-            <div key={i} className="flex items-center gap-3 p-2.5 bg-stone-50 rounded-xl">
-              <div className="h-7 w-7 rounded-full bg-brand text-brand-gold flex items-center justify-center font-heading font-bold text-xs flex-shrink-0">{i + 1}</div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-stone-700 truncate">{c.name || "—"}</div>
-                <div className="text-xs text-stone-400 truncate">{c.email}</div>
-              </div>
-              <CheckCircle size={16} weight="fill" className="text-emerald-500 flex-shrink-0" />
-            </div>
-          ))}
-        </div>
-      )}
-      {voucher?.claimants?.length === 0 && (
-        <div className="text-center py-4 text-stone-400 text-sm">Belum ada yang klaim — post kode ke IG Story @feedify.id</div>
-      )}
-    </CollapsibleCard>
-  );
-}
-
-// ─── Main AdminPage ────────────────────────────────────────────────────────
-
 export default function AdminPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -1229,12 +1142,15 @@ export default function AdminPage() {
         </button>
       </div>
 
+      {/* Daftar Klien and Command Library are day-to-day work, not configuration,
+          so they live as their own pages in the sidebar. What stays here is what
+          the owner changes occasionally. */}
+      <AgencySettingsPanel />
+      <WaitingListPanel />
       <MaintenancePanel />
       <PaymentVerificationPanel />
       <FeedbackPanel />
       <MenuLockdownPanel />
-      <DailyVoucherPanel />
-      <AnalyticsPanel />
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-up">

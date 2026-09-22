@@ -66,7 +66,9 @@
   "scripts": {
     "start": "craco start",
     "build": "craco build",
-    "test": "craco test"
+    "test": "craco test",
+    "portfolio": "node scripts/build-portfolio.js",
+    "lint:undef": "eslint --no-inline-config --config scripts/eslint-undef.config.mjs src"
   },
   "browserslist": {
     "production": [

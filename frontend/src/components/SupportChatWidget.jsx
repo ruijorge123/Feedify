@@ -2,14 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { Sparkle, ArrowRight } from "@phosphor-icons/react";
 
 const QUICK_QUESTIONS = [
-  "Berapa harga per foto?",
-  "Hasilnya bisa dipakai di mana saja?",
-  "Bagaimana cara mulai?",
-  "Kredit expired gak?",
-  "Ada diskon gak?",
+  "Paketnya apa saja?",
+  "Foto produk saya jelek, bisa?",
+  "Kontennya dikirim ke mana?",
+  "Berapa lama jadinya?",
+  "Kalau hasilnya belum cocok?",
 ];
 
-export default function SupportChatWidget({ title = "Ada pertanyaan?", subtitle = "Tanya langsung — Ara siap bantu." }) {
+export default function SupportChatWidget({ title = "Ada pertanyaan?", subtitle = "Tanya langsung — Anita siap bantu." }) {
   const [messages, setMessages] = useState([
     { role: "assistant", content: "Halo! Ada yang mau kamu tanyakan tentang Feedify? Tanya apa saja — saya siap bantu. 👋" }
   ]);
@@ -63,7 +63,7 @@ export default function SupportChatWidget({ title = "Ada pertanyaan?", subtitle 
             <Sparkle size={16} weight="fill" className="text-brand-gold" />
           </div>
           <div>
-            <div className="font-heading font-bold text-white text-sm">Ara · Asisten Feedify</div>
+            <div className="font-heading font-bold text-white text-sm">Anita · Asisten Feedify</div>
             <div className="flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-brand-cream/60 text-[10px]">Online sekarang</span>
@@ -138,8 +138,8 @@ export default function SupportChatWidget({ title = "Ada pertanyaan?", subtitle 
       </div>
 
       <p className="text-center text-xs text-stone-400 mt-3">
-        Ara · Asisten Feedify — siap bantu 24/7 · Pertanyaan lain?{" "}
-        <a href="https://instagram.com/feedify.id" target="_blank" rel="noreferrer" className="text-brand-light hover:text-brand">DM @feedify.id</a>
+        Anita · Asisten Feedify — siap bantu 24/7 · Pertanyaan lain?{" "}
+        <a href="https://www.instagram.com/feedify_id" target="_blank" rel="noreferrer" className="text-brand-light hover:text-brand">DM @feedify_id</a>
       </p>
     </div>
   );

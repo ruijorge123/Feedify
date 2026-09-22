@@ -401,3 +401,65 @@ button, [role="button"], input, select, textarea {
     [style*="sparkleRise"], .btn-shine::after,
     .animate-sparkle-pop { animation: none !important; }
 }
+
+/* Landing reveal-on-scroll — elements marked [data-rv] get .rv-in from an
+   IntersectionObserver once they enter the viewport. Kept in CSS (not JS style
+   writes) so it stays cheap on low-end phones. */
+.rv { opacity: 0; transform: translateY(22px); transition: opacity .75s cubic-bezier(.16,1,.3,1), transform .75s cubic-bezier(.16,1,.3,1); }
+.rv-in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .rv { opacity: 1; transform: none; transition: none; }
+}
+
+/* Shared form input for the public-facing pages (sample request, checkout).
+   Matches the design system: rounded-xl inputs, cream field, gold focus ring. */
+.feedify-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid #DDE9E1;
+  background: #FDFBF7;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  color: #1C1917;
+  transition: border-color .2s, box-shadow .2s;
+}
+.feedify-input::placeholder { color: #A8A29E; }
+.feedify-input:focus {
+  outline: none;
+  border-color: #0B3D2E;
+  box-shadow: 0 0 0 3px rgba(229, 193, 88, .35);
+}
+
+/* Full-bleed feed band on the landing page.
+
+   The track holds the same list twice and slides exactly one copy's width, so the
+   seam lands where the sequence restarts and the loop is invisible. Motion is pure
+   CSS: no scroll listener, no rAF, nothing to jank on a low-end phone. */
+.marquee { overflow: hidden; -webkit-mask-image: none; }
+.marquee-track {
+  display: flex;
+  gap: 1rem;
+  width: max-content;
+  animation: marquee-slide 70s linear infinite;
+  will-change: transform;
+  /* A flat list of 2n cards has 2n-1 gaps, so -50% would land half a gap short and
+     the seam would visibly jump each lap. The trailing padding supplies the 2n-th
+     gap, making one copy exactly half the track's width. */
+  padding-right: 1rem;
+}
+.marquee:hover .marquee-track { animation-play-state: paused; }
+/* Phone mockups are ~1:2, so the card is narrower than a square grid would be
+   — at the old width each one stood 30rem tall and dwarfed the section. */
+.marquee-card { flex: 0 0 auto; width: 11rem; }
+@media (min-width: 640px) {
+  .marquee-card { width: 14rem; }
+  .marquee-track { gap: 1.25rem; padding-right: 1.25rem; }
+}
+@keyframes marquee-slide {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+  .marquee { overflow-x: auto; }
+}

@@ -1,26 +1,34 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AppShell from "@/components/AppShell";
+import { useViewAs } from "@/lib/viewAs";
 import AdminPinGate from "@/components/AdminPinGate";
 import MenuLockGate from "@/components/MenuLockGate";
-import { fbTrack } from "@/lib/metaPixel";
 import "@/App.css";
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
 const LandingPage           = lazy(() => import("@/pages/LandingPage"));
+const PortfolioPage         = lazy(() => import("@/pages/PortfolioPage"));
+const SampleRequestPage     = lazy(() => import("@/pages/SampleRequestPage"));
 const LoginPage             = lazy(() => import("@/pages/LoginPage"));
 const RegisterPage          = lazy(() => import("@/pages/RegisterPage"));
 const VerifyEmailPage       = lazy(() => import("@/pages/VerifyEmailPage"));
 const ForgotPasswordPage    = lazy(() => import("@/pages/ForgotPasswordPage"));
 const OnboardingPage        = lazy(() => import("@/pages/OnboardingPage"));
-const PricingPage           = lazy(() => import("@/pages/PricingPage"));
 const CheckoutPage          = lazy(() => import("@/pages/CheckoutPage"));
 const MaintenancePage       = lazy(() => import("@/pages/MaintenancePage"));
 const DashboardPage         = lazy(() => import("@/pages/DashboardPage"));
+const ClientHomePage        = lazy(() => import("@/pages/ClientHomePage"));
+const ClientBrandDnaPage    = lazy(() => import("@/pages/ClientBrandDnaPage"));
+const ClientProductsPage    = lazy(() => import("@/pages/ClientProductsPage"));
+const ClientOrdersPage      = lazy(() => import("@/pages/ClientOrdersPage"));
+const InactiveAccountPage   = lazy(() => import("@/pages/InactiveAccountPage"));
+const AdminClientsPage      = lazy(() => import("@/pages/AdminClientsPage"));
+const CommandLibraryPage    = lazy(() => import("@/pages/CommandLibraryPage"));
 const BannerGeneratorPage   = lazy(() => import("@/pages/BannerGeneratorPage"));
 const CarouselGeneratorPage = lazy(() => import("@/pages/CarouselGeneratorPage"));
 const CopywritingPage       = lazy(() => import("@/pages/CopywritingPage"));
@@ -36,7 +44,6 @@ const SettingsPage          = lazy(() => import("@/pages/SettingsPage"));
 const BrandKitPage          = lazy(() => import("@/pages/BrandKitPage"));
 const FeedbackPage          = lazy(() => import("@/pages/FeedbackPage"));
 const MorePage              = lazy(() => import("@/pages/MorePage"));
-const BuyCreditsPage        = lazy(() => import("@/pages/BuyCreditsPage"));
 const ProductLibraryPage    = lazy(() => import("@/pages/ProductLibraryPage"));
 const AdminPage             = lazy(() => import("@/pages/AdminPage"));
 const FeedGeneratorPage     = lazy(() => import("@/pages/FeedGeneratorPage"));
@@ -55,19 +62,6 @@ function ScrollToTop() {
   return null;
 }
 
-// Meta Pixel: the base code in index.html already fires the first PageView on initial
-// load (before React mounts), so this only tracks SUBSEQUENT SPA route changes —
-// skipping the first run here avoids double-counting that initial load.
-function PixelPageView() {
-  const { pathname } = useLocation();
-  const isFirstRun = useRef(true);
-  useEffect(() => {
-    if (isFirstRun.current) { isFirstRun.current = false; return; }
-    fbTrack("PageView");
-  }, [pathname]);
-  return null;
-}
-
 function ProtectedRoute({ children, requireBrand = true }) {
   const { user, loading } = useAuth();
   if (loading) {
@@ -78,11 +72,25 @@ function ProtectedRoute({ children, requireBrand = true }) {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
-  // Non-admin users must have paid (lifetime access) before entering the app
+  // Non-admin users must have paid before entering the app
   const hasAccess = user.role === "admin" || user.is_lifetime;
-  if (!hasAccess) return <Navigate to="/pricing" replace />;
+  if (!hasAccess) return <Navigate to="/#harga" replace />;
+  // A client the owner deactivated keeps their account and data, but the
+  // dashboard would only show a dead counter — send them somewhere that says so.
+  if (user.role !== "admin" && user.client_status === "nonaktif") {
+    return <Navigate to="/akun-nonaktif" replace />;
+  }
   if (requireBrand && !user.has_brand_profile) return <Navigate to="/onboarding" replace />;
   return children;
+}
+
+function HomeByRole() {
+  const { user } = useAuth();
+  // While viewing as a client the owner should land on the CLIENT home, not
+  // their own tool dashboard — otherwise the mode is only half on.
+  const viewAs = useViewAs();
+  if (viewAs) return <ClientHomePage />;
+  return user?.role === "admin" ? <DashboardPage /> : <ClientHomePage />;
 }
 
 function AdminRoute({ children }) {
@@ -112,15 +120,30 @@ function PublicOnly({ children }) {
 
 function LogoutPage() {
   const { logout } = useAuth();
-  useEffect(() => { logout(); }, []); // eslint-disable-line
-  return null;
+  const navigate = useNavigate();
+  // Returning null left the screen blank after signing out, which reads as a
+  // crash. Log out, then land them somewhere that exists.
+  useEffect(() => {
+    logout();
+    navigate("/", { replace: true });
+  }, []); // eslint-disable-line
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-brand-cream">
+      <div className="animate-pulse font-heading text-brand">Keluar...</div>
+    </div>
+  );
 }
 
-// Checkout only requires login, not payment (user comes here TO pay)
+// Checkout only requires login, not payment (user comes here TO pay).
+// The chosen package lives in the query string, so send them back to this exact
+// URL after login — dropping it would silently reset them to the default package.
 function LoginRequired({ children }) {
   const { user, loading } = useAuth();
+  const { pathname, search } = useLocation();
   if (loading) return null;
-  if (!user) return <Navigate to="/login?redirect=/checkout?plan=lifetime" replace />;
+  if (!user) {
+    return <Navigate to={`/login?redirect=${encodeURIComponent(pathname + search)}`} replace />;
+  }
   return children;
 }
 
@@ -130,7 +153,6 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <ScrollToTop />
-        <PixelPageView />
         <ToastContainer
           position="top-right"
           autoClose={3000}
@@ -146,37 +168,47 @@ function App() {
           <Routes>
             <Route path="/"                element={<LandingPage />} />
             <Route path="/logout"          element={<LogoutPage />} />
-            <Route path="/pricing"         element={<BuyCreditsPage />} />
+            <Route path="/pricing"         element={<Navigate to="/#harga" replace />} />
             <Route path="/checkout"        element={<LoginRequired><CheckoutPage /></LoginRequired>} />
             <Route path="/login"           element={<LoginPage />} />
             <Route path="/register"        element={<PublicOnly><RegisterPage /></PublicOnly>} />
             <Route path="/verify-email"    element={<VerifyEmailPage />} />
             <Route path="/forgot-password" element={<PublicOnly><ForgotPasswordPage /></PublicOnly>} />
             <Route path="/maintenance"     element={<MaintenancePage />} />
+            <Route path="/akun-nonaktif"   element={<LoginRequired><InactiveAccountPage /></LoginRequired>} />
+            {/* Public sales pages — no login required on purpose: a prospect must be
+                able to see the work and ask for a sample before creating an account. */}
+            <Route path="/hasil-kerja"     element={<PortfolioPage />} />
+            <Route path="/sample"          element={<SampleRequestPage />} />
             <Route path="/onboarding"      element={
               <ProtectedRoute requireBrand={false}><OnboardingPage /></ProtectedRoute>
             } />
             <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
-              <Route path="/dashboard"             element={<DashboardPage />} />
-              <Route path="/studio"                 element={<MenuLockGate menuKey="studio"><StudioPage /></MenuLockGate>} />
-              <Route path="/generate/banner"       element={<MenuLockGate menuKey="banner"><BannerGeneratorPage /></MenuLockGate>} />
-              <Route path="/generate/carousel"     element={<MenuLockGate menuKey="carousel"><CarouselGeneratorPage /></MenuLockGate>} />
-              <Route path="/generate/copywriting"  element={<MenuLockGate menuKey="copywriting"><CopywritingPage /></MenuLockGate>} />
-              <Route path="/generate/reels"            element={<MenuLockGate menuKey="reels"><ReelsGeneratorPage /></MenuLockGate>} />
-              <Route path="/generate/talking-avatar"  element={<MenuLockGate menuKey="talking-avatar"><TalkingAvatarPage /></MenuLockGate>} />
+              <Route path="/dashboard"             element={<HomeByRole />} />
+              <Route path="/brand-dna"             element={<ClientBrandDnaPage />} />
+              <Route path="/produk"                element={<ClientProductsPage />} />
+              <Route path="/riwayat"               element={<ClientOrdersPage />} />
+              <Route path="/studio"                 element={<AdminRoute><MenuLockGate menuKey="studio"><StudioPage /></MenuLockGate></AdminRoute>} />
+              <Route path="/generate/banner"       element={<AdminRoute><MenuLockGate menuKey="banner"><BannerGeneratorPage /></MenuLockGate></AdminRoute>} />
+              <Route path="/generate/carousel"     element={<AdminRoute><MenuLockGate menuKey="carousel"><CarouselGeneratorPage /></MenuLockGate></AdminRoute>} />
+              <Route path="/generate/copywriting"  element={<AdminRoute><MenuLockGate menuKey="copywriting"><CopywritingPage /></MenuLockGate></AdminRoute>} />
+              <Route path="/generate/reels"            element={<AdminRoute><MenuLockGate menuKey="reels"><ReelsGeneratorPage /></MenuLockGate></AdminRoute>} />
+              <Route path="/generate/talking-avatar"  element={<AdminRoute><MenuLockGate menuKey="talking-avatar"><TalkingAvatarPage /></MenuLockGate></AdminRoute>} />
               <Route path="/generate/food"             element={<AdminRoute><MenuLockGate menuKey="food"><FoodMenuPage /></MenuLockGate></AdminRoute>} />
-              <Route path="/generate/marketplace"     element={<MenuLockGate menuKey="marketplace"><MarketplacePage /></MenuLockGate>} />
-              <Route path="/generate/feed-generator"  element={<MenuLockGate menuKey="feed-generator"><FeedGeneratorPage /></MenuLockGate>} />
+              <Route path="/generate/marketplace"     element={<AdminRoute><MenuLockGate menuKey="marketplace"><MarketplacePage /></MenuLockGate></AdminRoute>} />
+              <Route path="/generate/feed-generator"  element={<AdminRoute><MenuLockGate menuKey="feed-generator"><FeedGeneratorPage /></MenuLockGate></AdminRoute>} />
               <Route path="/growth-consultant"         element={<MenuLockGate menuKey="growth-consultant"><GrowthConsultantPage /></MenuLockGate>} />
-              <Route path="/calendar"              element={<MenuLockGate menuKey="calendar"><ContentCalendarPage /></MenuLockGate>} />
-              <Route path="/history"               element={<HistoryPage />} />
-              <Route path="/products"              element={<ProductLibraryPage />} />
+              <Route path="/calendar"              element={<AdminRoute><MenuLockGate menuKey="calendar"><ContentCalendarPage /></MenuLockGate></AdminRoute>} />
+              <Route path="/history"               element={<AdminRoute><HistoryPage /></AdminRoute>} />
+              <Route path="/products"              element={<AdminRoute><ProductLibraryPage /></AdminRoute>} />
               <Route path="/settings"             element={<SettingsPage />} />
-              <Route path="/brand-kit"             element={<BrandKitPage />} />
+              <Route path="/brand-kit"             element={<AdminRoute><BrandKitPage /></AdminRoute>} />
               <Route path="/feedback"              element={<FeedbackPage />} />
-              <Route path="/more"                  element={<MorePage />} />
+              <Route path="/more"                  element={<AdminRoute><MorePage /></AdminRoute>} />
+              <Route path="/klien"                 element={<AdminRoute><AdminClientsPage /></AdminRoute>} />
+              <Route path="/command-library"       element={<AdminRoute><CommandLibraryPage /></AdminRoute>} />
               <Route path="/admin"                 element={<AdminRoute><AdminPinGate><AdminPage /></AdminPinGate></AdminRoute>} />
-              <Route path="/credits"               element={<BuyCreditsPage />} />
+              
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

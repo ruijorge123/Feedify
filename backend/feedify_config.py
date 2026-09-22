@@ -90,3 +90,73 @@ CONTENT_PURPOSES = [
     {"id": "education", "name": "Edukasi"},
     {"id": "engagement", "name": "Engagement"},
 ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AGENCY PACKAGES — the live monetization path.
+# Feedify sells done-for-you content: the client buys a package, the Feedify team
+# produces the content and hands it over on WhatsApp. These are defaults only —
+# the owner can override price, feed count, slot numbers and open/closed state
+# from the Admin Panel (stored in app_settings), so a new batch never needs a
+# code change. See AGENCY_DEFAULTS below for the editable runtime values.
+# ─────────────────────────────────────────────────────────────────────────────
+
+AGENCY_PACKAGES = [
+    {
+        "id": "starter",
+        "name": "Starter",
+        "tagline": "Coba dulu, rasakan hasilnya",
+        "feeds": 15,
+        "price_idr": 69000,
+        "popular": False,
+        "features": [
+            "15 feed siap posting",
+            "Caption untuk tiap feed",
+            "Revisi maksimal 2x per feed",
+            "Brand DNA tersimpan permanen",
+            "Growth Consultant gratis",
+        ],
+    },
+    {
+        "id": "populer",
+        "name": "Populer",
+        "tagline": "Paling banyak dipilih",
+        "feeds": 30,
+        "price_idr": 119000,
+        "popular": True,
+        "features": [
+            "30 feed siap posting",
+            "Caption untuk tiap feed",
+            "Revisi maksimal 2x per feed",
+            "Brand DNA tersimpan permanen",
+            "Growth Consultant gratis",
+        ],
+    },
+    {
+        "id": "brand",
+        "name": "Brand",
+        "tagline": "Stok feed untuk jangka panjang",
+        "feeds": 60,
+        "price_idr": 209000,
+        "popular": False,
+        "features": [
+            "60 feed siap posting",
+            "Caption untuk tiap feed",
+            "Revisi maksimal 2x per feed",
+            "Brand DNA tersimpan permanen",
+            "Growth Consultant gratis",
+        ],
+    },
+]
+
+# Runtime-editable settings (Admin Panel writes these into app_settings).
+AGENCY_DEFAULTS = {
+    "slots_total": 50,        # kuota klien yang dibuka
+    "slots_taken": 0,         # diisi manual oleh owner
+    "registration_open": True,
+    "max_revisi": 2,
+    # Jumlah brand yang sudah dilayani, ditampilkan di landing sebagai social proof.
+    # Diisi manual oleh owner dan HARUS angka sebenarnya: ini klaim fakta ke calon
+    # pembeli, bukan elemen desain. 0 = tidak ditampilkan sama sekali.
+    "clients_served": 0,
+}

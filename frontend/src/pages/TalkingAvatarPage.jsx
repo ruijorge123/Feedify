@@ -271,7 +271,7 @@ export default function TalkingAvatarPage() {
               clearInterval(pollRef.current);
               setJobStatus("error");
               setGenerating(false);
-              toast.error("Gagal membuat video. Kredit dikembalikan.");
+              toast.error("Gagal membuat video. Coba lagi.");
             }
           } catch {
             clearInterval(pollRef.current);
@@ -471,7 +471,7 @@ export default function TalkingAvatarPage() {
                   <X size={28} weight="bold" className="text-red-400" />
                 </div>
                 <div className="font-semibold text-red-600">Gagal membuat video</div>
-                <p className="text-sm text-stone-500">Kredit kamu sudah dikembalikan. Coba lagi.</p>
+                <p className="text-sm text-stone-500">Tidak ada yang terpakai. Coba lagi.</p>
                 <button
                   onClick={() => { setJobStatus(null); setGenerating(false); }}
                   className="px-4 py-2 bg-brand text-brand-cream rounded-full text-sm font-semibold hover:bg-brand-light transition-colors"

@@ -190,7 +190,7 @@ export default function MarketplacePage() {
                         <p className="text-sm font-semibold text-stone-800 truncate">{selectedProduct.name}</p>
                         {selectedProduct.category && <p className="text-xs text-stone-500">{selectedProduct.category}</p>}
                       </div>
-                      <button onClick={e => { e.stopPropagation(); setSelectedProductId(null); setBenefitUtama(""); }}
+                      <button onClick={e => { e.stopPropagation(); setSelectedProductId(null); }}
                         className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 transition-all">
                         <X size={13} weight="bold" />
                       </button>
