@@ -275,7 +275,7 @@ function DetailKlien({ userId, onBack }) {
       note: data.client.note || "",
     });
   };
-  useEffect(() => { load(); }, [userId]);
+  useEffect(() => { load(); }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     setSaving(true);

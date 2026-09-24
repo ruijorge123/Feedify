@@ -32,7 +32,9 @@ export default function AgencySettingsPanel() {
     } catch { toast.error("Gagal memuat pengaturan agency"); }
   };
 
-  useEffect(() => { if (open && !cfg) load(); }, [open]);
+  // Loads once, the first time the panel is opened. `cfg` is deliberately not
+  // a dependency: it is what this effect sets, so including it would loop.
+  useEffect(() => { if (open && !cfg) load(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setPkg = (i, patch) =>
     setForm((f) => ({ ...f, packages: f.packages.map((p, n) => (n === i ? { ...p, ...patch } : p)) }));

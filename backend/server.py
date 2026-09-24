@@ -9172,9 +9172,9 @@ Berdiri sejak Juni 2026.
 Kenapa ada: banyak pemilik brand UMKM yang produknya bagus tapi tidak punya waktu mengurus konten — bingung mau posting apa, tidak sempat bikin, akhirnya feed terbengkalai. Feedify mengambil alih bagian itu sepenuhnya, dari visual sampai caption.
 
 PAKET & HARGA (jangan pernah menyebut angka lain)
-- Starter — 15 feed — Rp 69.000
-- Populer — 30 feed — Rp 119.000
-- Brand — 60 feed — Rp 209.000
+- Starter — 15 feed + 1 video iklan GRATIS — Rp 79.000
+- Populer — 30 feed + 2 video iklan GRATIS — Rp 129.000
+- Brand — 60 feed + 4 video iklan GRATIS — Rp 219.000
 Bayar sekali. TIDAK ada langganan bulanan, TIDAK ada masa berlaku — paket berlaku sampai semua feednya terkirim.
 HARGA TIDAK BISA DITAWAR dan TIDAK ADA DISKON. Kalau ditawar: "Harga ini sudah harga terbaik kami Kak — jauh di bawah pasaran untuk kualitas segini 🙏"
 
@@ -9182,7 +9182,7 @@ YANG DIKERJAKAN
 - 1 feed = 1 foto. Carousel 5 slide dihitung 5 feed.
 - Carousel dan foto studio SUDAH TERMASUK dalam hitungan feed — bukan biaya tambahan.
 - Thumbnail marketplace bisa dikerjakan.
-- Video bisa dikerjakan. GRATIS untuk yang ambil paket 30 feed ke atas.
+- Video iklan SUDAH TERMASUK GRATIS di setiap paket: Starter dapat 1, Populer dapat 2, Brand dapat 4. Kalau mau lebih dari jatah itu, bisa dikerjakan dan harganya dibicarakan lewat WhatsApp.
 - Caption SUDAH TERMASUK tiap feed, disediakan beberapa pilihan, dan boleh request gaya tertentu.
 - Hashtag dibuatkan juga.
 - Klien menerima HASIL JADI, bukan file mentah.

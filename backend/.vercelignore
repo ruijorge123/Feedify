@@ -1,0 +1,12 @@
+# Local virtualenvs — 950MB that the lambda builds from requirements.txt anyway.
+# Uploading these is what made `vercel deploy` fail with "more than 15000 items"
+# and the broken-symlink error.
+.venv
+.venv.nosync
+__pycache__
+**/__pycache__
+*.pyc
+.env
+.env.*
+tests/
+emergentintegrations_stub/

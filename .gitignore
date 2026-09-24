@@ -93,3 +93,8 @@ credentials.json
 
 # Claude Code project instructions (local-only)
 CLAUDE.md
+.env*
+
+# Written by `vercel link`
+.vercel
+.env.local

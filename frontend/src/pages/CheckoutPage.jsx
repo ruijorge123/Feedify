@@ -43,6 +43,10 @@ export default function CheckoutPage() {
   // Collected here rather than after signup: this is the number the team
   // contacts and delivers to, and the payment alert is useless without it.
   const [waNumber, setWaNumber] = useState("");
+  // createOrder is memoised on [navigate] but reads the number the buyer is
+  // still typing; a ref keeps it current without re-creating the callback on
+  // every keystroke (which would refire the effect that calls it).
+  const waRef = useRef("");
   const [waSaved, setWaSaved] = useState(false);
   const fileRef = useRef(null);
 
@@ -53,7 +57,7 @@ export default function CheckoutPage() {
   const createOrder = useCallback(async (pkgId) => {
     setLoading(true);
     try {
-      const { data } = await api.post("/checkout/manual/create", { paket: pkgId, whatsapp: waNumber });
+      const { data } = await api.post("/checkout/manual/create", { paket: pkgId, whatsapp: waRef.current });
       setOrder(data);
       if (data?.whatsapp) { setWaNumber(data.whatsapp); setWaSaved(true); }
       setProofPreview(null);
@@ -149,6 +153,7 @@ export default function CheckoutPage() {
     `Halo Feedify, saya sudah bayar paket ${selected?.name || ""} tapi belum dikonfirmasi.`);
 
   const waDigits = String(waNumber || "").replace(/\D/g, "");
+  waRef.current = waNumber;
   const status = order?.status;
   const expired = secondsLeft === 0 && status === "menunggu_transfer";
   const showUpload = !status || status === "menunggu_transfer" || status === "ditolak" || reuploading;

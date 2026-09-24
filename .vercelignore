@@ -1,0 +1,15 @@
+# Deploys run from the repo root because both projects set a Root Directory.
+# Everything here is either rebuilt on Vercel or local-only; uploading it is what
+# tripped the "more than 15000 items" and broken-symlink failures before.
+**/node_modules
+**/.venv
+**/.venv.nosync
+**/__pycache__
+**/*.pyc
+**/.env
+**/.env.*
+frontend/build
+frontend/assets-raw
+backend/tests
+backend/emergentintegrations_stub
+.git

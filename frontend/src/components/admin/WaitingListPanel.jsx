@@ -23,7 +23,8 @@ export default function WaitingListPanel() {
     try { const { data } = await api.get("/admin/waiting-list"); setRows(data); }
     catch { setRows([]); }
   };
-  useEffect(() => { if (open && rows === null) load(); }, [open]);
+  // Same as above: `rows` is the effect's own output, not an input.
+  useEffect(() => { if (open && rows === null) load(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const remove = async (id) => {
     if (!window.confirm("Hapus dari daftar tunggu?")) return;
