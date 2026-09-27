@@ -11,8 +11,8 @@ This is the single entry point for all video generation logic.
 import uuid
 from datetime import datetime, timezone
 
-from gpt_video_director import build_video_prompt
-from fal_provider import upload_image, generate_video
+from .director import build_video_prompt
+from .fal_provider import upload_image, generate_video
 
 _GOAL_LABELS = {
     "new_launch":      "New Launch",

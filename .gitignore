@@ -80,21 +80,23 @@ agenthub/agents/youtube/db
 # Build caches
 .cache/
 
-memory/test_credentials.md
+docs/test_credentials.md
 
 # Mobile development
 android-sdk/
-.env
-.env.*
-*.env
 credentials.json
 *.key
 .credentials
 
 # Claude Code project instructions (local-only)
 CLAUDE.md
-.env*
 
 # Written by `vercel link`
 .vercel
-.env.local
+
+# Secrets: every .env variant stays local. The .env.example templates carry no
+# values and are the one exception, so a fresh clone knows what to fill in.
+.env
+.env.*
+*.env
+!.env.example

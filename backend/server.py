@@ -33,7 +33,7 @@ except ImportError:
 
 # Reels video generation modules (optional — requires FAL_KEY + OPENAI_API_KEY)
 try:
-    from video_service import run_reels_pipeline
+    from video.service import run_reels_pipeline
     _REELS_ENABLED = True
 except ImportError:
     _REELS_ENABLED = False

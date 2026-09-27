@@ -11,5 +11,6 @@
 frontend/build
 frontend/assets-raw
 backend/tests
-backend/emergentintegrations_stub
 .git
+docs
+scripts
