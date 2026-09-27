@@ -9,7 +9,7 @@ import FeedifyLogo from "@/components/FeedifyLogo";
 
 /**
  * Videos are listed here rather than in the generated manifest: the build script
- * scans images, and three clips are not worth teaching it a second media type.
+ * scans images, and a handful of clips is not worth teaching it a second media type.
  * Drop a file in /public and add a line.
  */
 const VIDEO_WORKS = [
@@ -20,6 +20,8 @@ const VIDEO_WORKS = [
   { type: "video", cat: "Video Produk", title: "Iklan Produk 5", video: "/video5.mp4", images: [] },
   { type: "video", cat: "Video Produk", title: "Iklan Produk 6", video: "/video6.mp4", images: [] },
   { type: "video", cat: "Video Produk", title: "Iklan Produk 7", video: "/video7.mp4", images: [] },
+  { type: "video", cat: "Video Produk", title: "Iklan Produk 8", video: "/video8.mp4", images: [] },
+  { type: "video", cat: "Video Produk", title: "Iklan Produk 9", video: "/video9.mp4", images: [] },
 ];
 
 const ALL_WORKS = [...VIDEO_WORKS, ...WORKS];

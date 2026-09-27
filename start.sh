@@ -111,14 +111,7 @@ else
 fi
 
 log "Menginstall Python dependencies..."
-# emergentintegrations adalah package private Emergent — tidak tersedia di PyPI publik.
-# Semua import-nya ada di dalam try/except di server.py, jadi stub lokal cukup.
-# (/dev/stdin tidak bisa dipakai sebagai -r di Git Bash/Windows, jadi pakai file sementara)
-TMP_REQ="$(mktemp)"
-grep -v "emergentintegrations" "$BACKEND_DIR/requirements.txt" > "$TMP_REQ"
-pip install -q --timeout=300 -r "$TMP_REQ"
-rm -f "$TMP_REQ"
-pip install -q -e "$BACKEND_DIR/emergentintegrations_stub/"
+pip install -q --timeout=300 -r "$BACKEND_DIR/requirements.txt"
 
 # ── 5. Backend .env ──────────────────────────────────────────────────────────
 BACKEND_ENV="$BACKEND_DIR/.env"
