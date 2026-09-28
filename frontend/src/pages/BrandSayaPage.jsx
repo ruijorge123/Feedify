@@ -42,7 +42,20 @@ export default function BrandSayaPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  // /brand-saya?edit=<id> — the "Edit" link on every generator's brand chip —
+  // opens that brand straight away instead of the list.
+  const editParam = useRef(new URLSearchParams(window.location.search).get("edit"));
+
+  useEffect(() => {
+    load().then((d) => {
+      const id = editParam.current;
+      if (!id) return;
+      editParam.current = null;
+      const b = d?.brands?.find((x) => x.user_id === id);
+      if (b) setEditing(b);
+      window.history.replaceState(null, "", "/brand-saya");
+    });
+  }, [load]);
 
   if (!data) {
     return <div className="flex justify-center py-24"><CircleNotch size={26} className="animate-spin text-brand" /></div>;

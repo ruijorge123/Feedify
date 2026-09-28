@@ -9,7 +9,7 @@ const browser = ["window","document","localStorage","sessionStorage","navigator"
  "fetch","setTimeout","clearTimeout","setInterval","clearInterval","requestAnimationFrame",
  "cancelAnimationFrame","performance","Image","FileReader","FormData","Blob","URL","File",
  "IntersectionObserver","MutationObserver","ResizeObserver","AbortController","CustomEvent",
- "atob","btoa","alert","confirm","prompt","location","history","matchMedia","Audio","Notification",
+ "URLSearchParams","atob","btoa","alert","confirm","prompt","location","history","matchMedia","Audio","Notification",
  "process","module","require","__dirname","globalThis","structuredClone","queueMicrotask","crypto"];
 export default [{
   files: ["**/*.js","**/*.jsx"],

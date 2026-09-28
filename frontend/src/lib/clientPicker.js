@@ -38,6 +38,16 @@ export function getActiveClient() {
   return _selected;
 }
 
+/** Where "Edit brand" should lead for the current selection: the Brand Saya
+ *  entry, the client's detail page, or — with nothing picked — the owner's own
+ *  settings. Every generator's brand chip links here. */
+export function brandEditPath(client = _selected) {
+  if (!client?.user_id) return "/settings";
+  return client.internal
+    ? `/brand-saya?edit=${encodeURIComponent(client.user_id)}`
+    : `/klien?open=${encodeURIComponent(client.user_id)}`;
+}
+
 export function setActiveClient(client) {
   _selected = client || null;
   try {

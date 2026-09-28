@@ -59,7 +59,9 @@ export default function AdminClientsPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("semua");
   const [sort, setSort] = useState("baru");
-  const [open, setOpen] = useState(null);
+  // /klien?open=<id> — the "Edit" link on every generator's brand chip —
+  // lands on that client's detail page directly.
+  const [open, setOpen] = useState(() => new URLSearchParams(window.location.search).get("open"));
   const navigate = useNavigate();
 
   /** Step fully into that client's app — not a preview window. */
@@ -106,7 +108,7 @@ export default function AdminClientsPage() {
     return out;
   }, [rows, q, filter, sort]);
 
-  if (open) return <DetailKlien userId={open} onBack={() => { setOpen(null); load(); }} />;
+  if (open) return <DetailKlien userId={open} onBack={() => { setOpen(null); window.history.replaceState(null, "", "/klien"); load(); }} />;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-8 sm:px-8 sm:py-10">

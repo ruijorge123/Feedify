@@ -2,20 +2,27 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { Pencil } from "@phosphor-icons/react";
+import { whoseBrand } from "@/lib/activeBrand";
+import { useActiveClient, brandEditPath } from "@/lib/clientPicker";
 
-const BRAND_CACHE_KEY = "feedify_brand_cache";
+// One cached copy per selection (own account, each client, each Brand Saya
+// entry). A single shared key briefly showed the previously picked brand here
+// after switching, before the fresh request came back.
+const cacheKey = () => `feedify_brand_cache:${whoseBrand()}`;
 
 function getCached() {
-  try { return JSON.parse(localStorage.getItem(BRAND_CACHE_KEY)); } catch { return null; }
+  try { return JSON.parse(localStorage.getItem(cacheKey())); } catch { return null; }
 }
 
 export default function BrandDnaCard() {
   const [brand, setBrand] = useState(getCached);
+  const active = useActiveClient();
 
   useEffect(() => {
+    const key = cacheKey();
     api.get("/brand-profile").then(({ data }) => {
       setBrand(data);
-      localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(data));
+      try { localStorage.setItem(key, JSON.stringify(data)); } catch { /* storage full or blocked */ }
     }).catch(() => {});
   }, []);
 
@@ -25,7 +32,7 @@ export default function BrandDnaCard() {
     <div className="feedify-card p-5" data-testid="brand-dna-card">
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="text-xs uppercase tracking-[0.18em] text-brand-light font-bold">Brand DNA aktif</div>
-        <Link to="/settings" data-testid="edit-brand-quick"
+        <Link to={brandEditPath(active)} data-testid="edit-brand-quick"
           className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-brand hover:bg-brand-sand rounded-full uppercase tracking-wider">
           <Pencil size={11} weight="bold" /> Edit
         </Link>

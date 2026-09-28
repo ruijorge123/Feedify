@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { CaretRight } from "@phosphor-icons/react";
 import { useActiveBrand } from "@/lib/activeBrand";
+import { useActiveClient, brandEditPath } from "@/lib/clientPicker";
 
 /**
  * Shows which brand the page is about to generate for.
@@ -13,6 +14,7 @@ import { useActiveBrand } from "@/lib/activeBrand";
  */
 export default function ActiveBrandChip({ className = "" }) {
   const brand = useActiveBrand();
+  const active = useActiveClient();
   if (!brand?.brand_name) return null;
 
   const primary = brand.color_primary || "#0B3D2E";
@@ -20,10 +22,10 @@ export default function ActiveBrandChip({ className = "" }) {
 
   return (
     <Link
-      to="/settings"
+      to={brandEditPath(active)}
       data-testid="active-brand-chip"
       className={`inline-flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-full bg-white border border-brand-sand hover:border-brand/30 transition-colors ${className}`}
-      title={`Konten dibuat untuk brand "${brand.brand_name}". Klik untuk ganti brand.`}
+      title={`Konten dibuat untuk brand "${brand.brand_name}". Klik untuk mengubah Brand DNA-nya.`}
     >
       <span className="flex items-center -space-x-1.5 flex-shrink-0">
         <span className="h-4 w-4 rounded-full border border-white shadow-sm" style={{ background: primary }} />
