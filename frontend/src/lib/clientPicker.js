@@ -56,13 +56,24 @@ export function useActiveClient() {
   return c;
 }
 
-/** Roster for the picker. Cached — it changes rarely and is read on every tool page. */
+/** Roster for the picker: the owner's own brands (Brand Saya) first, then
+ *  clients. Cached — it changes rarely and is read on every tool page; Brand
+ *  Saya calls this with force=true after adding or removing a brand. */
 export function fetchClientList(force = false) {
   if (_list && !force) return Promise.resolve(_list);
-  return api
-    .get("/admin/clients")
-    .then(({ data }) => {
-      _list = (data || []).map((c) => ({
+  const clients = api.get("/admin/clients").then(({ data }) => data || []).catch(() => []);
+  const own = api.get("/admin/brand-saya").then(({ data }) => data?.brands || []).catch(() => []);
+  return Promise.all([own, clients]).then(([brands, rows]) => {
+    _list = [
+      ...brands.map((b) => ({
+        user_id: b.user_id,
+        name: b.nama,
+        nickname: b.nama,
+        internal: true,
+        brand_name: b.brand_name,
+        product_count: b.product_count,
+      })),
+      ...rows.map((c) => ({
         user_id: c.user_id,
         name: c.name || c.email,
         nickname: c.nickname,
@@ -70,10 +81,10 @@ export function fetchClientList(force = false) {
         counter: c.counter,
         total_feeds: c.total_feeds,
         lengkap: c.kelengkapan?.lengkap,
-      }));
-      return _list;
-    })
-    .catch(() => []);
+      })),
+    ];
+    return _list;
+  });
 }
 
 export function useClientList() {

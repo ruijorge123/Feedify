@@ -132,6 +132,7 @@ def build_router(require_admin: Callable, db, groq_chat: Callable) -> APIRouter:
                 "counter": int(client.get("counter") or 0),
                 "total_feeds": int(client.get("total_feeds") or 0),
                 "status": client.get("status", ""),
+                "internal": bool(client.get("internal")),
             },
             "brand": {k: brand.get(k) for k in (
                 "brand_name", "category", "colors", "color_primary", "color_secondary", "color_accent",

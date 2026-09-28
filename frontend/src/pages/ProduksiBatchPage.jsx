@@ -87,7 +87,7 @@ export default function ProduksiBatchPage() {
           <UserSwitch size={34} weight="duotone" className="mx-auto text-brand-light" />
           <h2 className="mt-4 font-heading text-xl font-bold text-brand">Pilih klien dulu</h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-stone-500">
-            Pakai pemilih klien di bagian atas, atau buka Daftar Klien lalu klik tombol Produksi Batch pada klien yang mau dikerjakan.
+            Pakai pemilih di bagian atas, atau klik Produksi pada klien di Daftar Klien atau pada brand di Brand Saya.
           </p>
           <Link to="/klien" className="mt-6 inline-flex items-center gap-2 rounded-full bg-brand px-6 py-3 text-sm font-semibold text-brand-cream hover:bg-brand-light" data-testid="produksi-ke-klien">
             Buka Daftar Klien
@@ -159,7 +159,7 @@ function Siapkan({ data, onCreated, onCancel }) {
   const tanpaFoto = products.filter((p) => !p.has_photo);
   const warnings = [
     !brand.brand_name && "Brand DNA belum diisi — prompt akan tanpa warna dan suasana brand.",
-    !products.length && "Klien belum menambahkan produk.",
+    !products.length && (client.internal ? "Brand ini belum punya produk — tambahkan di Brand Saya." : "Klien belum menambahkan produk."),
     tanpaFoto.length > 0 && `Belum ada foto untuk: ${tanpaFoto.map((p) => p.name).join(", ")}.`,
   ].filter(Boolean);
 
@@ -198,10 +198,17 @@ function Siapkan({ data, onCreated, onCancel }) {
     <div className="space-y-8">
       {/* brief klien */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card title="Paket">
-          <div className="font-heading text-4xl font-bold text-brand">{client.counter}<span className="text-xl text-stone-300"> / {client.total_feeds}</span></div>
-          <p className="mt-1 text-sm text-stone-500">feed selesai · sisa <strong className="text-brand">{sisa}</strong></p>
-        </Card>
+        {client.internal ? (
+          <Card title="Brand Saya">
+            <div className="font-heading text-xl font-bold text-brand">Brand internal</div>
+            <p className="mt-1 text-sm text-stone-500">Tanpa paket. Tentukan sendiri jumlah feed-nya.</p>
+          </Card>
+        ) : (
+          <Card title="Paket">
+            <div className="font-heading text-4xl font-bold text-brand">{client.counter}<span className="text-xl text-stone-300"> / {client.total_feeds}</span></div>
+            <p className="mt-1 text-sm text-stone-500">feed selesai · sisa <strong className="text-brand">{sisa}</strong></p>
+          </Card>
+        )}
         <Card title="Brand DNA">
           <div className="font-heading font-semibold text-brand">{brand.brand_name || "Belum diisi"}</div>
           {colors.length > 0 && (
@@ -240,7 +247,7 @@ function Siapkan({ data, onCreated, onCancel }) {
 
       {/* pengaturan */}
       <div className="space-y-7 rounded-2xl border border-brand-sand bg-white p-6 sm:p-8">
-        <Field label="Jumlah feed" hint={`Sisa paket klien: ${sisa} feed. Nanti dibagi per batch ${BATCH}.`}>
+        <Field label="Jumlah feed" hint={client.internal ? `Dibagi per batch ${BATCH}.` : `Sisa paket klien: ${sisa} feed. Nanti dibagi per batch ${BATCH}.`}>
           <input
             type="number" min={1} max={data.max_jumlah} value={jumlah}
             onChange={(e) => setJumlah(e.target.value)}

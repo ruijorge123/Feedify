@@ -37,6 +37,7 @@ const ADMIN_SECTIONS = [
     items: [
       { to: "/dashboard", label: "Beranda", icon: HouseSimple, testid: "nav-beranda" },
       { to: "/klien", label: "Daftar Klien", icon: Users, testid: "nav-klien" },
+      { to: "/brand-saya", label: "Brand Saya", icon: Palette, testid: "nav-brand-saya" },
       { to: "/produksi", label: "Produksi Batch", icon: ListChecks, testid: "nav-produksi" },
       { to: "/command-library", label: "Command Library", icon: Notepad, testid: "nav-command" },
       { to: "/admin", label: "Admin Panel", icon: ShieldStar, testid: "nav-admin" },
@@ -62,7 +63,6 @@ const ADMIN_SECTIONS = [
       { to: "/growth-consultant", label: "Growth Consultant", icon: Brain, testid: "nav-growth", lockKey: "growth-consultant" },
       { to: "/calendar", label: "Calendar Planner", icon: CalendarBlank, testid: "nav-calendar", lockKey: "calendar" },
       { to: "/history", label: "History", icon: ClockCounterClockwise, testid: "nav-history" },
-      { to: "/brand-kit", label: "Brand Kit", icon: Palette, testid: "nav-brand-kit" },
       { to: "/feedback", label: "Feedback", icon: ChatCircleDots, testid: "nav-feedback" },
     ],
   },

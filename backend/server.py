@@ -11094,6 +11094,9 @@ api_router.include_router(_build_agency_router(
     group_chat_id=TELEGRAM_GROUP_CHAT_ID,
 ))
 
+from agency.brand_saya import build_router as _build_brand_saya_router
+api_router.include_router(_build_brand_saya_router(require_admin, db, compress_photo=_compress_product_photo))
+
 from production.router import build_router as _build_production_router
 api_router.include_router(_build_production_router(require_admin, db, groq_chat=_groq_chat))
 app.include_router(api_router)

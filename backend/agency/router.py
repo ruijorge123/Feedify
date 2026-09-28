@@ -125,39 +125,7 @@ def build_router(
         if not payload.brand_name.strip():
             raise HTTPException(status_code=400, detail="Nama brand wajib diisi")
 
-        colors = [c.strip() for c in payload.colors if c.strip()][:MAX_COLORS]
-        doc = {
-            "user_id": current_user["id"],
-            "brand_name": payload.brand_name.strip(),
-            "category": payload.category.strip(),
-            "colors": colors,
-            # The prompt builders still read color_primary/secondary, so the new
-            # list is mirrored onto them rather than forcing a rewrite of every
-            # builder in server.py.
-            "color_primary": colors[0] if colors else "#0B3D2E",
-            "color_secondary": colors[1] if len(colors) > 1 else "#FDFBF7",
-            "color_accent": colors[2] if len(colors) > 2 else "",
-            "audience_age": payload.audience_age.strip(),
-            "audience_who": [w.strip() for w in payload.audience_who if w.strip()][:4],
-            # Prompt builders in server.py still read target_audience as one
-            # sentence, so the structured answers are joined into it rather than
-            # rewriting every builder.
-            "target_audience": ", ".join(
-                [payload.audience_age.strip()] + [w.strip() for w in payload.audience_who if w.strip()]
-            ).strip(", "),
-            "mood": payload.mood.strip(),
-            "lighting": payload.lighting.strip(),
-            "materials": [m.strip() for m in payload.materials if m.strip()][:3],
-            "composition": payload.composition.strip(),
-            "caption_tone": payload.caption_tone.strip(),
-            "notes": payload.notes.strip(),
-            "donts": [d.strip() for d in payload.donts if d.strip()][:8],
-            "donts_notes": payload.donts_notes.strip(),
-            "schema": "agency_v1",
-            "updated_at": store.now_iso(),
-        }
-        if payload.logo_base64:
-            doc["logo_base64"] = compress_photo(payload.logo_base64)
+        doc = store.build_brand_dna_doc(current_user["id"], payload, compress_photo)
 
         existing = await db.brand_profiles.find_one({"user_id": current_user["id"]}, {"_id": 0})
         if existing:
@@ -309,7 +277,9 @@ def build_router(
         admin_ids = {u["id"] for u in await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(50)}
         out = []
         for c in clients:
-            if c["user_id"] in admin_ids:
+            # Brand Saya records share this collection but are the owner's own
+            # brands, not customers.
+            if c["user_id"] in admin_ids or c.get("internal"):
                 continue
             comp = await store.completeness(db, c["user_id"], c)
             out.append({
@@ -399,7 +369,7 @@ def build_router(
     async def admin_stats(admin_user: dict = Depends(require_admin)):
         admin_ids = {u["id"] for u in await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(50)}
         clients = [c for c in await db.clients.find({}, {"_id": 0}).to_list(1000)
-                   if c["user_id"] not in admin_ids]
+                   if c["user_id"] not in admin_ids and not c.get("internal")]
         delivered = sum(int(c.get("counter") or 0) for c in clients)
         by_status = {}
         incomplete = 0

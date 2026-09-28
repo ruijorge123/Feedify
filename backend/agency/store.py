@@ -219,3 +219,47 @@ async def log_activity(db, user_id: str, action: str, detail: str = "") -> None:
         })
     except Exception as e:
         logger.warning(f"activity log failed ({action}) for {user_id}: {e}")
+
+MAX_BRAND_COLORS = 3
+
+
+def build_brand_dna_doc(user_id: str, payload, compress_photo) -> dict:
+    """The brand_profiles fields written from a Brand DNA form.
+
+    Shared by the client's own form and the owner's Brand Saya, so both save
+    exactly the same shape and every prompt builder reads them the same way.
+    """
+    colors = [c.strip() for c in payload.colors if c.strip()][:MAX_BRAND_COLORS]
+    doc = {
+        "user_id": user_id,
+        "brand_name": payload.brand_name.strip(),
+        "category": payload.category.strip(),
+        "colors": colors,
+        # The prompt builders still read color_primary/secondary, so the new
+        # list is mirrored onto them rather than forcing a rewrite of every
+        # builder in server.py.
+        "color_primary": colors[0] if colors else "#0B3D2E",
+        "color_secondary": colors[1] if len(colors) > 1 else "#FDFBF7",
+        "color_accent": colors[2] if len(colors) > 2 else "",
+        "audience_age": payload.audience_age.strip(),
+        "audience_who": [w.strip() for w in payload.audience_who if w.strip()][:4],
+        # Prompt builders in server.py still read target_audience as one
+        # sentence, so the structured answers are joined into it rather than
+        # rewriting every builder.
+        "target_audience": ", ".join(
+            [payload.audience_age.strip()] + [w.strip() for w in payload.audience_who if w.strip()]
+        ).strip(", "),
+        "mood": payload.mood.strip(),
+        "lighting": payload.lighting.strip(),
+        "materials": [m.strip() for m in payload.materials if m.strip()][:3],
+        "composition": payload.composition.strip(),
+        "caption_tone": payload.caption_tone.strip(),
+        "notes": payload.notes.strip(),
+        "donts": [d.strip() for d in payload.donts if d.strip()][:8],
+        "donts_notes": payload.donts_notes.strip(),
+        "schema": "agency_v1",
+        "updated_at": now_iso(),
+    }
+    if payload.logo_base64:
+        doc["logo_base64"] = compress_photo(payload.logo_base64)
+    return doc
