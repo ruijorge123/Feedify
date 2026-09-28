@@ -11,7 +11,7 @@ import {
   HouseSimple, Palette, Package, Brain, Receipt, Gear, SignOut,
   ImageSquare, SquaresFour, Camera, Stack, Storefront, PenNib,
   CalendarBlank, FilmSlate, Microphone, ForkKnife, ClockCounterClockwise,
-  ShieldStar, ChatCircleDots, List, X, Wrench, Users, Notepad, Eye, SignOut as SignOutIcon,
+  ShieldStar, ChatCircleDots, List, X, Wrench, Users, Notepad, Eye, SignOut as SignOutIcon, ListChecks,
 } from "@phosphor-icons/react";
 
 /**
@@ -37,6 +37,7 @@ const ADMIN_SECTIONS = [
     items: [
       { to: "/dashboard", label: "Beranda", icon: HouseSimple, testid: "nav-beranda" },
       { to: "/klien", label: "Daftar Klien", icon: Users, testid: "nav-klien" },
+      { to: "/produksi", label: "Produksi Batch", icon: ListChecks, testid: "nav-produksi" },
       { to: "/command-library", label: "Command Library", icon: Notepad, testid: "nav-command" },
       { to: "/admin", label: "Admin Panel", icon: ShieldStar, testid: "nav-admin" },
     ],
@@ -93,7 +94,7 @@ export default function AppShell() {
   // The picker only belongs where content is produced. Showing it on the Admin
   // Panel or Feedback would imply those screens change with it; they do not.
   const activeClient = useActiveClient();
-  const onToolPage = /^\/(generate|studio|calendar|history|brand-kit|products)/.test(location.pathname);
+  const onToolPage = /^\/(generate|studio|calendar|history|brand-kit|products|produksi)/.test(location.pathname);
 
   const doLogout = () => { logout(); navigate("/"); };
 

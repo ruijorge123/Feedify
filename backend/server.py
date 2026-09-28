@@ -3276,7 +3276,7 @@ async def create_product(payload: ProductCreate, current_user: dict = Depends(ge
     """Create a new product in the user's product library."""
     product = {
         "id": str(uuid.uuid4()),
-        "user_id": current_user["id"],
+        "user_id": _content_uid(current_user),
         "name": payload.name,
         "category": payload.category,
         "photo_base64": _compress_product_photo(payload.photo_base64),
@@ -3296,7 +3296,7 @@ async def create_product(payload: ProductCreate, current_user: dict = Depends(ge
 async def get_product(product_id: str, current_user: dict = Depends(get_current_user)):
     """Get a single product by ID."""
     product = await db.products.find_one(
-        {"id": product_id, "user_id": current_user["id"]}, {"_id": 0}
+        {"id": product_id, "user_id": _content_uid(current_user)}, {"_id": 0}
     )
     if not product:
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
@@ -3310,7 +3310,7 @@ async def update_product(
     current_user: dict = Depends(get_current_user),
 ):
     """Update a product in the user's library."""
-    product = await db.products.find_one({"id": product_id, "user_id": current_user["id"]})
+    product = await db.products.find_one({"id": product_id, "user_id": _content_uid(current_user)})
     if not product:
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
     updates = {k: v for k, v in payload.dict().items() if v is not None}
@@ -3326,7 +3326,7 @@ async def update_product(
 @api_router.delete("/products/{product_id}")
 async def delete_product(product_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a product from the user's library."""
-    result = await db.products.delete_one({"id": product_id, "user_id": current_user["id"]})
+    result = await db.products.delete_one({"id": product_id, "user_id": _content_uid(current_user)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
     return {"message": "Produk dihapus"}
@@ -5934,7 +5934,7 @@ async def preview_banner_prompt(payload: BannerPromptIn, current_user: dict = De
     product = None
     if payload.product_id:
         product = await db.products.find_one(
-            {"id": payload.product_id, "user_id": current_user["id"]}, {"_id": 0}
+            {"id": payload.product_id, "user_id": _content_uid(current_user)}, {"_id": 0}
         )
         if product:
             # Auto-fill payload fields from full product knowledge
@@ -6053,7 +6053,7 @@ async def generate_carousel_outline(payload: CarouselOutlineIn, current_user: di
 
     product = None
     if payload.product_id:
-        product = await db.products.find_one({"id": payload.product_id, "user_id": current_user["id"]}, {"_id": 0})
+        product = await db.products.find_one({"id": payload.product_id, "user_id": _content_uid(current_user)}, {"_id": 0})
     product_name = (product or {}).get("name") or "produk ini"
     category = (product or {}).get("category") or brand.get("category", "")
     ingredients = ", ".join((product or {}).get("ingredients", []) or []) or "(tidak ada data)"
@@ -7421,7 +7421,7 @@ async def _fetch_product_for_payload(payload, current_user: dict) -> Optional[di
     if not payload.product_id:
         return None
     product = await db.products.find_one(
-        {"id": payload.product_id, "user_id": current_user["id"]}, {"_id": 0}
+        {"id": payload.product_id, "user_id": _content_uid(current_user)}, {"_id": 0}
     )
     if product and not payload.product_name:
         payload.product_name = product.get("name", "")
@@ -7497,7 +7497,7 @@ async def studio_preview(payload: StudioIn, current_user: dict = Depends(get_cur
     # Auto-fill product knowledge from library if product_id provided
     if payload.product_id and not payload.product_name:
         product = await db.products.find_one(
-            {"id": payload.product_id, "user_id": current_user["id"]}, {"_id": 0}
+            {"id": payload.product_id, "user_id": _content_uid(current_user)}, {"_id": 0}
         )
         if product:
             payload = payload.model_copy(update={
@@ -7711,7 +7711,7 @@ async def generate_feed_prompts(payload: FeedGeneratorIn, current_user: dict = D
 
     # Gate: product must exist
     product = await db.products.find_one(
-        {"id": payload.product_id, "user_id": current_user["id"]}, {"_id": 0}
+        {"id": payload.product_id, "user_id": _content_uid(current_user)}, {"_id": 0}
     )
     if not product:
         raise HTTPException(status_code=404, detail="Produk tidak ditemukan")
@@ -11093,6 +11093,9 @@ api_router.include_router(_build_agency_router(
     telegram_api=_telegram_api,
     group_chat_id=TELEGRAM_GROUP_CHAT_ID,
 ))
+
+from production.router import build_router as _build_production_router
+api_router.include_router(_build_production_router(require_admin, db, groq_chat=_groq_chat))
 app.include_router(api_router)
 
 app.add_middleware(

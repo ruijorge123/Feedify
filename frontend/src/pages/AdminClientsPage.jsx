@@ -5,7 +5,7 @@ import {
   WhatsappLogo, InstagramLogo, FolderOpen, Package, Palette, Clock,
   CheckCircle, WarningCircle, ArrowLeft, Power, X, FilePdf, TiktokLogo,
   EnvelopeSimple, CalendarBlank, Storefront, Receipt, ClockCounterClockwise,
-  ArrowsDownUp, LinkSimple, Copy, Check,
+  ArrowsDownUp, LinkSimple, Copy, Check, ListChecks,
 } from "@phosphor-icons/react";
 import { toast } from "react-toastify";
 import api from "@/lib/api";
@@ -66,6 +66,12 @@ export default function AdminClientsPage() {
   const lihatSebagai = (r) => {
     enterViewAs({ user_id: r.user_id, name: r.name, nickname: r.nickname });
     navigate("/dashboard");
+  };
+
+  /** Point the tools at this client and open their batch plan. */
+  const produksi = (r) => {
+    setActiveClient({ user_id: r.user_id, name: r.name, nickname: r.nickname, status: r.status, counter: r.counter, total_feeds: r.total_feeds, lengkap: r.kelengkapan?.lengkap });
+    navigate("/produksi");
   };
 
   const load = async () => {
@@ -151,7 +157,7 @@ export default function AdminClientsPage() {
         <>
           <div className="mt-4 text-xs text-stone-400">{shown.length} dari {rows.length} klien</div>
           <div className="mt-3 space-y-3">
-            {shown.map((r) => <RowKlien key={r.user_id} r={r} onOpen={() => setOpen(r.user_id)} onPreview={() => lihatSebagai(r)} />)}
+            {shown.map((r) => <RowKlien key={r.user_id} r={r} onOpen={() => setOpen(r.user_id)} onPreview={() => lihatSebagai(r)} onProduksi={() => produksi(r)} />)}
           </div>
         </>
       )}
@@ -160,7 +166,7 @@ export default function AdminClientsPage() {
   );
 }
 
-function RowKlien({ r, onOpen, onPreview }) {
+function RowKlien({ r, onOpen, onPreview, onProduksi }) {
   const st = statusStyle(r.status);
   const pct = r.total_feeds ? Math.round((r.counter / r.total_feeds) * 100) : 0;
   const hari = umur(r.created_at);
@@ -234,6 +240,14 @@ function RowKlien({ r, onOpen, onPreview }) {
               data-testid="klien-pakai-brand"
             >
               <Palette size={14} weight="duotone" />
+            </button>
+            <button
+              onClick={onProduksi}
+              className="grid h-9 w-9 place-items-center rounded-full border border-brand-sand text-stone-500 hover:border-brand hover:text-brand"
+              title="Produksi Batch"
+              data-testid="klien-produksi"
+            >
+              <ListChecks size={14} weight="duotone" />
             </button>
             <button onClick={onOpen} className="flex-1 rounded-full bg-brand px-4 py-2 text-xs font-semibold text-brand-cream hover:bg-brand-light" data-testid="klien-detail">
               Kelola
@@ -320,6 +334,7 @@ function DetailKlien({ userId, onBack }) {
             Lihat sebagai klien
           </Btn>
           <Btn onClick={() => setActiveClient({ user_id: userId, name: u.name, nickname: c.nickname, status: c.status, counter: c.counter, total_feeds: c.total_feeds, lengkap: k.lengkap }) || toast.success("Tools memakai brand ini")} icon={Palette}>Pakai di tools</Btn>
+          <Btn onClick={() => { setActiveClient({ user_id: userId, name: u.name, nickname: c.nickname, status: c.status, counter: c.counter, total_feeds: c.total_feeds, lengkap: k.lengkap }); navigate("/produksi"); }} icon={ListChecks}>Produksi Batch</Btn>
           <Btn onClick={() => exportBriefPdf(d)} icon={FilePdf}>Cetak brief</Btn>
           <button onClick={toggleAktif} className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold ${
             c.status === "nonaktif" ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border border-red-200 text-red-600 hover:bg-red-50"

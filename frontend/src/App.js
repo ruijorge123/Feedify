@@ -29,6 +29,7 @@ const ClientOrdersPage      = lazy(() => import("@/pages/ClientOrdersPage"));
 const InactiveAccountPage   = lazy(() => import("@/pages/InactiveAccountPage"));
 const AdminClientsPage      = lazy(() => import("@/pages/AdminClientsPage"));
 const CommandLibraryPage    = lazy(() => import("@/pages/CommandLibraryPage"));
+const ProduksiBatchPage     = lazy(() => import("@/pages/ProduksiBatchPage"));
 const BannerGeneratorPage   = lazy(() => import("@/pages/BannerGeneratorPage"));
 const CarouselGeneratorPage = lazy(() => import("@/pages/CarouselGeneratorPage"));
 const CopywritingPage       = lazy(() => import("@/pages/CopywritingPage"));
@@ -207,6 +208,7 @@ function App() {
               <Route path="/more"                  element={<AdminRoute><MorePage /></AdminRoute>} />
               <Route path="/klien"                 element={<AdminRoute><AdminClientsPage /></AdminRoute>} />
               <Route path="/command-library"       element={<AdminRoute><CommandLibraryPage /></AdminRoute>} />
+              <Route path="/produksi"              element={<AdminRoute><ProduksiBatchPage /></AdminRoute>} />
               <Route path="/admin"                 element={<AdminRoute><AdminPinGate><AdminPage /></AdminPinGate></AdminRoute>} />
               
             </Route>
