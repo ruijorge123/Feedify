@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { resetClientScopedCache } from "@/lib/queryClient";
 
 const KEY = "feedify_active_client";
 
@@ -49,7 +50,11 @@ export function brandEditPath(client = _selected) {
 }
 
 export function setActiveClient(client) {
+  const changed = (client?.user_id || null) !== (_selected?.user_id || null);
   _selected = client || null;
+  // Cached products etc. belong to the previous pick — drop them so no tool
+  // offers another brand's products. (A rename of the same pick keeps them.)
+  if (changed) resetClientScopedCache();
   try {
     if (_selected) localStorage.setItem(KEY, JSON.stringify(_selected));
     else localStorage.removeItem(KEY);

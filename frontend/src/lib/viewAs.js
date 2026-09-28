@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { resetClientScopedCache } from "@/lib/queryClient";
 
 const KEY = "feedify_view_as";
 
@@ -38,7 +39,10 @@ export function getViewAs() {
 }
 
 export function enterViewAs(client) {
+  const changed = (client?.user_id || null) !== (_client?.user_id || null);
   _client = client || null;
+  // View-as also changes X-Client-Id; the cached data is the previous identity's.
+  if (changed) resetClientScopedCache();
   try {
     if (_client) localStorage.setItem(KEY, JSON.stringify(_client));
     else localStorage.removeItem(KEY);
